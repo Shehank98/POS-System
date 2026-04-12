@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, authApi } from '../api/client';
 import useAuthStore from '../store/authStore';
+import { getReceiptSize, setReceiptSize, getAutoPrint, setAutoPrint } from '../utils/receipt';
 
 function SubscriptionBanner({ user }) {
   if (!user) return null;
@@ -259,6 +260,73 @@ export default function SettingsPage() {
           </ul>
         </div>
       )}
+
+      {/* ── Receipt Settings ─────────────────────────────────── */}
+      <ReceiptSettings />
+    </div>
+  );
+}
+
+function ReceiptSettings() {
+  const [size,      setSize]      = useState(getReceiptSize);
+  const [autoPrint, setAutoPrint_] = useState(getAutoPrint);
+
+  function handleSize(val) {
+    setSize(val);
+    setReceiptSize(val);
+    toast.success('Receipt size saved');
+  }
+
+  function handleAutoPrint(e) {
+    const v = e.target.checked;
+    setAutoPrint_(v);
+    setAutoPrint(v);
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+        <Printer className="w-4 h-4 text-gray-400" />
+        <h2 className="text-sm font-semibold text-gray-700">Receipt Settings</h2>
+      </div>
+      <div className="px-4 py-4 space-y-4">
+        <div>
+          <label className="label">Receipt size</label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: '',      label: '80mm Thermal' },
+              { id: 'narrow', label: '58mm Thermal' },
+              { id: 'a4',    label: 'A4 Paper' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                className={`flex flex-col items-center gap-1 py-3 rounded-lg border text-xs
+                  font-medium transition-colors
+                  ${size === id
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => handleSize(id)}
+              >
+                <Printer className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded accent-primary-600"
+            checked={autoPrint}
+            onChange={handleAutoPrint}
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-700">Auto-print after sale</p>
+            <p className="text-xs text-gray-400">Opens browser print dialog automatically</p>
+          </div>
+        </label>
+      </div>
     </div>
   );
 }

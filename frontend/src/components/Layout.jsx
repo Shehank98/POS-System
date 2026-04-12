@@ -7,10 +7,11 @@ import { useState } from 'react';
 import useAuthStore from '../store/authStore';
 
 const NAV = [
-  { to: '/products',  label: 'Products',  icon: Package       },
-  { to: '/pos',       label: 'POS / Sale', icon: ShoppingCart  },
-  { to: '/reports',   label: 'Reports',   icon: Receipt       },
-  { to: '/settings',  label: 'Settings',  icon: Settings      },
+  { to: '/pos',          label: 'POS / Sale',    icon: ShoppingCart },
+  { to: '/products',     label: 'Products',      icon: Package      },
+  { to: '/transactions', label: 'Transactions',  icon: Receipt      },
+  { to: '/reports',      label: 'Reports',       icon: LayoutDashboard },
+  { to: '/settings',     label: 'Settings',      icon: Settings     },
 ];
 
 export default function Layout() {

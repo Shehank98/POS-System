@@ -4,9 +4,10 @@ import useAuthStore from './store/authStore';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import ProductsPage from './pages/ProductsPage';
+import POSPage from './pages/POSPage';
+import TransactionsPage from './pages/TransactionsPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Placeholder pages for routes that come in later phases
 function ComingSoon({ title }) {
   return (
     <div className="flex flex-col items-center justify-center h-64 text-gray-400 space-y-2">
@@ -16,7 +17,6 @@ function ComingSoon({ title }) {
   );
 }
 
-// Redirect to login if not authenticated
 function PrivateRoute({ children }) {
   const user = useAuthStore((s) => s.user);
   return user ? children : <Navigate to="/login" replace />;
@@ -43,11 +43,12 @@ export default function App() {
             </PrivateRoute>
           }
         >
-          <Route index           element={<Navigate to="/products" replace />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="pos"      element={<ComingSoon title="POS Terminal" />} />
-          <Route path="reports"  element={<ComingSoon title="Reports" />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route index              element={<Navigate to="/pos" replace />} />
+          <Route path="pos"         element={<POSPage />} />
+          <Route path="products"    element={<ProductsPage />} />
+          <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="reports"     element={<ComingSoon title="Reports" />} />
+          <Route path="settings"    element={<SettingsPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
