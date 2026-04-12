@@ -1,6 +1,7 @@
-const router    = require('express').Router();
-const adminAuth = require('../middleware/adminAuth');
-const ctrl      = require('../controllers/adminController');
+const router      = require('express').Router();
+const adminAuth   = require('../middleware/adminAuth');
+const ctrl        = require('../controllers/adminController');
+const auditCtrl   = require('../controllers/auditController');
 
 // Public admin login
 router.post('/login', ctrl.adminLogin);
@@ -23,5 +24,8 @@ router.get('/payments',                     ctrl.listPayments);
 router.get('/payments/:id/proof',           ctrl.getPaymentProof);
 router.put('/payments/:id/verify',          ctrl.verifyPayment);
 router.put('/payments/:id/reject',          ctrl.rejectPayment);
+
+// Audit log (all shops)
+router.get('/audit-log',                    auditCtrl.getAdminAuditLog);
 
 module.exports = router;

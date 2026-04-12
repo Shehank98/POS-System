@@ -26,11 +26,12 @@ client.interceptors.response.use(
 
 // ── Auth ─────────────────────────────────────────────────────
 export const authApi = {
-  login:        (data) => client.post('/auth/login', data),
-  me:           ()     => client.get('/auth/me'),
-  registerUser: (data) => client.post('/auth/register-user', data),
-  listUsers:    ()     => client.get('/auth/users'),
-  deleteUser:   (id)   => client.delete(`/auth/users/${id}`),
+  login:          (data) => client.post('/auth/login', data),
+  me:             ()     => client.get('/auth/me'),
+  registerUser:   (data) => client.post('/auth/register-user', data),
+  listUsers:      ()     => client.get('/auth/users'),
+  deleteUser:     (id)   => client.delete(`/auth/users/${id}`),
+  updateSettings: (data) => client.put('/auth/settings', data),
 };
 
 // ── Products ─────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export const transactionsApi = {
   summary: (params) => client.get('/transactions/summary', { params }),
   create:  (data)   => client.post('/transactions', data),
   void:    (id)     => client.post(`/transactions/${id}/void`),
+  refund:  (id, data) => client.post(`/transactions/${id}/refund`, data),
   sync:    (txns)   => client.post('/transactions/sync', { transactions: txns }),
 };
 
@@ -62,7 +64,7 @@ export const dashboardApi = {
   lowStock: (threshold = 10) => client.get('/dashboard/low-stock', { params: { threshold } }),
 };
 
-// ── Reports (file downloads – return raw Blob) ────────────────
+// ── Reports ───────────────────────────────────────────────────
 export const reportsApi = {
   sales: async (startDate, endDate, format = 'excel') => {
     const res = await client.get('/reports/sales', {
@@ -75,6 +77,8 @@ export const reportsApi = {
     const res = await client.get('/reports/inventory', { responseType: 'blob' });
     return res.data;
   },
+  taxReport: (startDate, endDate) =>
+    client.get('/reports/tax', { params: { start_date: startDate, end_date: endDate } }),
 };
 
 // ── Notifications ─────────────────────────────────────────────
@@ -82,6 +86,11 @@ export const notificationsApi = {
   list:       ()   => client.get('/notifications'),
   markRead:   (id) => client.put(`/notifications/${id}/read`),
   markAllRead: ()  => client.put('/notifications/read-all'),
+};
+
+// ── Audit Log (shop-level) ────────────────────────────────────
+export const auditApi = {
+  list: (params) => client.get('/audit-log', { params }),
 };
 
 // ── Payments (shop subscription payments) ────────────────────
@@ -120,6 +129,7 @@ export const adminApi = {
   getProof:       (id)   => adminClient.get(`/admin/payments/${id}/proof`),
   verifyPayment:  (id)   => adminClient.put(`/admin/payments/${id}/verify`),
   rejectPayment:  (id, data) => adminClient.put(`/admin/payments/${id}/reject`, data),
+  getAuditLog:    (params) => adminClient.get('/admin/audit-log', { params }),
 };
 
 export default client;

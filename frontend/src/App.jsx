@@ -11,6 +11,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import BillingPage from './pages/BillingPage';
+import AuditLogPage from './pages/AuditLogPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="reports"     element={<ReportsPage />} />
           <Route path="billing"     element={<BillingPage />} />
+          <Route path="audit-log"   element={<AuditLogPage />} />
           <Route path="settings"    element={<SettingsPage />} />
         </Route>
 

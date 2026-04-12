@@ -14,7 +14,7 @@ async function login(req, res) {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.password_hash, u.role, u.shop_id,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
-              s.barcode_enabled
+              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.username = $1 AND u.shop_id = $2`,
@@ -72,6 +72,7 @@ async function login(req, res) {
         subscription_status:   user.subscription_status,
         subscription_end_date: user.subscription_end_date,
         barcode_enabled:       user.barcode_enabled,
+        default_tax_rate:      parseFloat(user.default_tax_rate) || 0,
         read_only:             readOnly,
       },
     });
@@ -124,7 +125,7 @@ async function getMe(req, res) {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.role, u.shop_id, u.created_at,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
-              s.barcode_enabled
+              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,
@@ -177,4 +178,27 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = { login, registerUser, getMe, listUsers, deleteUser };
+// ── PUT /api/settings ────────────────────────────────────────
+// Shop owner updates shop-level settings (default tax rate, etc.)
+async function updateSettings(req, res) {
+  if (req.user.role !== 'owner') {
+    return res.status(403).json({ error: 'Only owners can update shop settings' });
+  }
+  const { default_tax_rate } = req.body;
+  const rate = parseFloat(default_tax_rate);
+  if (isNaN(rate) || rate < 0 || rate > 100) {
+    return res.status(400).json({ error: 'default_tax_rate must be between 0 and 100' });
+  }
+  try {
+    await db.query(
+      `UPDATE shops SET default_tax_rate = $1 WHERE id = $2`,
+      [rate, req.shopId]
+    );
+    res.json({ default_tax_rate: rate });
+  } catch (err) {
+    console.error('updateSettings error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { login, registerUser, getMe, listUsers, deleteUser, updateSettings };

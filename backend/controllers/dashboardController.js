@@ -11,6 +11,9 @@ async function getToday(req, res) {
            COALESCE(SUM(total_amount)    FILTER (WHERE status = 'completed'), 0)     AS total_sales,
            COALESCE(SUM(tax_amount)      FILTER (WHERE status = 'completed'), 0)     AS total_tax,
            COALESCE(SUM(discount_amount) FILTER (WHERE status = 'completed'), 0)     AS total_discounts,
+           COALESCE(ABS(SUM(total_amount) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL)), 0) AS total_refunds,
+           COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed'), 0)
+             + COALESCE(SUM(total_amount) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL), 0) AS net_sales,
            COALESCE(SUM(total_amount)    FILTER (WHERE status = 'completed'
                                                   AND payment_method = 'cash'), 0)  AS cash_sales,
            COALESCE(SUM(total_amount)    FILTER (WHERE status = 'completed'

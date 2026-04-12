@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react';
 import {
   Search, Receipt, Printer, Ban, ChevronLeft, ChevronRight,
-  RefreshCw, X, Calendar,
+  RefreshCw, X, RotateCcw, TrendingDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 import { openReceipt } from '../utils/receipt';
 import ConfirmDialog from '../components/ConfirmDialog';
+import RefundModal from '../components/RefundModal';
 
 const LIMIT = 30;
 const fmt   = (n) => Number(n || 0).toFixed(2);
+const fmtN  = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 function StatusBadge({ status }) {
   const map = {
     completed: 'badge-active',
     void:      'badge-expired',
-    refunded:  'badge-trial',
+    refunded:  'bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium',
   };
   return <span className={map[status] || 'badge-trial'}>{status}</span>;
 }
@@ -37,8 +39,9 @@ function PayBadge({ method }) {
 }
 
 export default function TransactionsPage() {
-  const user     = useAuthStore((s) => s.user);
-  const canVoid  = !user?.read_only && ['owner', 'manager'].includes(user?.role);
+  const user       = useAuthStore((s) => s.user);
+  const canVoid    = !user?.read_only && ['owner', 'manager'].includes(user?.role);
+  const canRefund  = !user?.read_only && ['owner', 'manager'].includes(user?.role);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -51,8 +54,9 @@ export default function TransactionsPage() {
   const [endDate,      setEndDate]      = useState(today);
   const [filterMethod, setFilterMethod] = useState('');
   const [voidId,       setVoidId]       = useState(null);
-  const [expanded,     setExpanded]     = useState(null); // expanded row id
-  const [expandItems,  setExpandItems]  = useState({});   // txn_id → items[]
+  const [refundTxn,    setRefundTxn]    = useState(null);
+  const [expanded,     setExpanded]     = useState(null);
+  const [expandItems,  setExpandItems]  = useState({});
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
@@ -112,14 +116,20 @@ export default function TransactionsPage() {
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: 'Total Sales',   value: summary.total_transactions,  cls: 'text-gray-900' },
-            { label: 'Revenue',       value: fmt(summary.total_revenue),   cls: 'text-primary-700' },
-            { label: 'Tax collected', value: fmt(summary.total_tax),       cls: 'text-gray-700' },
-            { label: 'Voided',        value: summary.voided_transactions,  cls: 'text-red-600' },
+            { label: 'Total Sales',   value: summary.total_transactions, cls: 'text-gray-900'    },
+            { label: 'Net Revenue',   value: fmtN(summary.net_revenue),  cls: 'text-primary-700' },
+            { label: 'Tax Collected', value: fmt(summary.total_tax),      cls: 'text-gray-700'   },
+            { label: 'Refunds',       value: summary.refund_transactions, cls: 'text-blue-600'   },
           ].map(({ label, value, cls }) => (
             <div key={label} className="card p-4">
               <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
               <p className={`text-2xl font-bold mt-1 ${cls}`}>{value}</p>
+              {label === 'Net Revenue' && Number(summary.total_refunds) > 0 && (
+                <p className="text-xs text-blue-500 mt-0.5 flex items-center gap-1">
+                  <TrendingDown className="w-3 h-3" />
+                  -{fmtN(summary.total_refunds)} refunded
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -154,7 +164,11 @@ export default function TransactionsPage() {
             </button>
             <button
               className="btn-secondary"
-              onClick={() => { setStartDate(today); setEndDate(today); setFilterMethod(''); setPage(1); load({ page: 1, start_date: today, end_date: today, payment_method: undefined }); }}
+              onClick={() => {
+                setStartDate(today); setEndDate(today);
+                setFilterMethod(''); setPage(1);
+                load({ page: 1, start_date: today, end_date: today, payment_method: undefined });
+              }}
             >
               Today
             </button>
@@ -189,11 +203,15 @@ export default function TransactionsPage() {
                 <>
                   <tr
                     key={t.id}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className={`hover:bg-gray-50 cursor-pointer
+                      ${t.status === 'refunded' && t.refund_of ? 'bg-blue-50/30' : ''}`}
                     onClick={() => toggleExpand(t.id)}
                   >
                     <td className="px-4 py-3 font-mono text-xs text-gray-600">
                       {t.transaction_number}
+                      {t.refund_of && (
+                        <span className="ml-1 text-blue-500">(refund)</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500 hidden sm:table-cell text-xs">
                       {new Date(t.transaction_date).toLocaleString()}
@@ -202,7 +220,11 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-center">
                       <PayBadge method={t.payment_method} />
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold">{fmt(t.total_amount)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold
+                      ${t.refund_of ? 'text-blue-600' : ''}`}>
+                      {t.refund_of && Number(t.total_amount) < 0 ? '-' : ''}
+                      {fmt(Math.abs(t.total_amount))}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={t.status} />
                     </td>
@@ -216,7 +238,17 @@ export default function TransactionsPage() {
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        {canVoid && t.status === 'completed' && (
+                        {canRefund && t.status === 'completed' && !t.refund_of && (
+                          <button
+                            className="p-1.5 rounded hover:bg-blue-50 text-gray-400
+                                       hover:text-blue-600"
+                            title="Process refund"
+                            onClick={() => setRefundTxn(t)}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canVoid && t.status === 'completed' && !t.refund_of && (
                           <button
                             className="p-1.5 rounded hover:bg-red-50 text-gray-400
                                        hover:text-red-600"
@@ -248,7 +280,7 @@ export default function TransactionsPage() {
                             <tbody>
                               {expandItems[t.id].map((i) => (
                                 <tr key={i.id}>
-                                  <td className="py-0.5">{i.product_name}</td>
+                                  <td className="py-0.5">{i.product_name || 'Deleted product'}</td>
                                   <td className="text-right">{i.quantity}</td>
                                   <td className="text-right">{fmt(i.unit_price)}</td>
                                   <td className="text-right text-orange-500">
@@ -296,6 +328,14 @@ export default function TransactionsPage() {
           message="Void this transaction? Stock will be restored. This cannot be undone."
           onConfirm={handleVoid}
           onCancel={() => setVoidId(null)}
+        />
+      )}
+
+      {refundTxn && (
+        <RefundModal
+          transaction={refundTxn}
+          onClose={() => setRefundTxn(null)}
+          onDone={() => { setRefundTxn(null); load(); }}
         />
       )}
     </div>

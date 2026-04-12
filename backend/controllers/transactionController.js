@@ -232,12 +232,149 @@ async function voidTransaction(req, res) {
       [req.params.id]
     );
 
+    // Audit trail
+    await client.query(
+      `INSERT INTO deleted_records (shop_id, record_type, record_id, deleted_by, original_data)
+       VALUES ($1, 'transaction_void', $2, $3, $4)`,
+      [req.shopId, rows[0].id, req.user.id, JSON.stringify(rows[0])]
+    );
+
     await client.query('COMMIT');
     res.json(updated[0]);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('voidTransaction error:', err);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+}
+
+// ── POST /api/transactions/:id/refund ─────────────────────────
+async function refundTransaction(req, res) {
+  const { items: refundItems, reason = '' } = req.body;
+
+  if (!Array.isArray(refundItems) || refundItems.length === 0) {
+    return res.status(400).json({ error: 'items array is required' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch original transaction
+    const { rows: txnRows } = await client.query(
+      `SELECT * FROM transactions WHERE id = $1 AND shop_id = $2`,
+      [req.params.id, req.shopId]
+    );
+    if (txnRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    const original = txnRows[0];
+    if (original.status === 'void') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cannot refund a voided transaction' });
+    }
+
+    // Fetch original line items
+    const { rows: origItems } = await client.query(
+      `SELECT ti.*, p.has_inventory, p.tax_rate
+         FROM transaction_items ti
+         LEFT JOIN products p ON p.id = ti.product_id
+        WHERE ti.transaction_id = $1`,
+      [original.id]
+    );
+
+    // Validate refund items and build enriched list
+    let refundSubtotal = 0;
+    let refundTax = 0;
+    const enriched = [];
+
+    for (const ri of refundItems) {
+      const orig = origItems.find((o) => o.id === ri.transaction_item_id);
+      if (!orig) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Line item ${ri.transaction_item_id} not found in original transaction`,
+        });
+      }
+      const qty = parseFloat(ri.quantity) || orig.quantity;
+      if (qty > parseFloat(orig.quantity)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Cannot refund more than original quantity for item ${orig.id}`,
+        });
+      }
+
+      // Proportional unit price & discount
+      const ratio    = qty / parseFloat(orig.quantity);
+      const subtotal = parseFloat(orig.subtotal) * ratio;
+      const taxRate  = parseFloat(orig.tax_rate || 0);
+      const taxAmt   = (parseFloat(orig.unit_price) * qty - parseFloat(orig.discount) * ratio)
+                       * (taxRate / 100);
+
+      refundSubtotal += subtotal;
+      refundTax      += taxAmt;
+
+      enriched.push({
+        product_id: orig.product_id,
+        quantity:   qty,
+        unit_price: orig.unit_price,
+        discount:   parseFloat(orig.discount) * ratio,
+        subtotal,
+        has_inventory: orig.has_inventory,
+      });
+    }
+
+    const refundTotal  = -(refundSubtotal + refundTax); // negative
+    const txnNumber    = `REF-${original.transaction_number}`;
+
+    // Create refund transaction (negative total)
+    const { rows: refRows } = await client.query(
+      `INSERT INTO transactions
+         (shop_id, user_id, transaction_number, total_amount, tax_amount,
+          discount_amount, payment_method, status, refund_of)
+       VALUES ($1,$2,$3,$4,$5,0,$6,'refunded',$7)
+       RETURNING *`,
+      [req.shopId, req.user.id, txnNumber, refundTotal, -refundTax,
+       original.payment_method, original.id]
+    );
+    const refundTxn = refRows[0];
+
+    // Insert refund line items and restore stock
+    for (const item of enriched) {
+      await client.query(
+        `INSERT INTO transaction_items
+           (transaction_id, product_id, quantity, unit_price, discount, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [refundTxn.id, item.product_id, item.quantity,
+         item.unit_price, item.discount, item.subtotal]
+      );
+
+      if (item.has_inventory && item.product_id) {
+        await client.query(
+          `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
+          [item.quantity, item.product_id]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const { rows: fullItems } = await db.query(
+      `SELECT ti.*, p.name AS product_name
+         FROM transaction_items ti
+         LEFT JOIN products p ON p.id = ti.product_id
+        WHERE ti.transaction_id = $1`,
+      [refundTxn.id]
+    );
+
+    res.status(201).json({ ...refundTxn, items: fullItems, reason });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('refundTransaction error:', err);
+    res.status(500).json({ error: 'Server error creating refund' });
   } finally {
     client.release();
   }
@@ -268,6 +405,10 @@ async function getSummary(req, res) {
          COALESCE(SUM(tax_amount)   FILTER (WHERE status = 'completed'), 0) AS total_tax,
          COALESCE(SUM(discount_amount) FILTER (WHERE status='completed'), 0) AS total_discounts,
          COUNT(*) FILTER (WHERE status = 'void')                   AS voided_transactions,
+         COUNT(*) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL) AS refund_transactions,
+         COALESCE(ABS(SUM(total_amount) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL)), 0) AS total_refunds,
+         COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed'), 0)
+           + COALESCE(SUM(total_amount) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL), 0) AS net_revenue,
          COUNT(*) FILTER (WHERE payment_method='cash' AND status='completed')   AS cash_count,
          COUNT(*) FILTER (WHERE payment_method='card' AND status='completed')   AS card_count,
          COUNT(*) FILTER (WHERE payment_method='mobile' AND status='completed') AS mobile_count
@@ -433,5 +574,5 @@ async function syncTransactions(req, res) {
 
 module.exports = {
   createTransaction, listTransactions, getTransaction,
-  voidTransaction, getSummary, syncTransactions,
+  voidTransaction, refundTransaction, getSummary, syncTransactions,
 };

@@ -225,9 +225,11 @@ export default function DashboardPage() {
       {/* Today stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Today's Revenue"
-          value={fmtN(summary.total_sales)}
-          sub={`Tax: ${fmt(summary.total_tax)}`}
+          label="Net Revenue"
+          value={fmtN(summary.net_sales ?? summary.total_sales)}
+          sub={Number(summary.total_refunds) > 0
+            ? `−${fmtN(summary.total_refunds)} refunded`
+            : `Tax: ${fmt(summary.total_tax)}`}
           icon={TrendingUp}
           color="primary"
           loading={loadingToday}

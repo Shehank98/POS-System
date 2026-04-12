@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, authApi } from '../api/client';
 import useAuthStore from '../store/authStore';
@@ -127,6 +127,9 @@ export default function SettingsPage() {
 
       {/* Subscription info */}
       <SubscriptionBanner user={user} />
+
+      {/* Default tax rate (owner only) */}
+      {canEdit && <TaxRateSettings />}
 
       {/* Account info */}
       <div className="card p-4 space-y-2">
@@ -263,6 +266,62 @@ export default function SettingsPage() {
 
       {/* ── Receipt Settings ─────────────────────────────────── */}
       <ReceiptSettings />
+    </div>
+  );
+}
+
+function TaxRateSettings() {
+  const user        = useAuthStore((s) => s.user);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const [rate,    setRate]    = useState(String(user?.default_tax_rate ?? 0));
+  const [saving,  setSaving]  = useState(false);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await authApi.updateSettings({ default_tax_rate: parseFloat(rate) || 0 });
+      await refreshUser();
+      toast.success('Default tax rate saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+        <Percent className="w-4 h-4 text-gray-400" />
+        <h2 className="text-sm font-semibold text-gray-700">Default Tax Rate</h2>
+      </div>
+      <form onSubmit={handleSave} className="px-4 py-4 space-y-3">
+        <p className="text-xs text-gray-500">
+          New products will use this tax rate by default. You can override it per product.
+        </p>
+        <div className="flex items-center gap-3">
+          <div className="relative w-32">
+            <input
+              className="input pr-7"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              placeholder="0"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+          </div>
+          <button type="submit" className="btn-primary text-sm py-2" disabled={saving}>
+            {saving
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+              : <><Save className="w-3.5 h-3.5" /> Save</>
+            }
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

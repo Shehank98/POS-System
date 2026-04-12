@@ -309,4 +309,77 @@ function numberCol(ws, key) {
   ws.getColumn(key).numFmt = '#,##0.00';
 }
 
-module.exports = { exportSales, exportInventory };
+// ── GET /api/reports/tax ──────────────────────────────────────
+async function getTaxReport(req, res) {
+  const { start_date, end_date } = req.query;
+  if (!start_date || !end_date) {
+    return res.status(400).json({ error: 'start_date and end_date are required' });
+  }
+
+  try {
+    const [summaryRes, byDayRes, byRateRes] = await Promise.all([
+      // Overall totals
+      db.query(
+        `SELECT
+           COUNT(*)                                   AS total_transactions,
+           COALESCE(SUM(total_amount),    0)          AS total_revenue,
+           COALESCE(SUM(tax_amount),      0)          AS total_tax_collected,
+           COALESCE(SUM(total_amount) - SUM(tax_amount) - SUM(discount_amount), 0)
+                                                      AS taxable_sales
+           FROM transactions
+          WHERE shop_id  = $1
+            AND status   = 'completed'
+            AND transaction_date >= $2
+            AND transaction_date <= ($3::date + INTERVAL '1 day' - INTERVAL '1 second')`,
+        [req.shopId, start_date, end_date]
+      ),
+
+      // Daily breakdown
+      db.query(
+        `SELECT DATE(transaction_date AT TIME ZONE 'UTC') AS day,
+                COUNT(*)                      AS transactions,
+                COALESCE(SUM(total_amount),0) AS revenue,
+                COALESCE(SUM(tax_amount),  0) AS tax_amount
+           FROM transactions
+          WHERE shop_id  = $1
+            AND status   = 'completed'
+            AND transaction_date >= $2
+            AND transaction_date <= ($3::date + INTERVAL '1 day' - INTERVAL '1 second')
+          GROUP BY day
+          ORDER BY day ASC`,
+        [req.shopId, start_date, end_date]
+      ),
+
+      // Breakdown by product tax rate
+      db.query(
+        `SELECT p.tax_rate,
+                COUNT(DISTINCT t.id)          AS transactions,
+                COALESCE(SUM(ti.subtotal), 0) AS taxable_amount,
+                COALESCE(SUM(ti.subtotal * p.tax_rate / 100), 0) AS tax_amount
+           FROM transaction_items ti
+           JOIN transactions t ON t.id = ti.transaction_id
+           JOIN products      p ON p.id = ti.product_id
+          WHERE t.shop_id = $1
+            AND t.status  = 'completed'
+            AND t.transaction_date >= $2
+            AND t.transaction_date <= ($3::date + INTERVAL '1 day' - INTERVAL '1 second')
+            AND p.tax_rate > 0
+          GROUP BY p.tax_rate
+          ORDER BY p.tax_rate ASC`,
+        [req.shopId, start_date, end_date]
+      ),
+    ]);
+
+    res.json({
+      period: { start: start_date, end: end_date },
+      summary:      summaryRes.rows[0],
+      by_day:       byDayRes.rows,
+      by_tax_rate:  byRateRes.rows,
+    });
+  } catch (err) {
+    console.error('getTaxReport error:', err);
+    res.status(500).json({ error: 'Failed to generate tax report' });
+  }
+}
+
+module.exports = { exportSales, exportInventory, getTaxReport };

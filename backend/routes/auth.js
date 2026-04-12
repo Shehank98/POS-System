@@ -34,4 +34,12 @@ router.delete(
   ctrl.deleteUser
 );
 
+// Shop settings (owner only)
+router.put(
+  '/settings',
+  authMiddleware,
+  shopIsolation,
+  ctrl.updateSettings
+);
+
 module.exports = router;

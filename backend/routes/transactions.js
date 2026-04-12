@@ -14,5 +14,6 @@ router.get('/:id',           ctrl.getTransaction);
 router.post('/sync',         readOnlyGuard, ctrl.syncTransactions);   // offline sync
 router.post('/',             readOnlyGuard, ctrl.createTransaction);
 router.post('/:id/void',     readOnlyGuard, requireRole('owner', 'manager'), ctrl.voidTransaction);
+router.post('/:id/refund',   readOnlyGuard, requireRole('owner', 'manager'), ctrl.refundTransaction);
 
 module.exports = router;

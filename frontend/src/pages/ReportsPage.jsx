@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Download, FileSpreadsheet, FileText, Calendar,
-  TrendingUp, Package, Loader2, CheckCircle2,
+  TrendingUp, Package, Loader2, Percent,
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import { reportsApi, transactionsApi } from '../api/client';
@@ -81,6 +81,21 @@ export default function ReportsPage() {
       alert('Export failed. Please try again.');
     } finally {
       setLoading('');
+    }
+  }
+
+  const [taxSummary,     setTaxSummary]     = useState(null);
+  const [loadingTax,     setLoadingTax]     = useState(false);
+
+  async function fetchTaxReport() {
+    setLoadingTax(true);
+    try {
+      const { data } = await reportsApi.taxReport(startDate, endDate);
+      setTaxSummary(data);
+    } catch {
+      alert('Failed to load tax report');
+    } finally {
+      setLoadingTax(false);
     }
   }
 
@@ -241,6 +256,87 @@ export default function ReportsPage() {
             : <><Download className="w-4 h-4" /> Download Inventory Excel</>
           }
         </button>
+      </div>
+
+      {/* ── Tax Report ────────────────────────────────────── */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Percent className="w-5 h-5 text-purple-500" />
+          <h2 className="font-semibold text-gray-800">Tax Report</h2>
+        </div>
+
+        <p className="text-sm text-gray-500">
+          Shows total tax collected, breakdown by day and by tax rate.
+          Uses the same date range as the Sales Report above.
+        </p>
+
+        <button
+          className="btn-secondary text-sm"
+          onClick={fetchTaxReport}
+          disabled={!canExport || loadingTax}
+        >
+          {loadingTax
+            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</>
+            : 'View Tax Report'
+          }
+        </button>
+
+        {taxSummary && (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { label: 'Tax Collected',   val: fmtN(taxSummary.summary?.total_tax_collected) },
+                { label: 'Taxable Sales',   val: fmtN(taxSummary.summary?.taxable_sales) },
+                { label: 'Transactions',    val: taxSummary.summary?.total_transactions },
+              ].map(({ label, val }) => (
+                <div key={label} className="bg-purple-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-purple-500 uppercase tracking-wide">{label}</p>
+                  <p className="text-lg font-bold text-purple-800 mt-0.5">{val}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* By tax rate */}
+            {taxSummary.by_tax_rate?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  By Tax Rate
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-500 text-xs">
+                        <th className="text-left px-3 py-2">Rate</th>
+                        <th className="text-right px-3 py-2">Taxable Amount</th>
+                        <th className="text-right px-3 py-2">Tax Collected</th>
+                        <th className="text-right px-3 py-2">Transactions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {taxSummary.by_tax_rate.map((r) => (
+                        <tr key={r.tax_rate}>
+                          <td className="px-3 py-2 font-medium">{r.tax_rate}%</td>
+                          <td className="px-3 py-2 text-right">{fmtN(r.taxable_amount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-purple-700">
+                            {fmtN(r.tax_amount)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-400">{r.transactions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {taxSummary.by_tax_rate?.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-4">
+                No taxable sales found for this period.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

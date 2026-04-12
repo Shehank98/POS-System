@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Package, Settings, LogOut,
-  LayoutDashboard, Receipt, Menu, X, CreditCard,
+  LayoutDashboard, Receipt, Menu, X, CreditCard, ClipboardList,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/transactions', label: 'Transactions',  icon: Receipt         },
   { to: '/reports',      label: 'Reports',       icon: LayoutDashboard },
   { to: '/billing',      label: 'Billing',       icon: CreditCard      },
+  { to: '/audit-log',    label: 'Audit Log',     icon: ClipboardList,  roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',      icon: Settings        },
 ];
 
@@ -67,7 +68,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {NAV.filter(({ roles }) => !roles || roles.includes(user?.role)).map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -138,7 +139,7 @@ export default function Layout() {
             onClick={(e) => e.stopPropagation()}
           >
             <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-              {NAV.map(({ to, label, icon: Icon }) => (
+              {NAV.filter(({ roles }) => !roles || roles.includes(user?.role)).map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}

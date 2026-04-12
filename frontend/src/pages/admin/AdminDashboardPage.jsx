@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Store, CreditCard, CheckCircle2, XCircle,
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
-  AlertTriangle, Users,
+  AlertTriangle, Users, ClipboardList,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -119,18 +119,78 @@ function RejectModal({ paymentId, onClose, onDone }) {
   );
 }
 
+const AUDIT_TYPE_LABELS = {
+  product:          'Product Deleted',
+  transaction_void: 'Transaction Voided',
+};
+
+function AuditRow({ record: r, preview }) {
+  const [open, setOpen] = useState(false);
+  const typeLabel = AUDIT_TYPE_LABELS[r.record_type] || r.record_type;
+  const dateStr   = r.deleted_at
+    ? new Date(r.deleted_at).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : '—';
+
+  return (
+    <>
+      <tr className="hover:bg-gray-750 transition-colors">
+        <td className="px-4 py-3 text-gray-300">{r.shop_name || '—'}</td>
+        <td className="px-4 py-3">
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full
+            ${r.record_type === 'product'
+              ? 'bg-red-900/50 text-red-300'
+              : 'bg-orange-900/50 text-orange-300'}`}>
+            {typeLabel}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-white font-medium">{preview}</td>
+        <td className="px-4 py-3 text-gray-400">{r.deleted_by || '—'}</td>
+        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{dateStr}</td>
+        <td className="px-4 py-3">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+          >
+            {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {open ? 'Hide' : 'Show'}
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="bg-gray-900/50">
+          <td colSpan={6} className="px-4 py-3">
+            <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+              {JSON.stringify(r.original_data, null, 2)}
+            </pre>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 export default function AdminDashboardPage() {
   const logout   = useAdminStore((s) => s.logout);
   const navigate = useNavigate();
 
-  const [tab,      setTab]      = useState('payments');
-  const [stats,    setStats]    = useState(null);
-  const [payments, setPayments] = useState([]);
-  const [shops,    setShops]    = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [tab,        setTab]        = useState('payments');
+  const [stats,      setStats]      = useState(null);
+  const [payments,   setPayments]   = useState([]);
+  const [shops,      setShops]      = useState([]);
+  const [auditLog,   setAuditLog]   = useState([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditPage,  setAuditPage]  = useState(0);
+  const [auditType,  setAuditType]  = useState('');
+  const [loading,    setLoading]    = useState(true);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   const [proofPayId,  setProofPayId]  = useState(null);
   const [rejectPayId, setRejectPayId] = useState(null);
+
+  const AUDIT_PAGE_SIZE = 25;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,7 +215,23 @@ export default function AdminDashboardPage() {
     }
   }, [logout, navigate]);
 
+  const loadAudit = useCallback(async () => {
+    setLoadingAudit(true);
+    try {
+      const params = { limit: AUDIT_PAGE_SIZE, offset: auditPage * AUDIT_PAGE_SIZE };
+      if (auditType) params.record_type = auditType;
+      const { data } = await adminApi.getAuditLog(params);
+      setAuditLog(data.records);
+      setAuditTotal(data.total);
+    } catch {
+      toast.error('Failed to load audit log');
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, [auditPage, auditType]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (tab === 'audit') loadAudit(); }, [tab, loadAudit]);
 
   async function handleApprove(paymentId) {
     try {
@@ -216,6 +292,7 @@ export default function AdminDashboardPage() {
           {[
             { id: 'payments', label: 'Payments', badge: pendingCount },
             { id: 'shops',    label: 'Shops'    },
+            { id: 'audit',    label: 'Audit Log' },
           ].map((t) => (
             <button
               key={t.id}
@@ -337,6 +414,96 @@ export default function AdminDashboardPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Audit Log tab */}
+        {tab === 'audit' && (
+          <div className="space-y-4">
+            {/* Filter + refresh */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <select
+                className="bg-gray-800 border border-gray-700 text-sm text-gray-300 rounded-lg px-3 py-2
+                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={auditType}
+                onChange={(e) => { setAuditType(e.target.value); setAuditPage(0); }}
+              >
+                <option value="">All types</option>
+                <option value="product">Product deletions</option>
+                <option value="transaction_void">Transaction voids</option>
+              </select>
+              <button
+                onClick={loadAudit}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingAudit ? 'animate-spin' : ''}`} />
+              </button>
+              {auditTotal > 0 && (
+                <span className="text-xs text-gray-500">{auditTotal} record{auditTotal !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+
+            {/* Table */}
+            {loadingAudit && auditLog.length === 0 && (
+              <div className="flex justify-center py-12">
+                <RefreshCw className="w-5 h-5 animate-spin text-gray-500" />
+              </div>
+            )}
+            {!loadingAudit && auditLog.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p>No deleted records found</p>
+              </div>
+            )}
+            {auditLog.length > 0 && (
+              <div className="bg-gray-800 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700 text-xs text-gray-400 uppercase tracking-wide">
+                      <th className="text-left px-4 py-3">Shop</th>
+                      <th className="text-left px-4 py-3">Type</th>
+                      <th className="text-left px-4 py-3">Record</th>
+                      <th className="text-left px-4 py-3">Deleted By</th>
+                      <th className="text-left px-4 py-3">Date</th>
+                      <th className="text-left px-4 py-3">Data</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {auditLog.map((r) => {
+                      const preview = r.original_data?.name
+                        || r.original_data?.transaction_number
+                        || `#${r.record_id}`;
+                      return (
+                        <AuditRow key={r.id} record={r} preview={preview} />
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {Math.ceil(auditTotal / AUDIT_PAGE_SIZE) > 1 && (
+              <div className="flex items-center justify-between text-sm text-gray-400">
+                <span>Page {auditPage + 1} of {Math.ceil(auditTotal / AUDIT_PAGE_SIZE)}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAuditPage((p) => Math.max(0, p - 1))}
+                    disabled={auditPage === 0}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setAuditPage((p) => p + 1)}
+                    disabled={auditPage >= Math.ceil(auditTotal / AUDIT_PAGE_SIZE) - 1}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

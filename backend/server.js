@@ -11,6 +11,7 @@ const dashboardRoutes    = require('./routes/dashboard');
 const reportRoutes       = require('./routes/reports');
 const notificationRoutes = require('./routes/notifications');
 const paymentRoutes      = require('./routes/payments');
+const auditRoutes        = require('./routes/audit');
 
 const { runDailyChecks } = require('./controllers/notificationController');
 
@@ -36,6 +37,7 @@ app.use('/api/dashboard',     dashboardRoutes);
 app.use('/api/reports',       reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments',      paymentRoutes);
+app.use('/api/audit-log',     auditRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

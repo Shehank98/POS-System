@@ -4,20 +4,23 @@ import toast from 'react-hot-toast';
 import { productsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 
-const EMPTY = {
-  name:           '',
-  barcode:        '',
-  price:          '',
-  cost_price:     '',
-  stock_quantity: '',
-  has_inventory:  true,
-  category:       '',
-  tax_rate:       '',
-};
+function emptyForm(defaultTaxRate = 0) {
+  return {
+    name:           '',
+    barcode:        '',
+    price:          '',
+    cost_price:     '',
+    stock_quantity: '',
+    has_inventory:  true,
+    category:       '',
+    tax_rate:       defaultTaxRate > 0 ? String(defaultTaxRate) : '',
+  };
+}
 
 export default function ProductForm({ product, onSaved, onClose }) {
-  const user        = useAuthStore((s) => s.user);
+  const user           = useAuthStore((s) => s.user);
   const barcodeEnabled = user?.barcode_enabled ?? false;
+  const defaultTaxRate = user?.default_tax_rate ?? 0;
 
   const [form,    setForm]    = useState(product ? {
     name:           product.name           || '',
@@ -28,7 +31,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
     has_inventory:  product.has_inventory  ?? true,
     category:       product.category      || '',
     tax_rate:       product.tax_rate       ?? '',
-  } : EMPTY);
+  } : emptyForm(defaultTaxRate));
   const [saving,  setSaving]  = useState(false);
   const [errors,  setErrors]  = useState({});
   const [categories, setCategories] = useState([]);
