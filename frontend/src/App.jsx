@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
+import useAdminStore from './store/adminStore';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -9,19 +10,18 @@ import POSPage from './pages/POSPage';
 import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
-
-function ComingSoon({ title }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-64 text-gray-400 space-y-2">
-      <p className="text-lg font-medium">{title}</p>
-      <p className="text-sm">Coming in the next phase</p>
-    </div>
-  );
-}
+import BillingPage from './pages/BillingPage';
+import AdminLoginPage from './pages/admin/AdminLoginPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
 function PrivateRoute({ children }) {
   const user = useAuthStore((s) => s.user);
   return user ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const token = useAdminStore((s) => s.token);
+  return token ? children : <Navigate to="/admin/login" replace />;
 }
 
 export default function App() {
@@ -35,8 +35,21 @@ export default function App() {
         }}
       />
       <Routes>
+        {/* Shop login */}
         <Route path="/login" element={<LoginPage />} />
 
+        {/* Admin section */}
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboardPage />
+            </AdminRoute>
+          }
+        />
+
+        {/* Shop app (requires shop auth) */}
         <Route
           path="/"
           element={
@@ -51,6 +64,7 @@ export default function App() {
           <Route path="products"    element={<ProductsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="reports"     element={<ReportsPage />} />
+          <Route path="billing"     element={<BillingPage />} />
           <Route path="settings"    element={<SettingsPage />} />
         </Route>
 

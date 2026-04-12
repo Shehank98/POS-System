@@ -20,6 +20,8 @@ router.get('/shops/:id/sales',              ctrl.getShopSales);
 
 // Payment management
 router.get('/payments',                     ctrl.listPayments);
+router.get('/payments/:id/proof',           ctrl.getPaymentProof);
 router.put('/payments/:id/verify',          ctrl.verifyPayment);
+router.put('/payments/:id/reject',          ctrl.rejectPayment);
 
 module.exports = router;

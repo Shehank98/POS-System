@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const db     = require('../config/database');
+const { createNotification, TYPES } = require('./notificationController');
 
 // ── POST /api/admin/login ─────────────────────────────────────
 async function adminLogin(req, res) {
@@ -253,6 +254,16 @@ async function verifyPayment(req, res) {
     );
 
     await client.query('COMMIT');
+
+    // Notify the shop
+    await createNotification(
+      payment.shop_id,
+      TYPES.PAYMENT_APPROVED,
+      'Payment Approved',
+      `Your payment has been approved. Subscription extended to ${newEnd.toLocaleDateString()}.`,
+      { new_end_date: newEnd, payment_id: payment.id }
+    );
+
     res.json({ message: 'Payment verified and subscription extended', new_end_date: newEnd });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -260,6 +271,42 @@ async function verifyPayment(req, res) {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+}
+
+// ── PUT /api/admin/payments/:id/reject ───────────────────────
+async function rejectPayment(req, res) {
+  const { notes } = req.body;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM payments WHERE id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Payment not found' });
+
+    const payment = rows[0];
+    if (payment.status !== 'pending') {
+      return res.status(400).json({ error: 'Only pending payments can be rejected' });
+    }
+
+    await db.query(
+      `UPDATE payments SET status = 'rejected', notes = $1 WHERE id = $2`,
+      [notes || null, payment.id]
+    );
+
+    await createNotification(
+      payment.shop_id,
+      TYPES.PAYMENT_REJECTED,
+      'Payment Rejected',
+      notes
+        ? `Your payment was rejected: ${notes}`
+        : 'Your payment was rejected. Please contact support or resubmit with correct details.',
+      { payment_id: payment.id, notes }
+    );
+
+    res.json({ message: 'Payment rejected' });
+  } catch (err) {
+    console.error('rejectPayment error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -287,9 +334,23 @@ async function updateShop(req, res) {
   }
 }
 
+// ── GET /api/admin/payments/:id/proof ────────────────────────
+async function getPaymentProof(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT payment_proof FROM payments WHERE id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Payment not found' });
+    res.json({ payment_proof: rows[0].payment_proof });
+  } catch (err) {
+    console.error('getPaymentProof error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   adminLogin, getDashboard,
   listShops, createShop, getShop, updateShop,
   updateSubscription, getShopSales,
-  listPayments, verifyPayment,
+  listPayments, verifyPayment, rejectPayment, getPaymentProof,
 };

@@ -77,4 +77,49 @@ export const reportsApi = {
   },
 };
 
+// ── Notifications ─────────────────────────────────────────────
+export const notificationsApi = {
+  list:       ()   => client.get('/notifications'),
+  markRead:   (id) => client.put(`/notifications/${id}/read`),
+  markAllRead: ()  => client.put('/notifications/read-all'),
+};
+
+// ── Payments (shop subscription payments) ────────────────────
+export const paymentsApi = {
+  bankInfo: () => client.get('/payments/bank-info'),
+  list:     () => client.get('/payments'),
+  submit:   (data) => client.post('/payments', data),
+};
+
+// ── Admin API (uses separate admin token) ────────────────────
+const adminClient = axios.create({ baseURL: BASE_URL });
+adminClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('pos_admin_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+adminClient.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('pos_admin_token');
+      window.location.href = '/admin/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export const adminApi = {
+  login:          (data) => adminClient.post('/admin/login', data),
+  dashboard:      ()     => adminClient.get('/admin/dashboard'),
+  listShops:      ()     => adminClient.get('/admin/shops'),
+  createShop:     (data) => adminClient.post('/admin/shops', data),
+  updateShop:     (id, data) => adminClient.put(`/admin/shops/${id}`, data),
+  updateSub:      (id, data) => adminClient.put(`/admin/shops/${id}/subscription`, data),
+  listPayments:   ()     => adminClient.get('/admin/payments'),
+  getProof:       (id)   => adminClient.get(`/admin/payments/${id}/proof`),
+  verifyPayment:  (id)   => adminClient.put(`/admin/payments/${id}/verify`),
+  rejectPayment:  (id, data) => adminClient.put(`/admin/payments/${id}/reject`, data),
+};
+
 export default client;

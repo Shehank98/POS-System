@@ -1,11 +1,12 @@
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Package, Settings, LogOut,
-  LayoutDashboard, Receipt, Menu, X,
+  LayoutDashboard, Receipt, Menu, X, CreditCard,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
 import ConnectionStatus, { ConnectionDot } from './ConnectionStatus';
+import NotificationBell from './NotificationBell';
 import { syncPending, cacheUserSubscription } from '../utils/syncService';
 
 const NAV = [
@@ -14,6 +15,7 @@ const NAV = [
   { to: '/products',     label: 'Products',      icon: Package         },
   { to: '/transactions', label: 'Transactions',  icon: Receipt         },
   { to: '/reports',      label: 'Reports',       icon: LayoutDashboard },
+  { to: '/billing',      label: 'Billing',       icon: CreditCard      },
   { to: '/settings',     label: 'Settings',      icon: Settings        },
 ];
 
@@ -28,7 +30,7 @@ export default function Layout() {
     if (user) cacheUserSubscription(user);
     if (navigator.onLine) syncPending();
 
-    function onFocus() { if (navigator.onLine) syncPending(); }
+    function onFocus()  { if (navigator.onLine) syncPending(); }
     function onOnline() { syncPending(); }
     window.addEventListener('focus',  onFocus);
     window.addEventListener('online', onOnline);
@@ -48,20 +50,23 @@ export default function Layout() {
       {/* Sidebar – desktop */}
       <aside className="hidden md:flex flex-col w-56 bg-white border-r border-gray-200 shrink-0">
         {/* Brand */}
-        <div className="flex items-center gap-2 px-4 py-5 border-b border-gray-100">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <ShoppingCart className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
+              <ShoppingCart className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate">
+                {user?.shop_name || 'POS System'}
+              </p>
+              <p className="text-xs text-gray-400 truncate">{user?.username}</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">
-              {user?.shop_name || 'POS System'}
-            </p>
-            <p className="text-xs text-gray-400 truncate">{user?.username}</p>
-          </div>
+          <NotificationBell />
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -81,11 +86,9 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="px-2 py-3 border-t border-gray-100 space-y-1">
-          {/* Connection status badge */}
           <div className="px-1">
             <ConnectionStatus />
           </div>
-
           {user?.read_only && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-yellow-700
                             bg-yellow-50 rounded-lg">
@@ -112,12 +115,15 @@ export default function Layout() {
           <span className="font-bold text-gray-900 text-sm">{user?.shop_name || 'POS'}</span>
           <ConnectionDot />
         </div>
-        <button
-          className="p-2 rounded hover:bg-gray-100 text-gray-600"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button
+            className="p-2 rounded hover:bg-gray-100 text-gray-600"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
