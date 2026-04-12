@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2 } from 'lucide-react';
+import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
 import { openReceipt } from '../utils/receipt';
+import { queueTransaction, isOfflineAllowed } from '../utils/offlineDB';
+import useAuthStore from '../store/authStore';
 
 const METHODS = [
   { id: 'cash',   label: 'Cash',  icon: Banknote            },
@@ -18,18 +21,21 @@ const fmtN = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDi
 const CASH_PRESETS = [5, 10, 20, 50, 100];
 
 export default function PaymentModal({ totals, items, onClose, onComplete }) {
+  const user    = useAuthStore((s) => s.user);
+  const isOnline = navigator.onLine;
+
   const [method,    setMethod]    = useState('cash');
   const [cashGiven, setCashGiven] = useState('');
   const [cardAmt,   setCardAmt]   = useState('');
   const [saving,    setSaving]    = useState(false);
-  const [done,      setDone]      = useState(null); // completed transaction
+  const [done,      setDone]      = useState(null);    // { offline?: bool, server_id?, transaction_number? }
 
   const grand    = totals.grandTotal;
   const cashNum  = parseFloat(cashGiven) || 0;
   const cardNum  = parseFloat(cardAmt)  || 0;
-  const change   = method === 'cash'  ? Math.max(0, cashNum - grand)  : 0;
+  const change   = method === 'cash'  ? Math.max(0, cashNum - grand) : 0;
   const cashUsed = method === 'split' ? cashNum : grand;
-  const cardUsed = method === 'split' ? Math.max(0, grand - cashNum)  : 0;
+  const cardUsed = method === 'split' ? Math.max(0, grand - cashNum) : 0;
 
   const canPay =
     (method === 'cash'   && cashNum >= grand) ||
@@ -39,28 +45,72 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
 
   async function handlePay() {
     setSaving(true);
+
+    const itemsPayload = items.map((i) => ({
+      product_id: i.product_id,
+      quantity:   i.quantity,
+      unit_price: i.unit_price,
+      discount:   i.discAmt,
+    }));
+
+    // ── Online path ──────────────────────────────────────────
+    if (isOnline) {
+      try {
+        const { data } = await transactionsApi.create({
+          payment_method:  method === 'split' ? 'cash' : method,
+          discount_amount: totals.orderDiscount,
+          items:           itemsPayload,
+        });
+        setDone({ server_id: data.id, transaction_number: data.transaction_number });
+        toast.success('Sale complete!');
+      } catch (err) {
+        // If the API returned an offline/network error, fall through to offline path
+        if (err.response?.data?.offline || !err.response) {
+          await saveOffline(itemsPayload);
+        } else {
+          toast.error(err.response?.data?.error || 'Transaction failed');
+          setSaving(false);
+        }
+      }
+      return;
+    }
+
+    // ── Offline path ─────────────────────────────────────────
+    await saveOffline(itemsPayload);
+  }
+
+  async function saveOffline(itemsPayload) {
+    // Subscription guard: block if expired > 3 days
+    const allowed = await isOfflineAllowed();
+    if (!allowed) {
+      toast.error('Offline transactions disabled — subscription expired. Please renew.');
+      setSaving(false);
+      return;
+    }
+
     try {
-      const payload = {
-        payment_method: method === 'split' ? 'cash' : method, // backend stores primary method
+      const clientId = uuidv4();
+      await queueTransaction({
+        client_id:       clientId,
+        shop_id:         user?.shop_id,
+        user_id:         user?.id,
+        items:           itemsPayload,
+        payment_method:  method === 'split' ? 'cash' : method,
         discount_amount: totals.orderDiscount,
-        items: items.map((i) => ({
-          product_id: i.product_id,
-          quantity:   i.quantity,
-          unit_price: i.unit_price,
-          discount:   i.discAmt,
-        })),
-      };
-      const { data } = await transactionsApi.create(payload);
-      setDone(data);
-      toast.success('Sale complete!');
+        total_amount:    totals.grandTotal,
+        created_at:      new Date().toISOString(),
+      });
+      setDone({ offline: true, client_id: clientId });
+      toast('Sale saved offline — will sync when connected', { icon: '📶' });
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Transaction failed');
+      toast.error('Failed to save offline transaction');
+      console.error(err);
       setSaving(false);
     }
   }
 
   function handlePrintAndClose() {
-    if (done) openReceipt(done.id);
+    if (done?.server_id) openReceipt(done.server_id);
     onComplete();
   }
 
@@ -69,9 +119,21 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div className="card w-full max-w-sm p-6 text-center space-y-4">
-          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
-          <h2 className="text-xl font-bold text-gray-900">Sale Complete!</h2>
-          <p className="text-sm text-gray-500">Txn #{done.transaction_number}</p>
+          {done.offline
+            ? <>
+                <WifiOff className="w-16 h-16 text-yellow-400 mx-auto" />
+                <h2 className="text-xl font-bold text-gray-900">Saved Offline</h2>
+                <p className="text-sm text-gray-500">
+                  This sale has been stored on this device and will sync automatically
+                  when you reconnect to the internet.
+                </p>
+              </>
+            : <>
+                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
+                <h2 className="text-xl font-bold text-gray-900">Sale Complete!</h2>
+                <p className="text-sm text-gray-500">Txn #{done.transaction_number}</p>
+              </>
+          }
           {method === 'cash' && (
             <div className="bg-green-50 rounded-lg py-3 px-4 text-center">
               <p className="text-xs text-gray-500 mb-1">Change due</p>
@@ -82,9 +144,11 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
             <button className="btn-secondary flex-1" onClick={onComplete}>
               New Sale
             </button>
-            <button className="btn-primary flex-1" onClick={handlePrintAndClose}>
-              🖨 Print Receipt
-            </button>
+            {!done.offline && (
+              <button className="btn-primary flex-1" onClick={handlePrintAndClose}>
+                🖨 Print Receipt
+              </button>
+            )}
           </div>
         </div>
       </div>

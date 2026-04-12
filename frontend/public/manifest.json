@@ -1,0 +1,32 @@
+{
+  "name": "POS System",
+  "short_name": "POS",
+  "description": "Multi-tenant Point of Sale system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance"],
+  "shortcuts": [
+    {
+      "name": "POS Terminal",
+      "url": "/pos",
+      "description": "Open the POS cashier screen"
+    }
+  ]
+}

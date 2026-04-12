@@ -51,6 +51,7 @@ export const transactionsApi = {
   summary: (params) => client.get('/transactions/summary', { params }),
   create:  (data)   => client.post('/transactions', data),
   void:    (id)     => client.post(`/transactions/${id}/void`),
+  sync:    (txns)   => client.post('/transactions/sync', { transactions: txns }),
 };
 
 // ── Dashboard ─────────────────────────────────────────────────

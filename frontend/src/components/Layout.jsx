@@ -1,10 +1,12 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   ShoppingCart, Package, Settings, LogOut,
   LayoutDashboard, Receipt, Menu, X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
+import ConnectionStatus, { ConnectionDot } from './ConnectionStatus';
+import { syncPending, cacheUserSubscription } from '../utils/syncService';
 
 const NAV = [
   { to: '/pos',          label: 'POS / Sale',    icon: ShoppingCart    },
@@ -20,6 +22,21 @@ export default function Layout() {
   const logout   = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  // Cache subscription for offline checks + auto-sync on mount/focus
+  useEffect(() => {
+    if (user) cacheUserSubscription(user);
+    if (navigator.onLine) syncPending();
+
+    function onFocus() { if (navigator.onLine) syncPending(); }
+    function onOnline() { syncPending(); }
+    window.addEventListener('focus',  onFocus);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('focus',  onFocus);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [user]);
 
   function handleLogout() {
     logout();
@@ -63,9 +80,14 @@ export default function Layout() {
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-gray-100">
+        <div className="px-2 py-3 border-t border-gray-100 space-y-1">
+          {/* Connection status badge */}
+          <div className="px-1">
+            <ConnectionStatus />
+          </div>
+
           {user?.read_only && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 mb-1 text-xs text-yellow-700
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-yellow-700
                             bg-yellow-50 rounded-lg">
               ⚠️ Read-only mode
             </div>
@@ -88,6 +110,7 @@ export default function Layout() {
             <ShoppingCart className="w-3.5 h-3.5 text-white" />
           </div>
           <span className="font-bold text-gray-900 text-sm">{user?.shop_name || 'POS'}</span>
+          <ConnectionDot />
         </div>
         <button
           className="p-2 rounded hover:bg-gray-100 text-gray-600"

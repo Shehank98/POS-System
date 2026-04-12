@@ -11,6 +11,7 @@ router.get('/summary',       ctrl.getSummary);
 router.get('/',              ctrl.listTransactions);
 router.get('/:id/receipt',   getReceipt);
 router.get('/:id',           ctrl.getTransaction);
+router.post('/sync',         readOnlyGuard, ctrl.syncTransactions);   // offline sync
 router.post('/',             readOnlyGuard, ctrl.createTransaction);
 router.post('/:id/void',     readOnlyGuard, requireRole('owner', 'manager'), ctrl.voidTransaction);
 

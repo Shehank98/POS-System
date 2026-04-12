@@ -282,7 +282,156 @@ async function getSummary(req, res) {
   }
 }
 
+// ── POST /api/transactions/sync ───────────────────────────────
+// Accepts an array of offline transactions recorded while the device
+// was disconnected. Each entry carries a client-generated UUID in
+// `client_id` used for idempotency: if the transaction already exists
+// (duplicate sync) we return the existing server record instead of
+// inserting a duplicate.
+async function syncTransactions(req, res) {
+  const { transactions } = req.body;
+
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return res.json({ results: [] });
+  }
+
+  const results = [];
+
+  for (const txnPayload of transactions) {
+    const { client_id, items, payment_method = 'cash', discount_amount = 0,
+            created_at } = txnPayload;
+
+    if (!client_id) {
+      results.push({ client_id: null, status: 'failed', error: 'client_id is required' });
+      continue;
+    }
+
+    // ── Idempotency check ───────────────────────────────────
+    try {
+      const { rows: existing } = await db.query(
+        `SELECT id, transaction_number FROM transactions WHERE client_id = $1`,
+        [client_id]
+      );
+      if (existing.length > 0) {
+        results.push({ client_id, status: 'duplicate', server_id: existing[0].id,
+                       transaction_number: existing[0].transaction_number });
+        continue;
+      }
+    } catch (err) {
+      // client_id column might not exist yet (pre-migration) – treat as new
+      console.warn('client_id column missing, running without idempotency check:', err.message);
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      results.push({ client_id, status: 'failed', error: 'items array is required' });
+      continue;
+    }
+
+    // ── Create transaction (same logic as createTransaction) ─
+    const pgClient = await db.getClient();
+    try {
+      await pgClient.query('BEGIN');
+
+      let subtotalSum = 0;
+      let taxSum      = 0;
+      const enrichedItems = [];
+      let itemError = null;
+
+      for (const item of items) {
+        const { rows } = await pgClient.query(
+          `SELECT id, name, price, tax_rate, has_inventory, stock_quantity
+             FROM products WHERE id = $1 AND shop_id = $2`,
+          [item.product_id, req.shopId]
+        );
+        if (rows.length === 0) { itemError = `Product ${item.product_id} not found`; break; }
+
+        const product  = rows[0];
+        const qty      = parseFloat(item.quantity)   || 1;
+        const price    = parseFloat(item.unit_price) ?? parseFloat(product.price);
+        const disc     = parseFloat(item.discount)   || 0;
+        const subtotal = (price * qty) - disc;
+        const taxAmt   = subtotal * (parseFloat(product.tax_rate) / 100);
+
+        subtotalSum += subtotal;
+        taxSum      += taxAmt;
+
+        if (product.has_inventory) {
+          if (product.stock_quantity < qty) {
+            itemError = `Insufficient stock for "${product.name}"`;
+            break;
+          }
+          await pgClient.query(
+            `UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+            [qty, product.id]
+          );
+        }
+        enrichedItems.push({ product_id: product.id, quantity: qty,
+                             unit_price: price, discount: disc, subtotal });
+      }
+
+      if (itemError) {
+        await pgClient.query('ROLLBACK');
+        results.push({ client_id, status: 'failed', error: itemError });
+        continue;
+      }
+
+      const totalAmount = subtotalSum + taxSum - parseFloat(discount_amount);
+      const txnDate     = created_at ? new Date(created_at) : new Date();
+      const txnNumber   = generateTxnNumber(req.shopId);
+
+      // Try to include client_id; ignore if column doesn't exist yet
+      let txnRows;
+      try {
+        ({ rows: txnRows } = await pgClient.query(
+          `INSERT INTO transactions
+             (shop_id, user_id, transaction_number, total_amount, tax_amount,
+              discount_amount, payment_method, status, transaction_date, client_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9)
+           RETURNING *`,
+          [req.shopId, req.user.id, txnNumber, totalAmount, taxSum,
+           discount_amount, payment_method, txnDate, client_id]
+        ));
+      } catch {
+        // Fallback without client_id column (pre-migration)
+        ({ rows: txnRows } = await pgClient.query(
+          `INSERT INTO transactions
+             (shop_id, user_id, transaction_number, total_amount, tax_amount,
+              discount_amount, payment_method, status, transaction_date)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8)
+           RETURNING *`,
+          [req.shopId, req.user.id, txnNumber, totalAmount, taxSum,
+           discount_amount, payment_method, txnDate]
+        ));
+      }
+
+      const txn = txnRows[0];
+
+      for (const item of enrichedItems) {
+        await pgClient.query(
+          `INSERT INTO transaction_items
+             (transaction_id, product_id, quantity, unit_price, discount, subtotal)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [txn.id, item.product_id, item.quantity, item.unit_price,
+           item.discount, item.subtotal]
+        );
+      }
+
+      await pgClient.query('COMMIT');
+      results.push({ client_id, status: 'synced', server_id: txn.id,
+                     transaction_number: txn.transaction_number });
+    } catch (err) {
+      await pgClient.query('ROLLBACK');
+      console.error('sync transaction error:', err);
+      results.push({ client_id, status: 'failed', error: 'Server error' });
+    } finally {
+      pgClient.release();
+    }
+  }
+
+  res.json({ results, synced: results.filter((r) => r.status === 'synced').length });
+}
+
 module.exports = {
   createTransaction, listTransactions, getTransaction,
-  voidTransaction, getSummary,
+  voidTransaction, getSummary, syncTransactions,
 };
