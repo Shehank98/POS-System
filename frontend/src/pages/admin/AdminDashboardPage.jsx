@@ -236,7 +236,7 @@ function CreateShopModal({ onClose, onCreated }) {
 
 // ── Extend Subscription Modal ─────────────────────────────────
 function ExtendSubModal({ shop, onClose, onDone }) {
-  const [months, setMonths] = useState('1');
+  const [months, setMonths] = useState('0');
   const [status, setStatus] = useState(shop.subscription_status);
   const [busy,   setBusy]   = useState(false);
 
@@ -273,9 +273,11 @@ function ExtendSubModal({ shop, onClose, onDone }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Extend by (months)</label>
+            <label className="block text-xs text-gray-400 mb-1">Add months (0 = status change only)</label>
             <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months} onChange={(e) => setMonths(e.target.value)} />
-            <p className="text-xs text-gray-500 mt-1">Set to 0 to only change status without extending.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Current expiry: {shop.subscription_end_date ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">

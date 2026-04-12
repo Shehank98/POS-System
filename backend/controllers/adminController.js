@@ -134,14 +134,16 @@ async function updateSubscription(req, res) {
     );
     if (current.length === 0) return res.status(404).json({ error: 'Shop not found' });
 
+    // extend_months > 0: add months from today (not from existing expiry)
+    // extend_months = 0 or absent: keep existing end date, just change status
     let newEndDate = current[0].subscription_end_date
       ? new Date(current[0].subscription_end_date)
       : new Date();
 
-    if (newEndDate < new Date()) newEndDate = new Date(); // start from today if already expired
-
-    if (extend_months) {
-      newEndDate.setMonth(newEndDate.getMonth() + parseInt(extend_months, 10));
+    const months = parseInt(extend_months, 10) || 0;
+    if (months > 0) {
+      newEndDate = new Date(); // always count from today
+      newEndDate.setMonth(newEndDate.getMonth() + months);
     }
 
     const newStatus = subscription_status || (extend_months ? 'active' : current[0].subscription_status);
