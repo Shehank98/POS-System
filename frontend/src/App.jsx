@@ -3,9 +3,11 @@ import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
 import POSPage from './pages/POSPage';
 import TransactionsPage from './pages/TransactionsPage';
+import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ComingSoon({ title }) {
@@ -45,9 +47,10 @@ export default function App() {
         >
           <Route index              element={<Navigate to="/pos" replace />} />
           <Route path="pos"         element={<POSPage />} />
+          <Route path="dashboard"   element={<DashboardPage />} />
           <Route path="products"    element={<ProductsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="reports"     element={<ComingSoon title="Reports" />} />
+          <Route path="reports"     element={<ReportsPage />} />
           <Route path="settings"    element={<SettingsPage />} />
         </Route>
 

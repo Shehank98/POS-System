@@ -53,4 +53,27 @@ export const transactionsApi = {
   void:    (id)     => client.post(`/transactions/${id}/void`),
 };
 
+// ── Dashboard ─────────────────────────────────────────────────
+export const dashboardApi = {
+  today:    ()              => client.get('/dashboard/today'),
+  week:     ()              => client.get('/dashboard/week'),
+  month:    ()              => client.get('/dashboard/month'),
+  lowStock: (threshold = 10) => client.get('/dashboard/low-stock', { params: { threshold } }),
+};
+
+// ── Reports (file downloads – return raw Blob) ────────────────
+export const reportsApi = {
+  sales: async (startDate, endDate, format = 'excel') => {
+    const res = await client.get('/reports/sales', {
+      params:       { start_date: startDate, end_date: endDate, format },
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+  inventory: async () => {
+    const res = await client.get('/reports/inventory', { responseType: 'blob' });
+    return res.data;
+  },
+};
+
 export default client;

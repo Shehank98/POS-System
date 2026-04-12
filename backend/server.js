@@ -6,6 +6,8 @@ const authRoutes        = require('./routes/auth');
 const productRoutes     = require('./routes/products');
 const transactionRoutes = require('./routes/transactions');
 const adminRoutes       = require('./routes/admin');
+const dashboardRoutes   = require('./routes/dashboard');
+const reportRoutes      = require('./routes/reports');
 
 const app = express();
 
@@ -25,6 +27,8 @@ app.use('/api/auth',         authRoutes);
 app.use('/api/products',     productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admin',        adminRoutes);
+app.use('/api/dashboard',    dashboardRoutes);
+app.use('/api/reports',      reportRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
