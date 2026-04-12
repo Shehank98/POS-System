@@ -31,17 +31,31 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Block login if subscription is expired
-    if (user.subscription_status === 'expired' || user.subscription_status === 'suspended') {
-      return res.status(403).json({ error: 'Subscription expired. Please contact support.' });
+    // Hard block: suspended shops cannot log in at all
+    if (user.subscription_status === 'suspended') {
+      return res.status(403).json({ error: 'Account suspended. Please contact support.' });
+    }
+
+    // Determine read-only mode:
+    // - expired status, OR
+    // - subscription end date is more than 3 days in the past
+    let readOnly = false;
+    if (user.subscription_status === 'expired') {
+      readOnly = true;
+    } else if (user.subscription_end_date) {
+      const msPerDay = 86_400_000;
+      const daysOverdue = (Date.now() - new Date(user.subscription_end_date).getTime()) / msPerDay;
+      if (daysOverdue > 3) readOnly = true;
     }
 
     const token = jwt.sign(
       {
-        id:       user.id,
-        shop_id:  user.shop_id,
-        role:     user.role,
-        username: user.username,
+        id:              user.id,
+        shop_id:         user.shop_id,
+        role:            user.role,
+        username:        user.username,
+        barcode_enabled: user.barcode_enabled,
+        read_only:       readOnly,
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
@@ -50,14 +64,15 @@ async function login(req, res) {
     res.json({
       token,
       user: {
-        id:                   user.id,
-        username:             user.username,
-        role:                 user.role,
-        shop_id:              user.shop_id,
-        shop_name:            user.shop_name,
-        subscription_status:  user.subscription_status,
+        id:                    user.id,
+        username:              user.username,
+        role:                  user.role,
+        shop_id:               user.shop_id,
+        shop_name:             user.shop_name,
+        subscription_status:   user.subscription_status,
         subscription_end_date: user.subscription_end_date,
-        barcode_enabled:      user.barcode_enabled,
+        barcode_enabled:       user.barcode_enabled,
+        read_only:             readOnly,
       },
     });
   } catch (err) {
