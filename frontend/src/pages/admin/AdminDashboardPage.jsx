@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Store, CreditCard, CheckCircle2, XCircle,
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
-  AlertTriangle, Users, ClipboardList,
+  AlertTriangle, Users, ClipboardList, Plus, CalendarPlus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -119,6 +119,178 @@ function RejectModal({ paymentId, onClose, onDone }) {
   );
 }
 
+// ── Create Shop Modal ─────────────────────────────────────────
+function CreateShopModal({ onClose, onCreated }) {
+  const empty = { name:'', owner_name:'', email:'', owner_username:'', owner_password:'', subscription_months:'1', barcode_enabled: false };
+  const [form, setForm] = useState(empty);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null); // shows Shop ID after creation
+
+  const set = (f) => (e) => {
+    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm((p) => ({ ...p, [f]: v }));
+  };
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { data } = await adminApi.createShop({
+        ...form,
+        subscription_months: parseInt(form.subscription_months, 10) || 1,
+      });
+      setResult(data);
+      onCreated();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to create shop');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder-gray-500';
+
+  if (result) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+        <div className="bg-gray-800 rounded-2xl p-6 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <p className="font-semibold text-white">Shop Created!</p>
+          </div>
+          <div className="bg-gray-900 rounded-lg p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Shop ID</span>
+              <span className="font-mono font-bold text-yellow-400 text-lg">{result.shop.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Shop Name</span>
+              <span className="text-white">{result.shop.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Login Username</span>
+              <span className="text-white font-mono">{result.owner.username}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Expires</span>
+              <span className="text-white">{new Date(result.shop.subscription_end_date).toLocaleDateString()}</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">Give the Shop ID and credentials to the shop owner to log in.</p>
+          <button onClick={onClose} className="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg">
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-white">Create New Shop</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-400 mb-1">Shop Name *</label>
+              <input className={inputCls} placeholder="e.g. Kedai Ali" value={form.name} onChange={set('name')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Owner Full Name *</label>
+              <input className={inputCls} placeholder="Ali bin Abu" value={form.owner_name} onChange={set('owner_name')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Email *</label>
+              <input className={inputCls} type="email" placeholder="ali@email.com" value={form.email} onChange={set('email')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Owner Username *</label>
+              <input className={inputCls} placeholder="ali_owner" value={form.owner_username} onChange={set('owner_username')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Owner Password *</label>
+              <input className={inputCls} type="password" placeholder="••••••••" value={form.owner_password} onChange={set('owner_password')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Subscription (months)</label>
+              <input className={inputCls} type="number" min="1" max="36" value={form.subscription_months} onChange={set('subscription_months')} />
+            </div>
+            <div className="flex items-center gap-2 pt-5">
+              <input type="checkbox" id="bc" className="w-4 h-4 rounded accent-primary-600" checked={form.barcode_enabled} onChange={set('barcode_enabled')} />
+              <label htmlFor="bc" className="text-sm text-gray-300 cursor-pointer">Barcode scanner</label>
+            </div>
+          </div>
+          <button type="submit" disabled={busy}
+            className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 disabled:opacity-50">
+            {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {busy ? 'Creating…' : 'Create Shop'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Extend Subscription Modal ─────────────────────────────────
+function ExtendSubModal({ shop, onClose, onDone }) {
+  const [months, setMonths] = useState('1');
+  const [status, setStatus] = useState(shop.subscription_status);
+  const [busy,   setBusy]   = useState(false);
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      await adminApi.updateSub(shop.id, {
+        subscription_status: status,
+        extend_months: parseInt(months, 10) || 0,
+      });
+      toast.success('Subscription updated');
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = 'bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="bg-gray-800 rounded-2xl p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm font-semibold text-white">Manage Subscription — {shop.name}</p>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Status</label>
+            <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="active">Active</option>
+              <option value="trial">Trial</option>
+              <option value="expired">Expired</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Extend by (months)</label>
+            <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months} onChange={(e) => setMonths(e.target.value)} />
+            <p className="text-xs text-gray-500 mt-1">Set to 0 to only change status without extending.</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">Cancel</button>
+          <button onClick={handleSave} disabled={busy}
+            className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50">
+            {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const AUDIT_TYPE_LABELS = {
   product:          'Product Deleted',
   transaction_void: 'Transaction Voided',
@@ -187,8 +359,10 @@ export default function AdminDashboardPage() {
   const [loading,    setLoading]    = useState(true);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
-  const [proofPayId,  setProofPayId]  = useState(null);
-  const [rejectPayId, setRejectPayId] = useState(null);
+  const [proofPayId,   setProofPayId]   = useState(null);
+  const [rejectPayId,  setRejectPayId]  = useState(null);
+  const [showCreateShop, setShowCreateShop] = useState(false);
+  const [extendShop,     setExtendShop]     = useState(null);
 
   const AUDIT_PAGE_SIZE = 25;
 
@@ -389,16 +563,39 @@ export default function AdminDashboardPage() {
         {/* Shops tab */}
         {tab === 'shops' && (
           <div className="space-y-3">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-400">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
+              <button
+                onClick={() => setShowCreateShop(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700
+                           text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Add Shop
+              </button>
+            </div>
+
             {loading && [...Array(3)].map((_, i) => (
               <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />
             ))}
+            {!loading && shops.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                <Store className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p>No shops yet. Add your first shop above.</p>
+              </div>
+            )}
             {!loading && shops.map((s) => {
               const badge = SUB_STATUS[s.subscription_status] || SUB_STATUS.expired;
               return (
                 <div key={s.id} className="bg-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-white">{s.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-white">{s.name}</p>
+                      <span className="text-xs font-mono bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
+                        ID: {s.id}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
                       {s.owner_name} · {s.email}
                       {s.subscription_end_date && (
                         <> · Expires {fmtDate(s.subscription_end_date)}</>
@@ -408,9 +605,19 @@ export default function AdminDashboardPage() {
                       {s.user_count || 0} users · {s.product_count || 0} products · {s.transaction_count || 0} transactions
                     </p>
                   </div>
-                  <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${badge.cls}`}>
-                    {badge.label}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                    <button
+                      onClick={() => setExtendShop(s)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-700
+                                 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+                      title="Manage subscription"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" /> Manage
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -511,6 +718,8 @@ export default function AdminDashboardPage() {
       {/* Modals */}
       {proofPayId  && <ProofModal  paymentId={proofPayId}  onClose={() => setProofPayId(null)} />}
       {rejectPayId && <RejectModal paymentId={rejectPayId} onClose={() => setRejectPayId(null)} onDone={() => { setRejectPayId(null); load(); }} />}
+      {showCreateShop && <CreateShopModal onClose={() => setShowCreateShop(false)} onCreated={() => { load(); }} />}
+      {extendShop && <ExtendSubModal shop={extendShop} onClose={() => setExtendShop(null)} onDone={() => { setExtendShop(null); load(); }} />}
     </div>
   );
 }
