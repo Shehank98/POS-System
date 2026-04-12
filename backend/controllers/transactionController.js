@@ -1,0 +1,288 @@
+const db = require('../config/database');
+
+// ── Helper: generate transaction number ───────────────────────
+function generateTxnNumber(shopId) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `TXN-${shopId}-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${Date.now().toString().slice(-6)}`;
+}
+
+// ── POST /api/transactions ────────────────────────────────────
+async function createTransaction(req, res) {
+  const {
+    items,            // [{ product_id, quantity, unit_price, discount }]
+    payment_method = 'cash',
+    discount_amount = 0,
+  } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items array is required' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    let subtotalSum = 0;
+    let taxSum = 0;
+    const enrichedItems = [];
+
+    for (const item of items) {
+      const { rows } = await client.query(
+        `SELECT id, name, price, tax_rate, has_inventory, stock_quantity
+           FROM products WHERE id = $1 AND shop_id = $2`,
+        [item.product_id, req.shopId]
+      );
+
+      if (rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `Product ${item.product_id} not found` });
+      }
+
+      const product = rows[0];
+      const qty     = parseFloat(item.quantity) || 1;
+      const price   = parseFloat(item.unit_price) ?? parseFloat(product.price);
+      const disc    = parseFloat(item.discount) || 0;
+      const subtotal = (price * qty) - disc;
+      const taxAmount = subtotal * (parseFloat(product.tax_rate) / 100);
+
+      subtotalSum += subtotal;
+      taxSum      += taxAmount;
+
+      // Deduct stock if inventory is tracked
+      if (product.has_inventory) {
+        if (product.stock_quantity < qty) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `Insufficient stock for "${product.name}". Available: ${product.stock_quantity}`
+          });
+        }
+        await client.query(
+          `UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+          [qty, product.id]
+        );
+      }
+
+      enrichedItems.push({ product_id: product.id, quantity: qty, unit_price: price, discount: disc, subtotal });
+    }
+
+    const totalAmount = subtotalSum + taxSum - parseFloat(discount_amount);
+    const txnNumber   = generateTxnNumber(req.shopId);
+
+    const { rows: txnRows } = await client.query(
+      `INSERT INTO transactions
+         (shop_id, user_id, transaction_number, total_amount, tax_amount, discount_amount, payment_method, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'completed')
+       RETURNING *`,
+      [req.shopId, req.user.id, txnNumber, totalAmount, taxSum, discount_amount, payment_method]
+    );
+
+    const txn = txnRows[0];
+
+    for (const item of enrichedItems) {
+      await client.query(
+        `INSERT INTO transaction_items (transaction_id, product_id, quantity, unit_price, discount, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [txn.id, item.product_id, item.quantity, item.unit_price, item.discount, item.subtotal]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // Return full transaction with items
+    const { rows: fullItems } = await db.query(
+      `SELECT ti.*, p.name AS product_name
+         FROM transaction_items ti
+         LEFT JOIN products p ON p.id = ti.product_id
+        WHERE ti.transaction_id = $1`,
+      [txn.id]
+    );
+
+    res.status(201).json({ ...txn, items: fullItems });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('createTransaction error:', err);
+    res.status(500).json({ error: 'Server error creating transaction' });
+  } finally {
+    client.release();
+  }
+}
+
+// ── GET /api/transactions ─────────────────────────────────────
+async function listTransactions(req, res) {
+  const {
+    start_date, end_date,
+    payment_method, status,
+    page = 1, limit = 50,
+  } = req.query;
+
+  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+  const params = [req.shopId];
+  const conditions = ['t.shop_id = $1'];
+
+  if (start_date) {
+    params.push(start_date);
+    conditions.push(`t.transaction_date >= $${params.length}`);
+  }
+  if (end_date) {
+    params.push(end_date + ' 23:59:59');
+    conditions.push(`t.transaction_date <= $${params.length}`);
+  }
+  if (payment_method) {
+    params.push(payment_method);
+    conditions.push(`t.payment_method = $${params.length}`);
+  }
+  if (status) {
+    params.push(status);
+    conditions.push(`t.status = $${params.length}`);
+  }
+
+  const where = conditions.join(' AND ');
+
+  try {
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM transactions t WHERE ${where}`, params
+    );
+    params.push(parseInt(limit, 10), offset);
+    const { rows } = await db.query(
+      `SELECT t.*, u.username AS cashier
+         FROM transactions t
+         LEFT JOIN users u ON u.id = t.user_id
+        WHERE ${where}
+        ORDER BY t.transaction_date DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json({
+      transactions: rows,
+      total: parseInt(countResult.rows[0].count, 10),
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
+  } catch (err) {
+    console.error('listTransactions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/transactions/:id ─────────────────────────────────
+async function getTransaction(req, res) {
+  try {
+    const { rows: txnRows } = await db.query(
+      `SELECT t.*, u.username AS cashier
+         FROM transactions t
+         LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.id = $1 AND t.shop_id = $2`,
+      [req.params.id, req.shopId]
+    );
+    if (txnRows.length === 0) return res.status(404).json({ error: 'Transaction not found' });
+
+    const { rows: items } = await db.query(
+      `SELECT ti.*, p.name AS product_name
+         FROM transaction_items ti
+         LEFT JOIN products p ON p.id = ti.product_id
+        WHERE ti.transaction_id = $1`,
+      [req.params.id]
+    );
+    res.json({ ...txnRows[0], items });
+  } catch (err) {
+    console.error('getTransaction error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── POST /api/transactions/:id/void ──────────────────────────
+async function voidTransaction(req, res) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT * FROM transactions WHERE id = $1 AND shop_id = $2`,
+      [req.params.id, req.shopId]
+    );
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    if (rows[0].status !== 'completed') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Only completed transactions can be voided' });
+    }
+
+    // Restore stock
+    const { rows: items } = await client.query(
+      `SELECT ti.product_id, ti.quantity, p.has_inventory
+         FROM transaction_items ti
+         JOIN products p ON p.id = ti.product_id
+        WHERE ti.transaction_id = $1`,
+      [req.params.id]
+    );
+    for (const item of items) {
+      if (item.has_inventory) {
+        await client.query(
+          `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
+          [item.quantity, item.product_id]
+        );
+      }
+    }
+
+    const { rows: updated } = await client.query(
+      `UPDATE transactions SET status = 'void' WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+
+    await client.query('COMMIT');
+    res.json(updated[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('voidTransaction error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+}
+
+// ── GET /api/transactions/summary ────────────────────────────
+async function getSummary(req, res) {
+  const { start_date, end_date } = req.query;
+  const params = [req.shopId];
+  const dateFilter = [];
+
+  if (start_date) {
+    params.push(start_date);
+    dateFilter.push(`transaction_date >= $${params.length}`);
+  }
+  if (end_date) {
+    params.push(end_date + ' 23:59:59');
+    dateFilter.push(`transaction_date <= $${params.length}`);
+  }
+
+  const dateWhere = dateFilter.length ? ' AND ' + dateFilter.join(' AND ') : '';
+
+  try {
+    const { rows } = await db.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'completed')              AS total_transactions,
+         COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed'), 0) AS total_revenue,
+         COALESCE(SUM(tax_amount)   FILTER (WHERE status = 'completed'), 0) AS total_tax,
+         COALESCE(SUM(discount_amount) FILTER (WHERE status='completed'), 0) AS total_discounts,
+         COUNT(*) FILTER (WHERE status = 'void')                   AS voided_transactions,
+         COUNT(*) FILTER (WHERE payment_method='cash' AND status='completed')   AS cash_count,
+         COUNT(*) FILTER (WHERE payment_method='card' AND status='completed')   AS card_count,
+         COUNT(*) FILTER (WHERE payment_method='mobile' AND status='completed') AS mobile_count
+       FROM transactions
+       WHERE shop_id = $1 ${dateWhere}`,
+      params
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('getSummary error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = {
+  createTransaction, listTransactions, getTransaction,
+  voidTransaction, getSummary,
+};
