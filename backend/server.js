@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const cron    = require('node-cron');
+const path    = require('path');
 
 const authRoutes         = require('./routes/auth');
 const productRoutes      = require('./routes/products');
@@ -39,7 +40,17 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments',      paymentRoutes);
 app.use('/api/audit-log',     auditRoutes);
 
-// ── 404 handler ───────────────────────────────────────────────
+// ── Serve React frontend in production ────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, '../frontend/dist');
+  app.use(express.static(frontendDist));
+  // All non-API routes return the SPA entry point
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
+
+// ── 404 handler (API only in production) ─────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // ── Global error handler ──────────────────────────────────────
