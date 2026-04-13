@@ -93,10 +93,11 @@ export default function PosCameraScanner({ onDone, onClose }) {
         .start(
           { facingMode: 'environment' },
           {
-            fps: 12,
-            // aspectRatio > 1 = wider than tall → shorter video on mobile
-            aspectRatio: 2.4,
-            qrbox: { width: 220, height: 80 },
+            fps: 10,
+            // aspectRatio controls the video height the library renders naturally —
+            // no overflow clipping needed (clipping breaks the scan canvas)
+            aspectRatio: 1.9,
+            qrbox: { width: 250, height: 110 },
           },
           (decoded) => {
             const now = Date.now();
@@ -172,14 +173,13 @@ export default function PosCameraScanner({ onDone, onClose }) {
 
       {/* ── Camera viewfinder ──────────────────────────────────── */}
       {/*
-        overflow-hidden clips the video the html5-qrcode library injects
-        (the library overrides container height via JS; we clamp it here).
-        Max height ~160px keeps plenty of room for the scanned items list.
+        aspectRatio: 1.9 in the html5-qrcode config makes the library render
+        the video at ~205px tall on a 390px wide screen — no overflow clipping
+        (clipping breaks the library's internal canvas and stops scan detection).
       */}
       <div
-        className={`relative bg-black shrink-0 overflow-hidden transition-colors duration-150
+        className={`relative bg-black shrink-0 transition-colors duration-150
                     ${flash ? 'ring-4 ring-green-400 ring-inset' : ''}`}
-        style={{ maxHeight: 160 }}
       >
         <div id="pos-multi-cam-view" className="w-full" />
 
