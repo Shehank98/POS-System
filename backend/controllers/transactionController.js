@@ -210,7 +210,7 @@ async function voidTransaction(req, res) {
       return res.status(400).json({ error: 'Only completed transactions can be voided' });
     }
 
-    // Restore stock (LEFT JOIN so items with deleted products are still counted)
+    // Restore stock (LEFT JOIN so items with deleted products are not skipped)
     const { rows: items } = await client.query(
       `SELECT ti.product_id, ti.quantity, p.has_inventory
          FROM transaction_items ti
@@ -232,18 +232,28 @@ async function voidTransaction(req, res) {
       [req.params.id, req.shopId]
     );
 
-    // Audit trail — pass object directly so pg serialises it as JSONB
-    await client.query(
-      `INSERT INTO deleted_records (shop_id, record_type, record_id, deleted_by, original_data)
-       VALUES ($1, 'transaction_void', $2, $3, $4)`,
-      [req.shopId, rows[0].id, req.user.id, rows[0]]
+    // ── Commit the real work BEFORE the audit trail ───────────
+    // The audit insert must NOT be inside this transaction — if the
+    // deleted_records table is missing or the insert fails for any
+    // reason, it would abort the whole transaction and roll back the
+    // void, leaving stock and status inconsistent.
+    await client.query('COMMIT');
+
+    // Audit trail — fire-and-forget after commit (best effort)
+    db.query(
+      `INSERT INTO deleted_records
+         (shop_id, record_type, record_id, deleted_by, original_data)
+       VALUES ($1, 'transaction_void', $2, $3, $4::jsonb)`,
+      [req.shopId, rows[0].id, req.user.id, JSON.stringify(rows[0])]
+    ).catch((auditErr) =>
+      console.error('void audit trail (non-fatal):', auditErr.message)
     );
 
-    await client.query('COMMIT');
     res.json(updated[0]);
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('voidTransaction error:', err);
+    try { await client.query('ROLLBACK'); } catch { /* ignore rollback error */ }
+    console.error('voidTransaction error — code:', err.code,
+                  '| message:', err.message, '| detail:', err.detail);
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
