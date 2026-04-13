@@ -23,7 +23,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ align = 'right' }) {
   const [open,         setOpen]         = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount,  setUnreadCount]  = useState(0);
@@ -110,8 +110,9 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 mt-1 w-80 bg-white rounded-xl shadow-lg border border-gray-200
-                        z-50 overflow-hidden">
+        <div className={`absolute mt-1 w-72 bg-white rounded-xl shadow-xl border border-gray-200
+                        z-50 overflow-hidden
+                        ${align === 'left' ? 'left-0' : 'right-0'}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900">
@@ -142,7 +143,7 @@ export default function NotificationBell() {
           </div>
 
           {/* List */}
-          <div className="max-h-96 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />

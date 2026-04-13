@@ -3,6 +3,7 @@ import {
   ShoppingCart, Package, Settings, LogOut,
   LayoutDashboard, Receipt, Menu, X, CreditCard,
   ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
@@ -50,6 +51,17 @@ export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Mobile "More" bottom sheet
   const [moreOpen,   setMoreOpen]   = useState(false);
+  // Collapsible desktop sidebar
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('sidebarCollapsed') === 'true'
+  );
+
+  function toggleSidebar() {
+    setCollapsed((v) => {
+      localStorage.setItem('sidebarCollapsed', String(!v));
+      return !v;
+    });
+  }
 
   // Cache subscription + auto-sync
   useEffect(() => {
@@ -80,62 +92,107 @@ export default function Layout() {
     <div className="min-h-screen flex bg-gray-50">
 
       {/* ── Desktop sidebar ───────────────────────────────────── */}
-      <aside className="hidden md:flex flex-col w-56 bg-white border-r border-gray-200 shrink-0">
+      <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200 shrink-0
+                         transition-all duration-200 overflow-hidden
+                         ${collapsed ? 'w-14' : 'w-56'}`}>
+
         {/* Brand */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
+        <div className={`flex items-center border-b border-gray-100 shrink-0
+                         ${collapsed ? 'justify-center px-0 py-4' : 'justify-between px-4 py-4'}`}>
+          {collapsed ? (
+            /* Collapsed: just the icon, acts as toggle too */
+            <button
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+              className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center"
+            >
               <ShoppingCart className="w-4 h-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900 truncate">
-                {user?.shop_name || 'POS System'}
-              </p>
-              <p className="text-xs text-gray-400 truncate">{user?.username}</p>
-            </div>
-          </div>
-          <NotificationBell />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
+                  <ShoppingCart className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">
+                    {user?.shop_name || 'POS System'}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">{user?.username}</p>
+                </div>
+              </div>
+              <NotificationBell align="left" />
+            </>
+          )}
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+        <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto
+                         ${collapsed ? 'px-1' : 'px-2'}`}>
           {NAV
             .filter(({ roles }) => !roles || roles.includes(user?.role))
             .map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
+                title={collapsed ? label : undefined}
                 className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium
-                   transition-colors ${isActive
+                  `flex items-center rounded-lg text-sm font-medium transition-colors
+                   ${collapsed
+                    ? 'justify-center p-2'
+                    : 'gap-2.5 px-3 py-2'}
+                   ${isActive
                     ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-600 hover:bg-gray-100'}`
                 }
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {label}
+                {!collapsed && label}
               </NavLink>
             ))
           }
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-gray-100 space-y-1">
-          <div className="px-1">
-            <ConnectionStatus />
-          </div>
-          {user?.read_only && (
+        <div className={`py-3 border-t border-gray-100 space-y-1
+                         ${collapsed ? 'px-1' : 'px-2'}`}>
+          {!collapsed && (
+            <div className="px-1">
+              <ConnectionStatus />
+            </div>
+          )}
+          {!collapsed && user?.read_only && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-yellow-700
                             bg-yellow-50 rounded-lg">
               Read-only mode
             </div>
           )}
+
+          {/* Sign out */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm
-                       font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            title={collapsed ? 'Sign out' : undefined}
+            className={`flex items-center w-full rounded-lg text-sm font-medium
+                        text-gray-600 hover:bg-gray-100 transition-colors
+                        ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}`}
           >
-            <LogOut className="w-4 h-4" /> Sign out
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!collapsed && 'Sign out'}
+          </button>
+
+          {/* Collapse / expand toggle */}
+          <button
+            onClick={toggleSidebar}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`flex items-center w-full rounded-lg text-xs font-medium
+                        text-gray-400 hover:bg-gray-100 transition-colors
+                        ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}`}
+          >
+            {collapsed
+              ? <PanelLeftOpen  className="w-4 h-4 shrink-0" />
+              : <PanelLeftClose className="w-4 h-4 shrink-0" />
+            }
+            {!collapsed && 'Collapse'}
           </button>
         </div>
       </aside>
