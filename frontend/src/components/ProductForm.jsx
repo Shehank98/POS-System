@@ -41,7 +41,8 @@ export default function ProductForm({ product, onSaved, onClose }) {
 
   useEffect(() => {
     productsApi.categories().then(({ data }) => setCategories(data)).catch(() => {});
-    nameRef.current?.focus();
+    // For existing products focus name; for new products let barcode autoFocus handle it
+    if (product) nameRef.current?.focus();
   }, []);
 
   const set = (field) => (e) => {
@@ -113,25 +114,23 @@ export default function ProductForm({ product, onSaved, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Barcode – shown only when shop has barcode enabled */}
-          {barcodeEnabled && (
-            <div>
-              <label className="label flex items-center gap-1.5">
-                <Barcode className="w-4 h-4 text-gray-400" />
-                Barcode
-                <span className="text-xs text-gray-400 font-normal">(scan or type)</span>
-              </label>
-              <input
-                ref={barcodeRef}
-                className="input font-mono"
-                placeholder="Scan barcode…"
-                value={form.barcode}
-                onChange={set('barcode')}
-                onKeyDown={handleBarcodeKey}
-                autoFocus={barcodeEnabled && !product}
-              />
-            </div>
-          )}
+          {/* Barcode — always shown; autoFocus when adding a new product so USB scanner works */}
+          <div>
+            <label className="label flex items-center gap-1.5">
+              <Barcode className="w-4 h-4 text-gray-400" />
+              Barcode
+              <span className="text-xs text-gray-400 font-normal">(scan or type)</span>
+            </label>
+            <input
+              ref={barcodeRef}
+              className="input font-mono"
+              placeholder="Scan or type barcode…"
+              value={form.barcode}
+              onChange={set('barcode')}
+              onKeyDown={handleBarcodeKey}
+              autoFocus={!product}
+            />
+          </div>
 
           {/* Name */}
           <div>

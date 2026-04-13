@@ -17,8 +17,10 @@ export default function ScannerPage() {
   const [flash,      setFlash]      = useState(false);
   const [camError,   setCamError]   = useState('');
 
-  const wsRef      = useRef(null);
-  const scannerRef = useRef(null);
+  const wsRef        = useRef(null);
+  const scannerRef   = useRef(null);
+  const lastScanRef  = useRef({ code: '', time: 0 });
+  const COOLDOWN_MS  = 2000;
 
   // ── WebSocket connect ───────────────────────────────────────
   function connect(codeOverride) {
@@ -90,15 +92,23 @@ export default function ScannerPage() {
         { facingMode: 'environment' },
         { fps: 12, qrbox: { width: 280, height: 150 } },
         (decoded) => {
+          // Debounce: ignore same barcode fired repeatedly by html5-qrcode
+          const now = Date.now();
+          if (
+            decoded === lastScanRef.current.code &&
+            now - lastScanRef.current.time < COOLDOWN_MS
+          ) return;
+          lastScanRef.current = { code: decoded, time: now };
+
           // Forward barcode to POS
           if (wsRef.current?.readyState === 1) {
             wsRef.current.send(JSON.stringify({ type: 'barcode', data: decoded }));
           }
-          // Visual + haptic feedback
-          navigator.vibrate?.(150);
+          // Haptic feedback (Android; iOS blocks vibration)
+          try { navigator.vibrate?.([200, 100, 200]); } catch { /* ignore */ }
           setLastScan(decoded);
           setFlash(true);
-          setTimeout(() => setFlash(false), 500);
+          setTimeout(() => setFlash(false), 700);
         },
         () => { /* scan-frame errors are normal, ignore */ }
       ).catch((err) => {
@@ -212,14 +222,20 @@ export default function ScannerPage() {
           <div className="flex-1 relative overflow-hidden bg-black">
             <div id="qr-reader-phone" className="w-full h-full" />
 
-            {/* Green flash overlay */}
+            {/* Green flash overlay — strong visual feedback (especially for iOS) */}
             {flash && (
-              <div className="absolute inset-0 bg-green-400/40 flex items-center justify-center
-                              pointer-events-none">
-                <div className="bg-green-500 text-white text-xl font-bold px-8 py-4
-                                rounded-2xl shadow-2xl">
-                  Scanned!
+              <div className="absolute inset-0 bg-green-500/60 flex flex-col items-center
+                              justify-center pointer-events-none gap-3">
+                <div className="bg-green-500 text-white text-2xl font-bold px-10 py-5
+                                rounded-2xl shadow-2xl border-2 border-green-300">
+                  ✓ Scanned!
                 </div>
+                {lastScan && (
+                  <p className="text-white font-mono text-sm bg-black/40 px-4 py-1 rounded-lg
+                                max-w-xs text-center truncate">
+                    {lastScan}
+                  </p>
+                )}
               </div>
             )}
 
