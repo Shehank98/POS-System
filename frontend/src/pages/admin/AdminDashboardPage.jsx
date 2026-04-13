@@ -3,7 +3,8 @@ import {
   Shield, Store, CreditCard, CheckCircle2, XCircle,
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
   AlertTriangle, Users, ClipboardList, Plus, CalendarPlus,
-  KeyRound, Loader2,
+  KeyRound, Loader2, BarChart2, TrendingUp, DollarSign,
+  ShoppingCart, Package,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -192,64 +193,69 @@ function CreateShopModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <p className="font-semibold text-white">Create New Shop</p>
+          <p className="font-semibold text-white text-lg">Create New Shop</p>
           <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle className="w-5 h-5" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Info</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Shop Name *</label>
-              <input className={inputCls} placeholder="e.g. Kedai Ali" value={form.name} onChange={set('name')} required />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Two-column layout on wide modal */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            {/* ── Left column: Shop Info ── */}
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Info</p>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Shop Name *</label>
+                <input className={inputCls} placeholder="e.g. Kedai Ali" value={form.name} onChange={set('name')} required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Phone</label>
+                <input className={inputCls} placeholder="+60 12-345 6789" value={form.phone} onChange={set('phone')} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Contact Email</label>
+                <input className={inputCls} type="email" placeholder="shop@email.com" value={form.contact_email} onChange={set('contact_email')} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Address</label>
+                <input className={inputCls} placeholder="123 Jalan Utama, Kuala Lumpur" value={form.address} onChange={set('address')} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Logo URL <span className="text-gray-600">(receipt logo)</span>
+                </label>
+                <input className={inputCls} placeholder="https://..." value={form.logo_url} onChange={set('logo_url')} />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Phone</label>
-              <input className={inputCls} placeholder="+60 12-345 6789" value={form.phone} onChange={set('phone')} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Contact Email</label>
-              <input className={inputCls} type="email" placeholder="shop@email.com" value={form.contact_email} onChange={set('contact_email')} />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Address</label>
-              <input className={inputCls} placeholder="123 Jalan Utama, Kuala Lumpur" value={form.address} onChange={set('address')} />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Logo URL
-                <span className="ml-1 text-gray-600">(paste image URL for receipt logo)</span>
-              </label>
-              <input className={inputCls} placeholder="https://..." value={form.logo_url} onChange={set('logo_url')} />
-            </div>
-          </div>
 
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold pt-1">Owner Account</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Owner Full Name *</label>
-              <input className={inputCls} placeholder="Ali bin Abu" value={form.owner_name} onChange={set('owner_name')} required />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Login Email *</label>
-              <input className={inputCls} type="email" placeholder="ali@email.com" value={form.email} onChange={set('email')} required />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Owner Username *</label>
-              <input className={inputCls} placeholder="ali_owner" value={form.owner_username} onChange={set('owner_username')} required />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Owner Password *</label>
-              <input className={inputCls} type="password" placeholder="••••••••" value={form.owner_password} onChange={set('owner_password')} required />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Subscription (months)</label>
-              <input className={inputCls} type="number" min="1" max="36" value={form.subscription_months} onChange={set('subscription_months')} />
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <input type="checkbox" id="bc" className="w-4 h-4 rounded accent-primary-600" checked={form.barcode_enabled} onChange={set('barcode_enabled')} />
-              <label htmlFor="bc" className="text-sm text-gray-300 cursor-pointer">Barcode scanner</label>
+            {/* ── Right column: Owner Account ── */}
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Owner Account</p>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Owner Full Name *</label>
+                <input className={inputCls} placeholder="Ali bin Abu" value={form.owner_name} onChange={set('owner_name')} required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Login Email *</label>
+                <input className={inputCls} type="email" placeholder="ali@email.com" value={form.email} onChange={set('email')} required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Owner Username *</label>
+                <input className={inputCls} placeholder="ali_owner" value={form.owner_username} onChange={set('owner_username')} required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Owner Password *</label>
+                <input className={inputCls} type="password" placeholder="••••••••" value={form.owner_password} onChange={set('owner_password')} required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Subscription (months)</label>
+                <input className={inputCls} type="number" min="1" max="36" value={form.subscription_months} onChange={set('subscription_months')} />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input type="checkbox" id="bc" className="w-4 h-4 rounded accent-primary-600" checked={form.barcode_enabled} onChange={set('barcode_enabled')} />
+                <label htmlFor="bc" className="text-sm text-gray-300 cursor-pointer">Enable barcode scanner</label>
+              </div>
             </div>
           </div>
           <button type="submit" disabled={busy}
@@ -525,6 +531,277 @@ function UsersModal({ shop, onClose }) {
   );
 }
 
+// ── Analysis Tab ──────────────────────────────────────────────
+function AnalysisTab({ shops }) {
+  const today     = new Date().toISOString().slice(0, 10);
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString().slice(0, 10);
+
+  const [startDate, setStartDate] = useState(monthStart);
+  const [endDate,   setEndDate]   = useState(today);
+  const [shopId,    setShopId]    = useState('');
+  const [data,      setData]      = useState(null);
+  const [loading,   setLoading]   = useState(false);
+
+  const fmt   = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+  const fmtN  = (n) => Number(n || 0).toLocaleString();
+
+  function setPreset(preset) {
+    const now = new Date();
+    if (preset === 'today') {
+      setStartDate(today); setEndDate(today);
+    } else if (preset === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - d.getDay());
+      setStartDate(d.toISOString().slice(0, 10)); setEndDate(today);
+    } else if (preset === 'month') {
+      setStartDate(monthStart); setEndDate(today);
+    } else if (preset === 'last_month') {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last  = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(first.toISOString().slice(0, 10));
+      setEndDate(last.toISOString().slice(0, 10));
+    }
+  }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const params = { start_date: startDate, end_date: endDate };
+      if (shopId) params.shop_id = shopId;
+      const { data: res } = await adminApi.getAnalysis(params);
+      setData(res);
+    } catch {
+      toast.error('Failed to load analysis');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // auto-load on mount
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const profitColor = (n) => Number(n) >= 0 ? 'text-green-400' : 'text-red-400';
+
+  const inputCls = 'bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  return (
+    <div className="space-y-5">
+      {/* ── Filters ── */}
+      <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Filters</p>
+
+        {/* Quick presets */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: 'Today',      key: 'today'      },
+            { label: 'This Week',  key: 'week'       },
+            { label: 'This Month', key: 'month'      },
+            { label: 'Last Month', key: 'last_month' },
+          ].map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPreset(p.key)}
+              className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">From</label>
+            <input type="date" className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">To</label>
+            <input type="date" className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Shop</label>
+            <select className={inputCls} value={shopId} onChange={(e) => setShopId(e.target.value)}>
+              <option value="">All Shops</option>
+              {shops.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700
+                       text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+          >
+            {loading
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <BarChart2 className="w-4 h-4" />}
+            {loading ? 'Loading…' : 'Run Analysis'}
+          </button>
+        </div>
+      </div>
+
+      {!data && !loading && (
+        <div className="text-center py-16 text-gray-500">
+          <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p>Select a date range and click Run Analysis</p>
+        </div>
+      )}
+
+      {loading && !data && (
+        <div className="flex justify-center py-16">
+          <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* ── Overview cards ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Total Revenue</p>
+                <p className="text-xl font-bold text-white">{fmt(data.total_revenue)}</p>
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-orange-600 flex items-center justify-center shrink-0">
+                <ShoppingCart className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Total Cost (COGS)</p>
+                <p className="text-xl font-bold text-white">{fmt(data.total_cost)}</p>
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${data.total_profit >= 0 ? 'bg-green-600' : 'bg-red-600'}`}>
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Gross Profit</p>
+                <p className={`text-xl font-bold ${profitColor(data.total_profit)}`}>{fmt(data.total_profit)}</p>
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                <Package className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Transactions</p>
+                <p className="text-xl font-bold text-white">{fmtN(data.transaction_count)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Profit margin badge */}
+          {data.total_revenue > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-400">Profit Margin:</span>
+              <span className={`text-sm font-bold ${profitColor(data.total_profit)}`}>
+                {((data.total_profit / data.total_revenue) * 100).toFixed(1)}%
+              </span>
+            </div>
+          )}
+
+          {/* ── Top Products ── */}
+          {data.top_products?.length > 0 && (
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
+                <Package className="w-4 h-4 text-gray-400" />
+                <p className="text-sm font-semibold text-white">Top Products by Revenue</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-700">
+                      <th className="text-left px-4 py-3">#</th>
+                      <th className="text-left px-4 py-3">Product</th>
+                      <th className="text-right px-4 py-3">Qty Sold</th>
+                      <th className="text-right px-4 py-3">Revenue</th>
+                      <th className="text-right px-4 py-3">Cost</th>
+                      <th className="text-right px-4 py-3">Profit</th>
+                      <th className="text-right px-4 py-3">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {data.top_products.map((p, i) => {
+                      const margin = Number(p.revenue) > 0
+                        ? ((Number(p.profit) / Number(p.revenue)) * 100).toFixed(1)
+                        : '0.0';
+                      return (
+                        <tr key={i} className="hover:bg-gray-750 transition-colors">
+                          <td className="px-4 py-3 text-gray-500 text-xs">{i + 1}</td>
+                          <td className="px-4 py-3 text-white font-medium">{p.name}</td>
+                          <td className="px-4 py-3 text-right text-gray-300">{fmtN(p.qty_sold)}</td>
+                          <td className="px-4 py-3 text-right text-white">{fmt(p.revenue)}</td>
+                          <td className="px-4 py-3 text-right text-gray-400">{fmt(p.cost)}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${profitColor(p.profit)}`}>{fmt(p.profit)}</td>
+                          <td className={`px-4 py-3 text-right text-xs ${profitColor(p.profit)}`}>{margin}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Shop Breakdown (all-shops view) ── */}
+          {data.shop_breakdown?.length > 0 && (
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
+                <Store className="w-4 h-4 text-gray-400" />
+                <p className="text-sm font-semibold text-white">Revenue by Shop</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-700">
+                      <th className="text-left px-4 py-3">Shop</th>
+                      <th className="text-right px-4 py-3">Transactions</th>
+                      <th className="text-right px-4 py-3">Revenue</th>
+                      <th className="text-right px-4 py-3">Cost</th>
+                      <th className="text-right px-4 py-3">Profit</th>
+                      <th className="text-right px-4 py-3">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {data.shop_breakdown.map((s) => {
+                      const margin = Number(s.revenue) > 0
+                        ? ((Number(s.profit) / Number(s.revenue)) * 100).toFixed(1)
+                        : '0.0';
+                      return (
+                        <tr key={s.shop_id} className="hover:bg-gray-750 transition-colors">
+                          <td className="px-4 py-3 text-white font-medium">{s.shop_name}</td>
+                          <td className="px-4 py-3 text-right text-gray-300">{fmtN(s.transaction_count)}</td>
+                          <td className="px-4 py-3 text-right text-white">{fmt(s.revenue)}</td>
+                          <td className="px-4 py-3 text-right text-gray-400">{fmt(s.cost)}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${profitColor(s.profit)}`}>{fmt(s.profit)}</td>
+                          <td className={`px-4 py-3 text-right text-xs ${profitColor(s.profit)}`}>{margin}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {data.top_products?.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              <p>No sales data for the selected period</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const AUDIT_TYPE_LABELS = {
   product:          'Product Deleted',
   transaction_void: 'Transaction Voided',
@@ -697,18 +974,20 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-800 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-gray-800 rounded-xl p-1 w-fit flex-wrap">
           {[
-            { id: 'payments', label: 'Payments', badge: pendingCount },
-            { id: 'shops',    label: 'Shops'    },
-            { id: 'audit',    label: 'Audit Log' },
+            { id: 'payments', label: 'Payments',  badge: pendingCount },
+            { id: 'shops',    label: 'Shops'      },
+            { id: 'analysis', label: 'Analysis', icon: BarChart2 },
+            { id: 'audit',    label: 'Audit Log'  },
           ].map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-colors
+              className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
                 ${tab === t.id ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
             >
+              {t.icon && <t.icon className="w-3.5 h-3.5" />}
               {t.label}
               {t.badge > 0 && (
                 <span className="ml-1.5 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full">
@@ -868,6 +1147,9 @@ export default function AdminDashboardPage() {
             })}
           </div>
         )}
+
+        {/* Analysis tab */}
+        {tab === 'analysis' && <AnalysisTab shops={shops} />}
 
         {/* Audit Log tab */}
         {tab === 'audit' && (

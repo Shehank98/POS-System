@@ -130,6 +130,7 @@ export const adminApi = {
   getProof:       (id)   => adminClient.get(`/admin/payments/${id}/proof`),
   verifyPayment:  (id)   => adminClient.put(`/admin/payments/${id}/verify`),
   rejectPayment:  (id, data) => adminClient.put(`/admin/payments/${id}/reject`, data),
+  getAnalysis:      (params)            => adminClient.get('/admin/analysis',  { params }),
   getAuditLog:      (params)            => adminClient.get('/admin/audit-log', { params }),
   getShopUsers:     (shopId)            => adminClient.get(`/admin/shops/${shopId}/users`),
   changeUserPw:     (shopId, userId, pw) => adminClient.put(`/admin/shops/${shopId}/users/${userId}/password`, { new_password: pw }),

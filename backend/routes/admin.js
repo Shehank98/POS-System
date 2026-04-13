@@ -10,6 +10,7 @@ router.post('/login', ctrl.adminLogin);
 router.use(adminAuth);
 
 router.get('/dashboard',                    ctrl.getDashboard);
+router.get('/analysis',                     ctrl.getAnalysis);
 
 // Shop management
 router.get('/shops',                        ctrl.listShops);

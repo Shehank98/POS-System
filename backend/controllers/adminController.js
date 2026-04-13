@@ -420,6 +420,111 @@ async function updateShop(req, res) {
   }
 }
 
+// ── GET /api/admin/analysis ───────────────────────────────────
+async function getAnalysis(req, res) {
+  const { start_date, end_date, shop_id } = req.query;
+
+  // Build parameterised WHERE conditions for completed transactions
+  const params = [];
+  const txnConds = ["t.status = 'completed'"];
+
+  if (start_date) {
+    params.push(start_date);
+    txnConds.push(`t.transaction_date >= $${params.length}`);
+  }
+  if (end_date) {
+    params.push(end_date + ' 23:59:59');
+    txnConds.push(`t.transaction_date <= $${params.length}`);
+  }
+  if (shop_id) {
+    params.push(parseInt(shop_id, 10));
+    txnConds.push(`t.shop_id = $${params.length}`);
+  }
+
+  const where = `WHERE ${txnConds.join(' AND ')}`;
+
+  try {
+    // ── Overview totals ────────────────────────────────────────
+    const { rows: ov } = await db.query(
+      `SELECT
+         COALESCE(SUM(t.total_amount), 0)                              AS total_revenue,
+         COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)    AS total_cost,
+         COUNT(DISTINCT t.id)                                           AS transaction_count
+       FROM transactions t
+       LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
+       LEFT JOIN products           p  ON p.id = ti.product_id
+       ${where}`,
+      params
+    );
+
+    // ── Top 20 products ────────────────────────────────────────
+    const { rows: topProducts } = await db.query(
+      `SELECT
+         COALESCE(p.name, '[Deleted Product]')                         AS name,
+         SUM(ti.quantity)::numeric                                      AS qty_sold,
+         COALESCE(SUM(ti.subtotal), 0)                                 AS revenue,
+         COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)    AS cost,
+         COALESCE(SUM(ti.subtotal), 0)
+           - COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS profit
+       FROM transaction_items ti
+       JOIN  transactions t ON t.id = ti.transaction_id
+       LEFT JOIN products   p ON p.id = ti.product_id
+       ${where}
+       GROUP BY p.id, p.name
+       ORDER BY revenue DESC
+       LIMIT 20`,
+      params
+    );
+
+    // ── Per-shop breakdown (only when not filtering by a single shop) ──
+    let shopBreakdown = [];
+    if (!shop_id) {
+      const bkParams = [];
+      const bkJoinConds = ["t.shop_id = s.id", "t.status = 'completed'"];
+      if (start_date) {
+        bkParams.push(start_date);
+        bkJoinConds.push(`t.transaction_date >= $${bkParams.length}`);
+      }
+      if (end_date) {
+        bkParams.push(end_date + ' 23:59:59');
+        bkJoinConds.push(`t.transaction_date <= $${bkParams.length}`);
+      }
+      const joinOn = bkJoinConds.join(' AND ');
+
+      const { rows } = await db.query(
+        `SELECT
+           s.id                                                          AS shop_id,
+           s.name                                                        AS shop_name,
+           COALESCE(SUM(t.total_amount), 0)                             AS revenue,
+           COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)   AS cost,
+           COALESCE(SUM(t.total_amount), 0)
+             - COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS profit,
+           COUNT(DISTINCT t.id)                                          AS transaction_count
+         FROM shops s
+         LEFT JOIN transactions      t  ON ${joinOn}
+         LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
+         LEFT JOIN products           p  ON p.id = ti.product_id
+         GROUP BY s.id, s.name
+         ORDER BY revenue DESC`,
+        bkParams
+      );
+      shopBreakdown = rows;
+    }
+
+    res.json({
+      total_revenue:     Number(ov[0].total_revenue),
+      total_cost:        Number(ov[0].total_cost),
+      total_profit:      Number(ov[0].total_revenue) - Number(ov[0].total_cost),
+      transaction_count: Number(ov[0].transaction_count),
+      top_products:      topProducts,
+      shop_breakdown:    shopBreakdown,
+    });
+  } catch (err) {
+    console.error('getAnalysis error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── GET /api/admin/payments/:id/proof ────────────────────────
 async function getPaymentProof(req, res) {
   try {
@@ -440,4 +545,5 @@ module.exports = {
   getShopUsers, changeUserPassword,
   updateSubscription, getShopSales,
   listPayments, verifyPayment, rejectPayment, getPaymentProof,
+  getAnalysis,
 };
