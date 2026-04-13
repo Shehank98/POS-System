@@ -3,13 +3,11 @@ const db = require('../config/database');
 // ── GET /api/transactions/:id/receipt ────────────────────────
 async function getReceipt(req, res) {
   try {
-    // Fetch transaction with full shop info
+    // Fetch transaction — only columns that exist in the base schema
     const { rows: txnRows } = await db.query(
       `SELECT t.*, u.username AS cashier,
-              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
-              s.email AS shop_login_email,
-              COALESCE(s.contact_email, s.email) AS shop_contact_email,
-              COALESCE(s.logo_url, '') AS shop_logo
+              s.name AS shop_name, s.address AS shop_address,
+              s.phone AS shop_phone, s.email AS shop_email
          FROM transactions t
          LEFT JOIN users  u ON u.id  = t.user_id
          LEFT JOIN shops  s ON s.id  = t.shop_id
@@ -17,6 +15,23 @@ async function getReceipt(req, res) {
       [req.params.id, req.shopId]
     );
     if (txnRows.length === 0) return res.status(404).json({ error: 'Transaction not found' });
+
+    // Fetch optional columns added by migration 005 (logo_url, contact_email).
+    // Wrapped in try/catch so receipt still works if migration hasn't been run yet.
+    let shopLogo = '';
+    let shopContactEmail = txnRows[0].shop_email || '';
+    try {
+      const { rows: extra } = await db.query(
+        `SELECT COALESCE(logo_url, '') AS logo_url,
+                COALESCE(contact_email, email) AS contact_email
+           FROM shops WHERE id = $1`,
+        [txnRows[0].shop_id]
+      );
+      if (extra.length > 0) {
+        shopLogo         = extra[0].logo_url         || '';
+        shopContactEmail = extra[0].contact_email    || shopContactEmail;
+      }
+    } catch { /* migration 005 not yet applied — continue without logo/contact email */ }
 
     // Fetch line items
     const { rows: items } = await db.query(
@@ -52,15 +67,15 @@ async function getReceipt(req, res) {
       ? `<tr class="summary-row"><td colspan="4">Tax</td><td>${fmt(t.tax_amount)}</td></tr>` : '';
 
     // Logo block
-    const logoBlock = t.shop_logo
-      ? `<div class="logo-wrap"><img src="${escHtml(t.shop_logo)}" alt="logo" class="shop-logo" /></div>`
+    const logoBlock = shopLogo
+      ? `<div class="logo-wrap"><img src="${escHtml(shopLogo)}" alt="logo" class="shop-logo" /></div>`
       : '';
 
     // Contact block
     const contactLines = [
       t.shop_address ? escHtml(t.shop_address) : null,
       t.shop_phone   ? `Tel: ${escHtml(t.shop_phone)}` : null,
-      t.shop_contact_email ? escHtml(t.shop_contact_email) : null,
+      shopContactEmail ? escHtml(shopContactEmail) : null,
     ].filter(Boolean);
     const contactBlock = contactLines.map((l) => `<p class="shop-meta">${l}</p>`).join('');
 
