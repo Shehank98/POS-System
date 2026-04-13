@@ -11,7 +11,7 @@ import { productsApi } from '../api/client';
 import PaymentModal      from '../components/PaymentModal';
 import usePosScanner     from '../hooks/usePosScanner';
 import PhoneScannerModal from '../components/PhoneScannerModal';
-import CameraScanner     from '../components/CameraScanner';
+import PosCameraScanner  from '../components/PosCameraScanner';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
@@ -587,23 +587,16 @@ export default function POSPage() {
         />
       )}
 
-      {/* Direct device camera scanner */}
+      {/* Direct device camera scanner — stays open for multi-scan */}
       {showCamera && (
-        <CameraScanner
-          scannerId="pos-cam-scanner"
-          onScan={async (code) => {
-            setShowCamera(false);
-            setScanning(true);
-            try {
-              const { data } = await productsApi.byBarcode(code);
-              addItem(data);
-              toast.success(`Added: ${data.name}`);
-            } catch {
-              toast.error(`Barcode "${code}" not found`);
-            } finally {
-              setScanning(false);
-              barcodeRef.current?.focus();
+        <PosCameraScanner
+          onDone={(items) => {
+            items.forEach(({ product, quantity }) => addItem(product, quantity));
+            if (items.length > 0) {
+              const total = items.reduce((s, i) => s + i.quantity, 0);
+              toast.success(`Added ${total} item${total !== 1 ? 's' : ''} to cart`);
             }
+            barcodeRef.current?.focus();
           }}
           onClose={() => setShowCamera(false)}
         />
