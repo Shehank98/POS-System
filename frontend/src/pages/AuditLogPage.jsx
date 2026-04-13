@@ -15,7 +15,7 @@ function fmtDate(d) {
   return d ? new Date(d).toLocaleString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
-  }) : '—';
+  }) : '-';
 }
 
 function JsonBlock({ data }) {
@@ -161,7 +161,7 @@ export default function AuditLogPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900">{preview}</td>
-                      <td className="px-4 py-3 text-gray-500">{r.deleted_by || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{r.deleted_by || '-'}</td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(r.deleted_at)}</td>
                       <td className="px-4 py-3">
                         <JsonBlock data={r.original_data} />

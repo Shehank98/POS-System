@@ -13,7 +13,7 @@ const STATUS_BADGE = {
   rejected: { label: 'Rejected',       cls: 'bg-red-100    text-red-700'    },
 };
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '—';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '-';
 const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 function daysUntil(dateStr) {
@@ -77,7 +77,7 @@ function SubscriptionBanner({ user }) {
           </p>
           <p className="text-sm text-green-700">
             {days !== null
-              ? `Expires in ${days} day${days !== 1 ? 's' : ''} — ${fmtDate(user.subscription_end_date)}`
+              ? `Expires in ${days} day${days !== 1 ? 's' : ''} - ${fmtDate(user.subscription_end_date)}`
               : 'No expiry date set'}
           </p>
         </div>
@@ -125,7 +125,7 @@ export default function BillingPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image too large — max 2 MB');
+      toast.error('Image too large - max 2 MB');
       return;
     }
     setProofFile(file);
@@ -324,7 +324,7 @@ export default function BillingPage() {
                 >
                   <div>
                     <p className="font-medium text-gray-800">
-                      {fmtMoney(p.amount)} — {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
+                      {fmtMoney(p.amount)} - {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-gray-400">{fmtDate(p.payment_date)}</p>
                     {p.notes && (

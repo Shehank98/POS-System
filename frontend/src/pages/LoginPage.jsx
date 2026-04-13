@@ -32,7 +32,7 @@ export default function LoginPage() {
       });
 
       if (data.user.read_only) {
-        toast('Logged in as read-only — subscription expired', { icon: '⚠️' });
+        toast('Logged in as read-only - subscription expired', { icon: '⚠️' });
       } else {
         toast.success(`Welcome, ${data.user.username}!`);
       }

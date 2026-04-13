@@ -8,10 +8,10 @@ import { syncPending, isSyncing } from '../utils/syncService';
  * Compact status badge shown in the Layout sidebar footer.
  *
  * States:
- *   🟢 Online, nothing pending          — green
- *   🟡 Online, pending transactions     — yellow (with sync button)
- *   🔵 Syncing…                         — blue spinner
- *   🔴 Offline                          — red
+ *   🟢 Online, nothing pending          - green
+ *   🟡 Online, pending transactions     - yellow (with sync button)
+ *   🔵 Syncing…                         - blue spinner
+ *   🔴 Offline                          - red
  */
 export default function ConnectionStatus() {
   const { isOnline, pendingCount, refreshPending } = useOnlineStatus();

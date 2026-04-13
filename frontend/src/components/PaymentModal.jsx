@@ -83,7 +83,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
     // Subscription guard: block if expired > 3 days
     const allowed = await isOfflineAllowed();
     if (!allowed) {
-      toast.error('Offline transactions disabled — subscription expired. Please renew.');
+      toast.error('Offline transactions disabled - subscription expired. Please renew.');
       setSaving(false);
       return;
     }
@@ -101,7 +101,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
         created_at:      new Date().toISOString(),
       });
       setDone({ offline: true, client_id: clientId });
-      toast('Sale saved offline — will sync when connected', { icon: '📶' });
+      toast('Sale saved offline - will sync when connected', { icon: '📶' });
     } catch (err) {
       toast.error('Failed to save offline transaction');
       console.error(err);

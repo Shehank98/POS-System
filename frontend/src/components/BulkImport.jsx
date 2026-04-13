@@ -107,7 +107,7 @@ export default function BulkImport({ onClose, onDone }) {
         <div className="px-6 py-4 space-y-4">
           {/* Step 1: Download template */}
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-2">
-            <p className="text-sm font-medium text-blue-800">Step 1 — Download the template</p>
+            <p className="text-sm font-medium text-blue-800">Step 1 - Download the template</p>
             <p className="text-xs text-blue-600">
               Fill in the Excel template with your products, then upload it below.
               Column <code>has_inventory</code>: use <code>true</code> / <code>false</code>.
@@ -119,7 +119,7 @@ export default function BulkImport({ onClose, onDone }) {
 
           {/* Step 2: Upload */}
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Step 2 — Upload your filled file</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">Step 2 - Upload your filled file</p>
             <label className="flex flex-col items-center justify-center w-full h-28 border-2
                               border-dashed border-gray-300 rounded-lg cursor-pointer
                               hover:border-primary-400 hover:bg-blue-50 transition-colors">
@@ -170,9 +170,9 @@ export default function BulkImport({ onClose, onDone }) {
                     {rows.slice(0, 100).map((r) => (
                       <tr key={r._row} className={r._valid ? '' : 'bg-red-50'}>
                         <td className="px-3 py-1.5 text-gray-400">{r._row}</td>
-                        <td className="px-3 py-1.5 font-medium">{r.name || '—'}</td>
+                        <td className="px-3 py-1.5 font-medium">{r.name || '-'}</td>
                         <td className="px-3 py-1.5 text-right">{r.price}</td>
-                        <td className="px-3 py-1.5 text-gray-500">{r.category || '—'}</td>
+                        <td className="px-3 py-1.5 text-gray-500">{r.category || '-'}</td>
                         <td className="px-3 py-1.5 text-right">
                           {r.has_inventory ? r.stock_quantity : 'N/A'}
                         </td>

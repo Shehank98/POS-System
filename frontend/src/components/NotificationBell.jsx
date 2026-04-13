@@ -36,7 +36,7 @@ export default function NotificationBell() {
       setNotifications(data.notifications || []);
       setUnreadCount(data.unread_count || 0);
     } catch {
-      // silently fail — user might be offline
+      // silently fail - user might be offline
     }
   }, []);
 

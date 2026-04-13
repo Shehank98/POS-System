@@ -223,9 +223,9 @@ export default function ReportsPage() {
         <div className="bg-blue-50 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
           <p className="font-medium">Excel export includes 3 sheets:</p>
           <ul className="list-disc pl-4 space-y-0.5">
-            <li>Summary — totals, counts, tax, discounts</li>
-            <li>Transactions — one row per sale with all columns</li>
-            <li>Line Items — one row per product sold</li>
+            <li>Summary - totals, counts, tax, discounts</li>
+            <li>Transactions - one row per sale with all columns</li>
+            <li>Line Items - one row per product sold</li>
           </ul>
           <p className="font-medium mt-1.5">PDF export includes:</p>
           <ul className="list-disc pl-4 space-y-0.5">

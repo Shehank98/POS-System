@@ -218,7 +218,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
               <p className="text-xs text-gray-400">
                 {form.has_inventory
                   ? 'Stock will decrease with each sale'
-                  : 'Unlimited — stock is not tracked'}
+                  : 'Unlimited - stock is not tracked'}
               </p>
             </div>
           </div>

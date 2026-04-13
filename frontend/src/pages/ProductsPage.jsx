@@ -106,7 +106,7 @@ export default function ProductsPage() {
       {user?.read_only && (
         <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200
                         text-yellow-800 rounded-lg px-4 py-2 text-sm">
-          ⚠️ Read-only mode — subscription expired. Contact admin to renew.
+          ⚠️ Read-only mode - subscription expired. Contact admin to renew.
         </div>
       )}
 
@@ -189,10 +189,10 @@ export default function ProductsPage() {
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs hidden md:table-cell">
-                    {p.barcode || <span className="text-gray-300">—</span>}
+                    {p.barcode || <span className="text-gray-300">-</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
-                    {p.category || <span className="text-gray-300">—</span>}
+                    {p.category || <span className="text-gray-300">-</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(p.price)}</td>
                   <td className="px-4 py-3 text-right hidden sm:table-cell">
@@ -204,7 +204,7 @@ export default function ProductsPage() {
                     }
                   </td>
                   <td className="px-4 py-3 text-center text-gray-500 hidden lg:table-cell">
-                    {p.tax_rate > 0 ? `${p.tax_rate}%` : '—'}
+                    {p.tax_rate > 0 ? `${p.tax_rate}%` : '-'}
                   </td>
                   {canEdit && (
                     <td className="px-4 py-3 text-right">

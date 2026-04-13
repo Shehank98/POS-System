@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminApi } from '../../api/client';
 import useAdminStore from '../../store/adminStore';
 
-const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '—';
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '-';
 const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 const PAY_STATUS = {
@@ -261,7 +261,7 @@ function ExtendSubModal({ shop, onClose, onDone }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="bg-gray-800 rounded-2xl p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-white">Manage Subscription — {shop.name}</p>
+        <p className="text-sm font-semibold text-white">Manage Subscription - {shop.name}</p>
         <div className="space-y-3">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Status</label>
@@ -306,12 +306,12 @@ function AuditRow({ record: r, preview }) {
         month: 'short', day: 'numeric', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
   return (
     <>
       <tr className="hover:bg-gray-750 transition-colors">
-        <td className="px-4 py-3 text-gray-300">{r.shop_name || '—'}</td>
+        <td className="px-4 py-3 text-gray-300">{r.shop_name || '-'}</td>
         <td className="px-4 py-3">
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full
             ${r.record_type === 'product'
@@ -321,7 +321,7 @@ function AuditRow({ record: r, preview }) {
           </span>
         </td>
         <td className="px-4 py-3 text-white font-medium">{preview}</td>
-        <td className="px-4 py-3 text-gray-400">{r.deleted_by || '—'}</td>
+        <td className="px-4 py-3 text-gray-400">{r.deleted_by || '-'}</td>
         <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{dateStr}</td>
         <td className="px-4 py-3">
           <button
@@ -509,7 +509,7 @@ export default function AdminDashboardPage() {
                         <span className="ml-2 text-gray-400 font-normal text-sm">({p.owner_name})</span>
                       </p>
                       <p className="text-sm text-gray-400">
-                        {fmtMoney(p.amount)} — {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
+                        {fmtMoney(p.amount)} - {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
                         <span className="mx-2 text-gray-600">·</span>
                         {fmtDate(p.payment_date)}
                       </p>

@@ -216,7 +216,7 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-gray-500 hidden sm:table-cell text-xs">
                       {new Date(t.transaction_date).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{t.cashier || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{t.cashier || '-'}</td>
                     <td className="px-4 py-3 text-center">
                       <PayBadge method={t.payment_method} />
                     </td>
@@ -284,7 +284,7 @@ export default function TransactionsPage() {
                                   <td className="text-right">{i.quantity}</td>
                                   <td className="text-right">{fmt(i.unit_price)}</td>
                                   <td className="text-right text-orange-500">
-                                    {Number(i.discount) > 0 ? `-${fmt(i.discount)}` : '—'}
+                                    {Number(i.discount) > 0 ? `-${fmt(i.discount)}` : '-'}
                                   </td>
                                   <td className="text-right font-medium">{fmt(i.subtotal)}</td>
                                 </tr>
