@@ -94,11 +94,13 @@ export default function PosCameraScanner({ onDone, onClose }) {
           { facingMode: 'environment' },
           {
             fps: 15,
-            // Request 16:9 landscape stream — on a portrait phone this renders
-            // ~220px tall (390px wide ÷ 1.778). We clip it to 200px via the
-            // wrapper's overflow:hidden. qrbox fits fully inside that 200px.
             aspectRatio: 1.778,
-            qrbox: { width: 260, height: 120 },
+            // No qrbox — library scans the FULL video frame.
+            // With qrbox the detection zone is centred in the full video height
+            // (~500px on a portrait phone), but overflow:hidden only shows the
+            // top ~200px, so the barcode is always outside the detection zone.
+            // Without qrbox every part of the frame is checked; the CSS visual
+            // guide below shows the user where to aim.
           },
           (decoded) => {
             const now = Date.now();
@@ -175,10 +177,10 @@ export default function PosCameraScanner({ onDone, onClose }) {
       {/* ── Camera viewfinder ──────────────────────────────────── */}
       {/*
         aspectRatio:1.778 requests 16:9 → ~220px tall on a 390px wide phone.
-        overflow:hidden + maxHeight:200 clips layout to 200px.
-        Barcode analysis runs on the MediaStream (not the CSS-rendered area),
-        so clipping does NOT break scan detection. The 260×120 qrbox is centred
-        within the ~220px video and fits fully inside the 200px visible window.
+        overflow:hidden + maxHeight:200 keeps the viewfinder compact.
+        qrbox is removed — html5-qrcode scans the full video frame so the
+        barcode is detected wherever it appears in the camera view.
+        A CSS corner-bracket overlay provides the visual scanning guide.
       */}
       <div
         className={`relative bg-black shrink-0 overflow-hidden transition-colors duration-150
@@ -186,6 +188,22 @@ export default function PosCameraScanner({ onDone, onClose }) {
         style={{ maxHeight: 200 }}
       >
         <div id="pos-multi-cam-view" className="w-full" />
+
+        {/* CSS-only scanning guide — purely visual, doesn't affect detection */}
+        {!flash && !camError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* Corner brackets */}
+            <div className="relative w-56 h-24">
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white/80" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white/80" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white/80" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white/80" />
+              {/* Scan line animation */}
+              <div className="absolute left-1 right-1 h-0.5 bg-red-400/70 animate-[scan_1.5s_ease-in-out_infinite]"
+                   style={{ top: '50%' }} />
+            </div>
+          </div>
+        )}
 
         {/* Scan flash overlay */}
         {flash && (
