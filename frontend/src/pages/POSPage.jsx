@@ -2,15 +2,16 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Barcode, Search, X, Plus, Minus,
   ShoppingCart, Percent, CreditCard, Smartphone,
-  Wifi, RefreshCw,
+  Wifi, RefreshCw, Camera,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useCartStore   from '../store/cartStore';
 import useAuthStore   from '../store/authStore';
 import { productsApi } from '../api/client';
-import PaymentModal   from '../components/PaymentModal';
-import usePosScanner  from '../hooks/usePosScanner';
+import PaymentModal      from '../components/PaymentModal';
+import usePosScanner     from '../hooks/usePosScanner';
 import PhoneScannerModal from '../components/PhoneScannerModal';
+import CameraScanner     from '../components/CameraScanner';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
@@ -282,6 +283,7 @@ export default function POSPage() {
   const [showPayment,    setShowPayment]     = useState(false);
   const [showPhoneModal, setShowPhoneModal]  = useState(false);
   const [showMobileCart, setShowMobileCart]  = useState(false);
+  const [showCamera,     setShowCamera]      = useState(false);
 
   const barcodeRef = useRef();
 
@@ -409,6 +411,19 @@ export default function POSPage() {
                 <span className="hidden sm:inline">
                   {phoneScanner.state === 'phone_connected' ? 'Phone' : 'Scanner'}
                 </span>
+              </button>
+            )}
+            {/* Camera scanner — direct device camera, ideal for mobile */}
+            {barcodeEnabled && !readOnly && (
+              <button
+                onClick={() => setShowCamera(true)}
+                title="Use device camera to scan barcode"
+                className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border
+                           bg-white border-gray-200 text-gray-600 hover:bg-gray-50
+                           font-medium transition-colors"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Camera</span>
               </button>
             )}
             {/* Reload */}
@@ -569,6 +584,28 @@ export default function POSPage() {
           onClose={() => setShowPhoneModal(false)}
           onConnect={phoneScanner.connect}
           onDisconnect={phoneScanner.disconnect}
+        />
+      )}
+
+      {/* Direct device camera scanner */}
+      {showCamera && (
+        <CameraScanner
+          scannerId="pos-cam-scanner"
+          onScan={async (code) => {
+            setShowCamera(false);
+            setScanning(true);
+            try {
+              const { data } = await productsApi.byBarcode(code);
+              addItem(data);
+              toast.success(`Added: ${data.name}`);
+            } catch {
+              toast.error(`Barcode "${code}" not found`);
+            } finally {
+              setScanning(false);
+              barcodeRef.current?.focus();
+            }
+          }}
+          onClose={() => setShowCamera(false)}
         />
       )}
 

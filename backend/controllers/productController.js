@@ -113,17 +113,17 @@ async function updateProduct(req, res) {
     const { rows } = await db.query(
       `UPDATE products
           SET name = COALESCE($1, name),
-              barcode = COALESCE($2, barcode),
+              barcode = $2,
               price = COALESCE($3, price),
               cost_price = COALESCE($4, cost_price),
               stock_quantity = COALESCE($5, stock_quantity),
               has_inventory = COALESCE($6, has_inventory),
-              category = COALESCE($7, category),
+              category = $7,
               tax_rate = COALESCE($8, tax_rate)
         WHERE id = $9 AND shop_id = $10
         RETURNING *`,
-      [name, barcode, price, cost_price, stock_quantity, has_inventory, category, tax_rate,
-       req.params.id, req.shopId]
+      [name, barcode ?? null, price, cost_price, stock_quantity, has_inventory,
+       category ?? null, tax_rate, req.params.id, req.shopId]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Product not found' });
     res.json(rows[0]);

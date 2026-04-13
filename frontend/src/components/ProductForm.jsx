@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Barcode, Loader2 } from 'lucide-react';
+import { X, Barcode, Loader2, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
+import CameraScanner from './CameraScanner';
 
 function emptyForm(defaultTaxRate = 0) {
   return {
@@ -32,9 +33,10 @@ export default function ProductForm({ product, onSaved, onClose }) {
     category:       product.category      || '',
     tax_rate:       product.tax_rate       ?? '',
   } : emptyForm(defaultTaxRate));
-  const [saving,  setSaving]  = useState(false);
-  const [errors,  setErrors]  = useState({});
-  const [categories, setCategories] = useState([]);
+  const [saving,      setSaving]      = useState(false);
+  const [errors,      setErrors]      = useState({});
+  const [categories,  setCategories]  = useState([]);
+  const [showCamera,  setShowCamera]  = useState(false);
 
   const barcodeRef = useRef();
   const nameRef    = useRef();
@@ -121,16 +123,41 @@ export default function ProductForm({ product, onSaved, onClose }) {
               Barcode
               <span className="text-xs text-gray-400 font-normal">(scan or type)</span>
             </label>
-            <input
-              ref={barcodeRef}
-              className="input font-mono"
-              placeholder="Scan or type barcode…"
-              value={form.barcode}
-              onChange={set('barcode')}
-              onKeyDown={handleBarcodeKey}
-              autoFocus={!product}
-            />
+            <div className="flex gap-1.5">
+              <input
+                ref={barcodeRef}
+                className="input font-mono flex-1"
+                placeholder="Scan or type barcode…"
+                value={form.barcode}
+                onChange={set('barcode')}
+                onKeyDown={handleBarcodeKey}
+                autoFocus={!product}
+              />
+              <button
+                type="button"
+                title="Use camera to scan barcode"
+                onClick={() => setShowCamera(true)}
+                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg
+                           border border-gray-300 bg-white text-gray-500
+                           hover:bg-primary-50 hover:border-primary-400 hover:text-primary-600
+                           transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Camera scanner overlay */}
+          {showCamera && (
+            <CameraScanner
+              scannerId="product-form-cam"
+              onScan={(code) => {
+                setForm((f) => ({ ...f, barcode: code }));
+                setShowCamera(false);
+              }}
+              onClose={() => setShowCamera(false)}
+            />
+          )}
 
           {/* Name */}
           <div>
