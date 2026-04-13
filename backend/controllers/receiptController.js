@@ -147,16 +147,9 @@ async function getReceipt(req, res) {
 </head>
 <body id="receipt-body">
 
-<!-- Print controls (hidden on print) -->
-<div class="no-print" style="margin-bottom:4mm; display:flex; gap:4px; flex-wrap:wrap;">
-  <button onclick="window.print()" style="padding:4px 10px; cursor:pointer;">🖨 Print</button>
-  <button onclick="document.getElementById('receipt-body').className='a4'"
-          style="padding:4px 10px; cursor:pointer;">A4</button>
-  <button onclick="document.getElementById('receipt-body').className=''"
-          style="padding:4px 10px; cursor:pointer;">80mm</button>
-  <button onclick="document.getElementById('receipt-body').className='narrow'"
-          style="padding:4px 10px; cursor:pointer;">58mm</button>
-  <button onclick="window.close()" style="padding:4px 10px; cursor:pointer; margin-left:auto;">✕ Close</button>
+<!-- Print control (hidden on print) -->
+<div class="no-print" style="margin-bottom:4mm; display:flex; justify-content:center;">
+  <button onclick="window.print()" style="padding:6px 18px; cursor:pointer; font-size:13px;">🖨 Print</button>
 </div>
 
 ${logoBlock}
@@ -197,7 +190,10 @@ ${t.status === 'void' ? '<div class="voided-stamp">★ VOID ★</div>' : ''}
 <div class="divider"></div>
 <p class="thank-you">Thank you for your purchase!</p>
 <p class="thank-you" style="font-size:0.8em; margin-top:1mm; color:#555;">
-  Powered by POS SaaS
+  Powered by BillFlow
+</p>
+<p class="thank-you" style="font-size:0.75em; margin-top:0.5mm; color:#777;">
+  0706421998
 </p>
 
 <script>
