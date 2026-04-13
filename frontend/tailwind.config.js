@@ -3,15 +3,6 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      keyframes: {
-        scan: {
-          '0%, 100%': { transform: 'translateY(-20px)', opacity: '0.4' },
-          '50%':       { transform: 'translateY(20px)',  opacity: '0.9' },
-        },
-      },
-      animation: {
-        scan: 'scan 1.5s ease-in-out infinite',
-      },
       colors: {
         primary: {
           50:  '#eff6ff',
