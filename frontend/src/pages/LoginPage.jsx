@@ -54,11 +54,11 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* White card so the logo is always legible against the dark-blue gradient */}
-          <div className="bg-white rounded-2xl px-8 py-5 mb-8 shadow-2xl">
+          <div className="bg-white rounded-2xl px-10 py-6 mb-8 shadow-2xl">
             <img
               src="/logo.png"
               alt="BillFlow"
-              className="h-16 w-auto object-contain"
+              className="h-28 w-auto object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">BillFlow</h1>
@@ -68,7 +68,7 @@ export default function LoginPage() {
         </div>
 
         <p className="absolute bottom-8 text-primary-300 text-sm">
-          &copy; {new Date().getFullYear()} POS System. All rights reserved.
+          &copy; {new Date().getFullYear()} BillFlow. All rights reserved.
         </p>
       </div>
 
