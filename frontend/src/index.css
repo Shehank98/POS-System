@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Mobile scanner corner marker borders ──────────────────── */
+.scan-corner { @apply absolute w-6 h-6; }
+.scan-corner-tl { @apply top-0 left-0  border-t-2 border-l-2; }
+.scan-corner-tr { @apply top-0 right-0 border-t-2 border-r-2; }
+.scan-corner-bl { @apply bottom-0 left-0  border-b-2 border-l-2; }
+.scan-corner-br { @apply bottom-0 right-0 border-b-2 border-r-2; }
+
+/* ── Smooth bottom sheet ──────────────────────────────────── */
+.bottom-sheet {
+  @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-40;
+  animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Safe-area support ────────────────────────────────────── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
