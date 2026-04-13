@@ -63,7 +63,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">BillFlow</h1>
           <p className="text-primary-200 text-lg max-w-xs leading-relaxed">
-            Manage your shop with ease — sales, inventory, and reports in one place.
+            Manage your shop with ease. Sales, inventory, and reports in one place.
           </p>
         </div>
 
