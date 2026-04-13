@@ -222,7 +222,8 @@ async function getMonth(req, res) {
   }
 }
 
-// ── GET /api/dashboard/low-stock ─────────────────────────────async function getLowStock(req, res) {
+// ── GET /api/dashboard/low-stock ─────────────────────────────
+async function getLowStock(req, res) {
   const threshold = parseInt(req.query.threshold, 10) || 10;
   try {
     const { rows } = await db.query(
