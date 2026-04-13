@@ -210,16 +210,16 @@ async function voidTransaction(req, res) {
       return res.status(400).json({ error: 'Only completed transactions can be voided' });
     }
 
-    // Restore stock
+    // Restore stock (LEFT JOIN so items with deleted products are still counted)
     const { rows: items } = await client.query(
       `SELECT ti.product_id, ti.quantity, p.has_inventory
          FROM transaction_items ti
-         JOIN products p ON p.id = ti.product_id
+         LEFT JOIN products p ON p.id = ti.product_id
         WHERE ti.transaction_id = $1`,
       [req.params.id]
     );
     for (const item of items) {
-      if (item.has_inventory) {
+      if (item.has_inventory && item.product_id) {
         await client.query(
           `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
           [item.quantity, item.product_id]
@@ -228,15 +228,15 @@ async function voidTransaction(req, res) {
     }
 
     const { rows: updated } = await client.query(
-      `UPDATE transactions SET status = 'void' WHERE id = $1 RETURNING *`,
-      [req.params.id]
+      `UPDATE transactions SET status = 'void' WHERE id = $1 AND shop_id = $2 RETURNING *`,
+      [req.params.id, req.shopId]
     );
 
-    // Audit trail
+    // Audit trail — pass object directly so pg serialises it as JSONB
     await client.query(
       `INSERT INTO deleted_records (shop_id, record_type, record_id, deleted_by, original_data)
        VALUES ($1, 'transaction_void', $2, $3, $4)`,
-      [req.shopId, rows[0].id, req.user.id, JSON.stringify(rows[0])]
+      [req.shopId, rows[0].id, req.user.id, rows[0]]
     );
 
     await client.query('COMMIT');
