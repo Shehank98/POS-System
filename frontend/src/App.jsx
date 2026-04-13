@@ -12,6 +12,7 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import BillingPage from './pages/BillingPage';
 import AuditLogPage from './pages/AuditLogPage';
+import ScannerPage from './pages/ScannerPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -36,8 +37,9 @@ export default function App() {
         }}
       />
       <Routes>
-        {/* Shop login */}
+        {/* Public routes (no auth required) */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/scanner" element={<ScannerPage />} />
 
         {/* Admin section */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

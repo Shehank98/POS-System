@@ -1,8 +1,10 @@
 require('dotenv').config();
+const http    = require('http');
 const express = require('express');
 const cors    = require('cors');
 const cron    = require('node-cron');
 const path    = require('path');
+const { setupWebSocket } = require('./websocket');
 
 const authRoutes         = require('./routes/auth');
 const productRoutes      = require('./routes/products');
@@ -64,5 +66,7 @@ cron.schedule('0 9 * * *', runDailyChecks);
 console.log('[Cron] Daily check scheduled at 09:00');
 
 // ── Start ─────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`POS API running on port ${PORT}`));
+const PORT   = process.env.PORT || 3001;
+const server = http.createServer(app);
+setupWebSocket(server);
+server.listen(PORT, () => console.log(`POS API running on port ${PORT}`));

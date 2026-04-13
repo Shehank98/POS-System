@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, authApi } from '../api/client';
 import useAuthStore from '../store/authStore';
@@ -264,8 +264,72 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* ── Scanner Mode (when barcode is enabled) ───────────── */}
+      {user?.barcode_enabled && <ScannerModeSettings />}
+
       {/* ── Receipt Settings ─────────────────────────────────── */}
       <ReceiptSettings />
+    </div>
+  );
+}
+
+function ScannerModeSettings() {
+  const [mode, setMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
+
+  function handleMode(val) {
+    setMode(val);
+    localStorage.setItem('scannerMode', val);
+    toast.success('Scanner mode saved');
+  }
+
+  const OPTIONS = [
+    {
+      value: 'usb',
+      label: 'USB Scanner',
+      desc: 'Hardware barcode scanner via keyboard input',
+    },
+    {
+      value: 'phone',
+      label: 'Phone Camera',
+      desc: 'Wireless scanning from your phone',
+    },
+    {
+      value: 'both',
+      label: 'Both',
+      desc: 'Use either method (recommended)',
+    },
+  ];
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+        <Barcode className="w-4 h-4 text-gray-400" />
+        <h2 className="text-sm font-semibold text-gray-700">Barcode Scanner Mode</h2>
+      </div>
+      <div className="px-4 py-4 space-y-3">
+        <p className="text-xs text-gray-500">
+          Choose which barcode scanning methods appear on the POS page.
+          Changes take effect immediately on next POS visit.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {OPTIONS.map(({ value, label, desc }) => (
+            <button
+              key={value}
+              onClick={() => handleMode(value)}
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border
+                          text-xs font-medium transition-colors text-center
+                          ${mode === value
+                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            >
+              <span className="font-semibold">{label}</span>
+              <span className={`text-[10px] leading-tight ${mode === value ? 'text-primary-500' : 'text-gray-400'}`}>
+                {desc}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
