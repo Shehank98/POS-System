@@ -93,7 +93,7 @@ export default function Layout() {
 
       {/* ── Desktop sidebar ───────────────────────────────────── */}
       <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200 shrink-0
-                         transition-all duration-200 overflow-hidden
+                         transition-all duration-200
                          ${collapsed ? 'w-14' : 'w-56'}`}>
 
         {/* Brand */}
