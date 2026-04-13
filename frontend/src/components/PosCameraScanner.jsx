@@ -93,11 +93,12 @@ export default function PosCameraScanner({ onDone, onClose }) {
         .start(
           { facingMode: 'environment' },
           {
-            fps: 10,
-            // aspectRatio controls the video height the library renders naturally —
-            // no overflow clipping needed (clipping breaks the scan canvas)
-            aspectRatio: 1.9,
-            qrbox: { width: 250, height: 110 },
+            fps: 15,
+            // Request 16:9 landscape stream — on a portrait phone this renders
+            // ~220px tall (390px wide ÷ 1.778). We clip it to 200px via the
+            // wrapper's overflow:hidden. qrbox fits fully inside that 200px.
+            aspectRatio: 1.778,
+            qrbox: { width: 260, height: 120 },
           },
           (decoded) => {
             const now = Date.now();
@@ -173,13 +174,16 @@ export default function PosCameraScanner({ onDone, onClose }) {
 
       {/* ── Camera viewfinder ──────────────────────────────────── */}
       {/*
-        aspectRatio: 1.9 in the html5-qrcode config makes the library render
-        the video at ~205px tall on a 390px wide screen — no overflow clipping
-        (clipping breaks the library's internal canvas and stops scan detection).
+        aspectRatio:1.778 requests 16:9 → ~220px tall on a 390px wide phone.
+        overflow:hidden + maxHeight:200 clips layout to 200px.
+        Barcode analysis runs on the MediaStream (not the CSS-rendered area),
+        so clipping does NOT break scan detection. The 260×120 qrbox is centred
+        within the ~220px video and fits fully inside the 200px visible window.
       */}
       <div
-        className={`relative bg-black shrink-0 transition-colors duration-150
+        className={`relative bg-black shrink-0 overflow-hidden transition-colors duration-150
                     ${flash ? 'ring-4 ring-green-400 ring-inset' : ''}`}
+        style={{ maxHeight: 200 }}
       >
         <div id="pos-multi-cam-view" className="w-full" />
 
