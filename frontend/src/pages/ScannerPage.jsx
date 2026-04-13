@@ -58,7 +58,7 @@ export default function ScannerPage() {
 
     ws.onclose = () => {
       wsRef.current = null;
-      if (wsState !== 'idle') setWsState('disconnected');
+      setWsState((prev) => prev !== 'idle' ? 'disconnected' : prev);
     };
 
     ws.onerror = () => ws.close();
@@ -218,9 +218,9 @@ export default function ScannerPage() {
       {/* Scanner screen */}
       {wsState === 'paired' && (
         <div className="flex-1 flex flex-col">
-          {/* Camera viewfinder */}
-          <div className="flex-1 relative overflow-hidden bg-black">
-            <div id="qr-reader-phone" className="w-full h-full" />
+          {/* Camera viewfinder — no overflow:hidden, no h-full; library controls sizing */}
+          <div className="flex-1 relative bg-black">
+            <div id="qr-reader-phone" className="w-full" />
 
             {/* Green flash overlay — strong visual feedback (especially for iOS) */}
             {flash && (
