@@ -12,6 +12,7 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import BillingPage from './pages/BillingPage';
 import AuditLogPage from './pages/AuditLogPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import ScannerPage from './pages/ScannerPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="products"    element={<ProductsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="reports"     element={<ReportsPage />} />
+          <Route path="analytics"   element={<AnalyticsPage />} />
           <Route path="billing"     element={<BillingPage />} />
           <Route path="audit-log"   element={<AuditLogPage />} />
           <Route path="settings"    element={<SettingsPage />} />

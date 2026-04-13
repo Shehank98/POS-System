@@ -82,6 +82,11 @@ export const reportsApi = {
     client.get('/reports/tax', { params: { start_date: startDate, end_date: endDate } }),
 };
 
+// ── Analytics (shop-level) ────────────────────────────────────
+export const analyticsApi = {
+  get: (params) => client.get('/dashboard/analytics', { params }),
+};
+
 // ── Notifications ─────────────────────────────────────────────
 export const notificationsApi = {
   list:       ()   => client.get('/notifications'),

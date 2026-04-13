@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   ShoppingCart, Package, Settings, LogOut,
   LayoutDashboard, Receipt, Menu, X, CreditCard,
-  ClipboardList, BarChart2, MoreHorizontal,
+  ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/products',     label: 'Products',     icon: Package         },
   { to: '/transactions', label: 'Transactions', icon: Receipt         },
   { to: '/reports',      label: 'Reports',      icon: BarChart2       },
+  { to: '/analytics',    label: 'Analytics',    icon: TrendingUp      },
   { to: '/billing',      label: 'Billing',      icon: CreditCard      },
   { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList,  roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',     icon: Settings        },
@@ -32,7 +33,8 @@ const BOTTOM_TABS = [
 
 // "More" sheet items (everything not in BOTTOM_TABS)
 const MORE_NAV = [
-  { to: '/reports',      label: 'Reports',   icon: BarChart2      },
+  { to: '/reports',      label: 'Reports',    icon: BarChart2      },
+  { to: '/analytics',    label: 'Analytics', icon: TrendingUp     },
   { to: '/billing',      label: 'Billing',   icon: CreditCard     },
   { to: '/audit-log',    label: 'Audit Log', icon: ClipboardList, roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',  icon: Settings       },

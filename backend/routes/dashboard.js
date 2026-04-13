@@ -10,5 +10,6 @@ router.get('/yesterday', ctrl.getYesterday);
 router.get('/week',      ctrl.getWeek);
 router.get('/month',     ctrl.getMonth);
 router.get('/low-stock', ctrl.getLowStock);
+router.get('/analytics', ctrl.getAnalytics);
 
 module.exports = router;

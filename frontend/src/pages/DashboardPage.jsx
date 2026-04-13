@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, ShoppingCart, Package, AlertTriangle,
   RefreshCw, BarChart2, Loader2, Receipt,
@@ -140,7 +141,8 @@ function ChartTooltip({ active, payload, label }) {
 const POLL_INTERVAL = 30_000;
 
 export default function DashboardPage() {
-  const user = useAuthStore((s) => s.user);
+  const user     = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
 
   // Period selection controls the summary stat cards
   const [activePeriod, setActivePeriod] = useState('today');
@@ -244,14 +246,23 @@ export default function DashboardPage() {
             {lastRefresh && ` · Updated ${lastRefresh.toLocaleTimeString()}`}
           </p>
         </div>
-        <button
-          className="btn-secondary text-xs"
-          onClick={handleRefresh}
-          disabled={loadingSummary}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loadingSummary ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-primary text-xs"
+            onClick={() => navigate('/analytics')}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            Analytics
+          </button>
+          <button
+            className="btn-secondary text-xs"
+            onClick={handleRefresh}
+            disabled={loadingSummary}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingSummary ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Period selector */}

@@ -222,8 +222,7 @@ async function getMonth(req, res) {
   }
 }
 
-// ── GET /api/dashboard/low-stock ─────────────────────────────
-async function getLowStock(req, res) {
+// ── GET /api/dashboard/low-stock ─────────────────────────────async function getLowStock(req, res) {
   const threshold = parseInt(req.query.threshold, 10) || 10;
   try {
     const { rows } = await db.query(
@@ -239,6 +238,142 @@ async function getLowStock(req, res) {
     res.json({ threshold, products: rows });
   } catch (err) {
     console.error('dashboard/low-stock error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/dashboard/analytics ─────────────────────────────
+async function getAnalytics(req, res) {
+  const { start_date, end_date } = req.query;
+  const shopId = req.shopId;
+
+  try {
+    // Build date conditions for the transactions table directly
+    const txParams = [shopId];
+    const txDateConds = [];
+    if (start_date) {
+      txParams.push(start_date);
+      txDateConds.push(`DATE(transaction_date AT TIME ZONE 'UTC') >= $${txParams.length}`);
+    }
+    if (end_date) {
+      txParams.push(end_date);
+      txDateConds.push(`DATE(transaction_date AT TIME ZONE 'UTC') <= $${txParams.length}`);
+    }
+    const txDateWhere = txDateConds.length ? `AND ${txDateConds.join(' AND ')}` : '';
+
+    // Build date conditions for queries that JOIN through the transactions table
+    const jtParams = [shopId];
+    const jtDateConds = [];
+    if (start_date) {
+      jtParams.push(start_date);
+      jtDateConds.push(`DATE(t.transaction_date AT TIME ZONE 'UTC') >= $${jtParams.length}`);
+    }
+    if (end_date) {
+      jtParams.push(end_date);
+      jtDateConds.push(`DATE(t.transaction_date AT TIME ZONE 'UTC') <= $${jtParams.length}`);
+    }
+    const jtDateWhere = jtDateConds.length ? `AND ${jtDateConds.join(' AND ')}` : '';
+
+    const [ovRes, cogsRes, topProdsRes, dailyRes, inventoryRes] = await Promise.all([
+
+      // Overview: revenue, tax, discounts, refunds, payment-method split
+      db.query(`
+        SELECT
+          COALESCE(SUM(total_amount)    FILTER (WHERE status = 'completed'), 0) AS total_revenue,
+          COALESCE(SUM(tax_amount)      FILTER (WHERE status = 'completed'), 0) AS total_tax,
+          COALESCE(SUM(discount_amount) FILTER (WHERE status = 'completed'), 0) AS total_discounts,
+          COALESCE(ABS(SUM(total_amount) FILTER (WHERE status = 'refunded'
+                                                   AND refund_of IS NOT NULL)), 0) AS total_refunds,
+          COUNT(*) FILTER (WHERE status = 'completed') AS transaction_count,
+          COALESCE(SUM(total_amount) FILTER (WHERE status='completed' AND payment_method='cash'),   0) AS cash_revenue,
+          COALESCE(SUM(total_amount) FILTER (WHERE status='completed' AND payment_method='card'),   0) AS card_revenue,
+          COALESCE(SUM(total_amount) FILTER (WHERE status='completed' AND payment_method='mobile'), 0) AS mobile_revenue,
+          COALESCE(SUM(total_amount) FILTER (WHERE status='completed' AND payment_method='other'),  0) AS other_revenue
+        FROM transactions
+        WHERE shop_id = $1 ${txDateWhere}
+      `, txParams),
+
+      // Cost of goods sold + items sold
+      db.query(`
+        SELECT
+          COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS total_cost,
+          COALESCE(SUM(ti.quantity), 0)                              AS items_sold
+        FROM transaction_items ti
+        JOIN  transactions t ON t.id = ti.transaction_id
+        LEFT JOIN products  p ON p.id = ti.product_id
+        WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
+      `, jtParams),
+
+      // Top 20 products by revenue with profit breakdown
+      db.query(`
+        SELECT
+          COALESCE(p.name, '[Deleted Product]')                          AS name,
+          SUM(ti.quantity)::numeric                                       AS qty_sold,
+          COALESCE(SUM(ti.subtotal), 0)                                  AS revenue,
+          COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)     AS cost,
+          COALESCE(SUM(ti.subtotal), 0)
+            - COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS profit
+        FROM transaction_items ti
+        JOIN  transactions t ON t.id = ti.transaction_id
+        LEFT JOIN products  p ON p.id = ti.product_id
+        WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
+        GROUP BY p.id, p.name
+        ORDER BY revenue DESC
+        LIMIT 20
+      `, jtParams),
+
+      // Daily revenue trend for the selected period
+      db.query(`
+        SELECT
+          DATE(transaction_date AT TIME ZONE 'UTC') AS day,
+          COALESCE(SUM(total_amount), 0) AS revenue,
+          COUNT(*)                        AS transactions
+        FROM transactions
+        WHERE shop_id = $1 AND status = 'completed' ${txDateWhere}
+        GROUP BY day
+        ORDER BY day ASC
+      `, txParams),
+
+      // Inventory snapshot (not date-filtered — always current)
+      db.query(`
+        SELECT
+          COUNT(*)                                                                  AS total_products,
+          COUNT(*) FILTER (WHERE has_inventory AND stock_quantity <= 0)            AS out_of_stock,
+          COUNT(*) FILTER (WHERE has_inventory AND stock_quantity > 0
+                                               AND stock_quantity < 10)            AS low_stock,
+          COUNT(DISTINCT category) FILTER (WHERE category IS NOT NULL)             AS categories_count,
+          COALESCE(SUM(stock_quantity * COALESCE(cost_price, 0))
+                   FILTER (WHERE has_inventory), 0)                               AS stock_value
+        FROM products
+        WHERE shop_id = $1
+      `, [shopId]),
+    ]);
+
+    const ov   = ovRes.rows[0];
+    const cogs = cogsRes.rows[0];
+
+    res.json({
+      total_revenue:     Number(ov.total_revenue),
+      total_tax:         Number(ov.total_tax),
+      total_discounts:   Number(ov.total_discounts),
+      total_refunds:     Number(ov.total_refunds),
+      net_revenue:       Number(ov.total_revenue) - Number(ov.total_refunds),
+      total_cost:        Number(cogs.total_cost),
+      gross_profit:      Number(ov.total_revenue) - Number(cogs.total_cost),
+      transaction_count: Number(ov.transaction_count),
+      items_sold:        Number(cogs.items_sold),
+      payment_methods: {
+        cash:   Number(ov.cash_revenue),
+        card:   Number(ov.card_revenue),
+        mobile: Number(ov.mobile_revenue),
+        other:  Number(ov.other_revenue),
+      },
+      daily_trend:  dailyRes.rows,
+      top_products: topProdsRes.rows,
+      inventory:    inventoryRes.rows[0],
+    });
+  } catch (err) {
+    console.error('dashboard/analytics error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 }
@@ -265,4 +400,4 @@ function fillDays(rows, count, fromMonthStart = false) {
   return fromMonthStart ? result : result;
 }
 
-module.exports = { getToday, getYesterday, getWeek, getMonth, getLowStock };
+module.exports = { getToday, getYesterday, getWeek, getMonth, getLowStock, getAnalytics };
