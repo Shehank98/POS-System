@@ -14,29 +14,16 @@ import PhoneScannerModal from '../components/PhoneScannerModal';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
-// ── Product card colour palette (by first letter) ─────────────
-const PALETTES = [
-  ['bg-red-100',    'text-red-700'],
-  ['bg-orange-100', 'text-orange-700'],
-  ['bg-amber-100',  'text-amber-700'],
-  ['bg-lime-100',   'text-lime-700'],
-  ['bg-green-100',  'text-green-700'],
-  ['bg-teal-100',   'text-teal-700'],
-  ['bg-cyan-100',   'text-cyan-700'],
-  ['bg-blue-100',   'text-blue-700'],
-  ['bg-violet-100', 'text-violet-700'],
-  ['bg-purple-100', 'text-purple-700'],
-  ['bg-pink-100',   'text-pink-700'],
-  ['bg-rose-100',   'text-rose-700'],
+// ── Colour accent strip (by first letter, Tailwind classes kept literal for purge) ──
+const ACCENTS = [
+  'bg-red-400',    'bg-orange-400', 'bg-amber-400',  'bg-lime-500',
+  'bg-green-500',  'bg-teal-400',   'bg-cyan-500',   'bg-blue-400',
+  'bg-violet-500', 'bg-purple-400', 'bg-pink-400',   'bg-rose-400',
 ];
-function cardColor(name) {
-  return PALETTES[(name.charCodeAt(0) || 0) % PALETTES.length];
-}
+const accent = (name) => ACCENTS[(name.charCodeAt(0) || 0) % ACCENTS.length];
 
-// ── Product card ──────────────────────────────────────────────
+// ── Compact product card (no image — slim left accent strip) ───
 function ProductCard({ product, onSelect, disabled }) {
-  const [bg, fg] = cardColor(product.name);
-  const initial    = product.name.charAt(0).toUpperCase();
   const outOfStock = product.has_inventory && product.stock_quantity <= 0;
   const lowStock   = product.has_inventory && product.stock_quantity > 0
                      && product.stock_quantity <= 5;
@@ -45,40 +32,43 @@ function ProductCard({ product, onSelect, disabled }) {
     <button
       onClick={() => onSelect(product)}
       disabled={disabled || outOfStock}
-      className={`relative flex flex-col rounded-xl border text-left transition-all duration-100
-                  active:scale-95 select-none overflow-hidden
+      className={`relative flex rounded-xl border text-left transition-all duration-100
+                  active:scale-[0.97] select-none overflow-hidden min-h-[64px]
                   ${outOfStock
-                    ? 'border-gray-200 bg-gray-50 opacity-55 cursor-not-allowed'
-                    : 'border-gray-200 bg-white hover:border-primary-400 hover:shadow-lg cursor-pointer'}`}
+                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md cursor-pointer'}`}
     >
-      {/* Stock badge */}
-      {outOfStock && (
-        <span className="absolute top-1.5 right-1.5 text-[10px] bg-red-100 text-red-600
-                         px-1.5 py-0.5 rounded-full font-semibold z-10">Out</span>
-      )}
-      {lowStock && (
-        <span className="absolute top-1.5 right-1.5 text-[10px] bg-orange-100 text-orange-600
-                         px-1.5 py-0.5 rounded-full font-semibold z-10">
-          {product.stock_quantity} left
-        </span>
-      )}
+      {/* Colour accent strip — 4px left edge */}
+      <div className={`w-1 shrink-0 self-stretch ${accent(product.name)}`} />
 
-      {/* Colour avatar */}
-      <div className={`w-full aspect-square flex items-center justify-center
-                       text-4xl font-extrabold ${bg} ${fg}`}>
-        {initial}
-      </div>
-
-      {/* Details */}
-      <div className="p-2.5 flex flex-col gap-0.5">
-        <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 min-h-[2.4em]">
+      {/* Content */}
+      <div className="flex flex-col justify-between flex-1 px-2.5 py-2.5 gap-1 min-w-0">
+        <p className="text-[13px] font-semibold text-gray-900 leading-snug line-clamp-2">
           {product.name}
         </p>
-        {product.category && (
-          <p className="text-[10px] text-gray-400 truncate">{product.category}</p>
-        )}
-        <p className="text-sm font-bold text-primary-700 mt-0.5">{fmt(product.price)}</p>
+        <div className="flex items-center gap-1">
+          {product.category && (
+            <span className="text-[10px] text-gray-400 truncate flex-1">
+              {product.category}
+            </span>
+          )}
+          <span className="text-[13px] font-bold text-primary-700 shrink-0 ml-auto">
+            {fmt(product.price)}
+          </span>
+        </div>
       </div>
+
+      {/* Stock badges — top-right corner */}
+      {outOfStock && (
+        <span className="absolute top-1.5 right-1.5 text-[9px] bg-red-100 text-red-600
+                         px-1.5 py-0.5 rounded font-semibold leading-tight">Out</span>
+      )}
+      {lowStock && (
+        <span className="absolute top-1.5 right-1.5 text-[9px] bg-orange-100 text-orange-600
+                         px-1.5 py-0.5 rounded font-semibold leading-tight">
+          {product.stock_quantity}
+        </span>
+      )}
     </button>
   );
 }
@@ -443,12 +433,12 @@ export default function POSPage() {
         )}
 
         {/* Search */}
-        <div className="px-3 pt-2.5 pb-2 shrink-0">
+        <div className="px-3 pt-2 pb-1.5 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
-              className="input pl-9 pr-8 py-2 text-sm bg-white"
-              placeholder="Search products by name..."
+              className="input pl-9 pr-8 h-9 text-sm bg-white"
+              placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setActiveCategory('All'); }}
             />
@@ -465,12 +455,13 @@ export default function POSPage() {
 
         {/* Category tabs */}
         {categories.length > 1 && (
-          <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto shrink-0">
+          <div className="flex gap-1.5 px-3 pb-1.5 overflow-x-auto shrink-0"
+               style={{ scrollbarWidth: 'none' }}>
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => { setActiveCategory(cat); setSearchQuery(''); }}
-                className={`whitespace-nowrap text-xs px-3 py-1.5 rounded-full border
+                className={`whitespace-nowrap text-xs px-3 py-1 rounded-full border
                             font-medium transition-colors shrink-0
                   ${activeCategory === cat
                     ? 'bg-primary-600 text-white border-primary-600'
@@ -483,14 +474,16 @@ export default function POSPage() {
         )}
 
         {/* Product grid */}
-        <div className="flex-1 overflow-y-auto px-3 pb-28 md:pb-4">
+        {/* pb accounts for: bottom nav (56px) + cart button (~52px) + gap = ~120px */}
+        <div className="flex-1 overflow-y-auto px-3 pb-32 md:pb-4">
           {loadingProds ? (
-            /* Skeleton */
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 pt-1">
-              {[...Array(12)].map((_, i) => (
-                <div key={i} className="rounded-xl border border-gray-200 overflow-hidden animate-pulse">
-                  <div className="aspect-square bg-gray-200" />
-                  <div className="p-2.5 space-y-2">
+            /* Skeleton — matches compact card shape */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pt-1">
+              {[...Array(14)].map((_, i) => (
+                <div key={i} className="flex rounded-xl border border-gray-200 overflow-hidden
+                                        animate-pulse min-h-[64px]">
+                  <div className="w-1 bg-gray-200 shrink-0" />
+                  <div className="flex-1 px-2.5 py-2.5 space-y-2">
                     <div className="h-3 bg-gray-200 rounded w-4/5" />
                     <div className="h-3 bg-gray-200 rounded w-2/5" />
                   </div>
@@ -505,7 +498,7 @@ export default function POSPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pt-1">
               {filteredProducts.map((p) => (
                 <ProductCard
                   key={p.id}
@@ -525,10 +518,10 @@ export default function POSPage() {
         <CartPanel onPayClick={() => setShowPayment(true)} />
       </div>
 
-      {/* ── MOBILE: floating cart button ──────────────────────── */}
-      <div className="md:hidden fixed bottom-16 left-0 right-0 z-30 px-3 pointer-events-none">
+      {/* ── MOBILE: floating cart button (sits between bottom nav h-14=56px and content) ── */}
+      <div className="md:hidden fixed bottom-[3.75rem] left-0 right-0 z-30 px-3 pointer-events-none">
         <button
-          className="w-full btn-primary py-3 justify-between text-base shadow-xl rounded-xl
+          className="w-full btn-primary py-3 justify-between text-sm shadow-xl rounded-xl
                      pointer-events-auto"
           onClick={() => setShowMobileCart(true)}
         >
