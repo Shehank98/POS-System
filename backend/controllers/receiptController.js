@@ -3,10 +3,13 @@ const db = require('../config/database');
 // ── GET /api/transactions/:id/receipt ────────────────────────
 async function getReceipt(req, res) {
   try {
-    // Fetch transaction
+    // Fetch transaction with full shop info
     const { rows: txnRows } = await db.query(
       `SELECT t.*, u.username AS cashier,
-              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone
+              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
+              s.email AS shop_login_email,
+              COALESCE(s.contact_email, s.email) AS shop_contact_email,
+              COALESCE(s.logo_url, '') AS shop_logo
          FROM transactions t
          LEFT JOIN users  u ON u.id  = t.user_id
          LEFT JOIN shops  s ON s.id  = t.shop_id
@@ -26,11 +29,13 @@ async function getReceipt(req, res) {
 
     const t = txnRows[0];
     const fmt = (n) => Number(n || 0).toFixed(2);
-    const date = new Date(t.transaction_date);
-    const dateStr = date.toLocaleDateString('en-GB', {
+
+    // Server-side fallback date (will be overridden by client-side JS for correct timezone)
+    const serverDate = new Date(t.transaction_date);
+    const fallbackDateStr = serverDate.toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const fallbackTimeStr = serverDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
     const itemRows = items.map((i) => `
       <tr>
@@ -45,6 +50,19 @@ async function getReceipt(req, res) {
       ? `<tr class="summary-row"><td colspan="4">Discount</td><td>-${fmt(t.discount_amount)}</td></tr>` : '';
     const taxRow = Number(t.tax_amount) > 0
       ? `<tr class="summary-row"><td colspan="4">Tax</td><td>${fmt(t.tax_amount)}</td></tr>` : '';
+
+    // Logo block
+    const logoBlock = t.shop_logo
+      ? `<div class="logo-wrap"><img src="${escHtml(t.shop_logo)}" alt="logo" class="shop-logo" /></div>`
+      : '';
+
+    // Contact block
+    const contactLines = [
+      t.shop_address ? escHtml(t.shop_address) : null,
+      t.shop_phone   ? `Tel: ${escHtml(t.shop_phone)}` : null,
+      t.shop_contact_email ? escHtml(t.shop_contact_email) : null,
+    ].filter(Boolean);
+    const contactBlock = contactLines.map((l) => `<p class="shop-meta">${l}</p>`).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -79,8 +97,11 @@ async function getReceipt(req, res) {
   .bold    { font-weight: bold; }
   .divider { border-top: 1px dashed #000; margin: 3mm 0; }
 
+  .logo-wrap  { text-align: center; margin-bottom: 2mm; }
+  .shop-logo  { max-height: 14mm; max-width: 100%; object-fit: contain; }
+
   .shop-name { font-size: 1.3em; font-weight: bold; text-align: center; }
-  .shop-meta { text-align: center; font-size: 0.9em; margin-bottom: 2mm; }
+  .shop-meta { text-align: center; font-size: 0.9em; margin-bottom: 1mm; }
 
   table { width: 100%; border-collapse: collapse; }
   th    { border-bottom: 1px solid #000; text-align: left; padding-bottom: 1mm; }
@@ -112,7 +133,7 @@ async function getReceipt(req, res) {
 <body id="receipt-body">
 
 <!-- Print controls (hidden on print) -->
-<div class="no-print" style="margin-bottom:4mm; display:flex; gap:4px;">
+<div class="no-print" style="margin-bottom:4mm; display:flex; gap:4px; flex-wrap:wrap;">
   <button onclick="window.print()" style="padding:4px 10px; cursor:pointer;">🖨 Print</button>
   <button onclick="document.getElementById('receipt-body').className='a4'"
           style="padding:4px 10px; cursor:pointer;">A4</button>
@@ -123,13 +144,13 @@ async function getReceipt(req, res) {
   <button onclick="window.close()" style="padding:4px 10px; cursor:pointer; margin-left:auto;">✕ Close</button>
 </div>
 
+${logoBlock}
 <p class="shop-name">${escHtml(t.shop_name || 'Shop')}</p>
-${t.shop_address ? `<p class="shop-meta">${escHtml(t.shop_address)}</p>` : ''}
-${t.shop_phone   ? `<p class="shop-meta">Tel: ${escHtml(t.shop_phone)}</p>` : ''}
+${contactBlock}
 
 <div class="divider"></div>
 
-<p>Date: <strong>${dateStr}</strong> &nbsp; ${timeStr}</p>
+<p>Date: <strong><span id="txn-date">${fallbackDateStr}&nbsp;&nbsp;${fallbackTimeStr}</span></strong></p>
 <p>Txn: <strong>${escHtml(t.transaction_number)}</strong></p>
 <p>Cashier: ${escHtml(t.cashier || '—')}</p>
 
@@ -165,7 +186,16 @@ ${t.status === 'void' ? '<div class="voided-stamp">★ VOID ★</div>' : ''}
 </p>
 
 <script>
-  // Auto-apply size from localStorage if set
+  // Fix date/time to browser local timezone (server may be UTC)
+  try {
+    var d = new Date('${t.transaction_date}');
+    var dateOpts = { day: '2-digit', month: 'short', year: 'numeric' };
+    var timeOpts = { hour: '2-digit', minute: '2-digit' };
+    document.getElementById('txn-date').textContent =
+      d.toLocaleDateString('en-GB', dateOpts) + '   ' +
+      d.toLocaleTimeString('en-GB', timeOpts);
+  } catch(e) {}
+  // Apply saved paper size
   var size = localStorage.getItem('pos_receipt_size');
   if (size) document.getElementById('receipt-body').className = size;
   // Auto-print if flag is set

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Barcode, Search, X, Plus, Minus, Trash2,
+  Barcode, Search, X, Plus, Minus,
   ShoppingCart, Percent, CreditCard, Smartphone,
-  ChevronUp, Wifi, WifiOff,
+  Wifi, RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useCartStore   from '../store/cartStore';
@@ -14,87 +14,72 @@ import PhoneScannerModal from '../components/PhoneScannerModal';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
-// ── Product search dropdown ───────────────────────────────────
-function ProductSearch({ onSelect }) {
-  const [query,   setQuery]   = useState('');
-  const [results, setResults] = useState([]);
-  const [open,    setOpen]    = useState(false);
-  const [loading, setLoading] = useState(false);
-  const timer = useRef();
+// ── Product card colour palette (by first letter) ─────────────
+const PALETTES = [
+  ['bg-red-100',    'text-red-700'],
+  ['bg-orange-100', 'text-orange-700'],
+  ['bg-amber-100',  'text-amber-700'],
+  ['bg-lime-100',   'text-lime-700'],
+  ['bg-green-100',  'text-green-700'],
+  ['bg-teal-100',   'text-teal-700'],
+  ['bg-cyan-100',   'text-cyan-700'],
+  ['bg-blue-100',   'text-blue-700'],
+  ['bg-violet-100', 'text-violet-700'],
+  ['bg-purple-100', 'text-purple-700'],
+  ['bg-pink-100',   'text-pink-700'],
+  ['bg-rose-100',   'text-rose-700'],
+];
+function cardColor(name) {
+  return PALETTES[(name.charCodeAt(0) || 0) % PALETTES.length];
+}
 
-  useEffect(() => {
-    clearTimeout(timer.current);
-    if (!query.trim()) { setResults([]); setOpen(false); return; }
-    timer.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data } = await productsApi.list({ search: query, limit: 10 });
-        setResults(data.products);
-        setOpen(true);
-      } catch { /* ignore */ } finally { setLoading(false); }
-    }, 250);
-    return () => clearTimeout(timer.current);
-  }, [query]);
-
-  function select(p) {
-    onSelect(p);
-    setQuery('');
-    setResults([]);
-    setOpen(false);
-  }
+// ── Product card ──────────────────────────────────────────────
+function ProductCard({ product, onSelect, disabled }) {
+  const [bg, fg] = cardColor(product.name);
+  const initial    = product.name.charAt(0).toUpperCase();
+  const outOfStock = product.has_inventory && product.stock_quantity <= 0;
+  const lowStock   = product.has_inventory && product.stock_quantity > 0
+                     && product.stock_quantity <= 5;
 
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          className="input pl-9 pr-8"
-          placeholder="Search product by name..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => results.length && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-        />
-        {(query || loading) && (
-          <button
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
-            onMouseDown={(e) => { e.preventDefault(); setQuery(''); setOpen(false); }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+    <button
+      onClick={() => onSelect(product)}
+      disabled={disabled || outOfStock}
+      className={`relative flex flex-col rounded-xl border text-left transition-all duration-100
+                  active:scale-95 select-none overflow-hidden
+                  ${outOfStock
+                    ? 'border-gray-200 bg-gray-50 opacity-55 cursor-not-allowed'
+                    : 'border-gray-200 bg-white hover:border-primary-400 hover:shadow-lg cursor-pointer'}`}
+    >
+      {/* Stock badge */}
+      {outOfStock && (
+        <span className="absolute top-1.5 right-1.5 text-[10px] bg-red-100 text-red-600
+                         px-1.5 py-0.5 rounded-full font-semibold z-10">Out</span>
+      )}
+      {lowStock && (
+        <span className="absolute top-1.5 right-1.5 text-[10px] bg-orange-100 text-orange-600
+                         px-1.5 py-0.5 rounded-full font-semibold z-10">
+          {product.stock_quantity} left
+        </span>
+      )}
+
+      {/* Colour avatar */}
+      <div className={`w-full aspect-square flex items-center justify-center
+                       text-4xl font-extrabold ${bg} ${fg}`}>
+        {initial}
       </div>
-      {open && results.length > 0 && (
-        <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg
-                        shadow-lg max-h-56 overflow-y-auto">
-          {results.map((p) => (
-            <li key={p.id}>
-              <button
-                className="w-full flex items-center justify-between px-3 py-2
-                           hover:bg-gray-50 text-left text-sm"
-                onMouseDown={(e) => { e.preventDefault(); select(p); }}
-              >
-                <span>
-                  <span className="font-medium text-gray-900">{p.name}</span>
-                  {p.category && (
-                    <span className="text-gray-400 text-xs ml-2">{p.category}</span>
-                  )}
-                </span>
-                <span className="font-semibold text-primary-600 shrink-0 ml-3">
-                  {fmt(p.price)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {open && !loading && results.length === 0 && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg
-                        shadow-sm px-3 py-2 text-sm text-gray-400">
-          No products found
-        </div>
-      )}
-    </div>
+
+      {/* Details */}
+      <div className="p-2.5 flex flex-col gap-0.5">
+        <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 min-h-[2.4em]">
+          {product.name}
+        </p>
+        {product.category && (
+          <p className="text-[10px] text-gray-400 truncate">{product.category}</p>
+        )}
+        <p className="text-sm font-bold text-primary-700 mt-0.5">{fmt(product.price)}</p>
+      </div>
+    </button>
   );
 }
 
@@ -131,8 +116,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
           </button>
           <input
             className="w-12 h-6 text-center text-sm border border-gray-200 rounded"
-            type="number"
-            min="1"
+            type="number" min="1"
             value={item.quantity}
             onChange={(e) => onQty(item.cartId, parseInt(e.target.value, 10) || 1)}
           />
@@ -145,7 +129,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
           </button>
         </div>
 
-        <span className="text-xs text-gray-400">x {fmt(item.unit_price)}</span>
+        <span className="text-xs text-gray-400">× {fmt(item.unit_price)}</span>
 
         <button
           className={`flex items-center gap-0.5 text-xs rounded px-1.5 py-0.5 transition-colors
@@ -177,14 +161,14 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
           <span className="text-xs text-orange-600">%</span>
           <button className="btn-primary text-xs py-0.5 px-2 h-6" onClick={commitDiscount}>OK</button>
           <button className="btn-secondary text-xs py-0.5 px-2 h-6"
-                  onClick={() => setEditDisc(false)}>x</button>
+                  onClick={() => setEditDisc(false)}>×</button>
         </div>
       )}
     </li>
   );
 }
 
-// ── Cart panel (used for desktop sidebar + mobile drawer) ─────
+// ── Cart panel (desktop sidebar + mobile drawer) ───────────────
 function CartPanel({ onPayClick, onClose }) {
   const {
     items, orderDiscount,
@@ -194,7 +178,7 @@ function CartPanel({ onPayClick, onClose }) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Cart header */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <span className="font-semibold text-gray-800">
           Cart
@@ -210,7 +194,6 @@ function CartPanel({ onPayClick, onClose }) {
               Clear
             </button>
           )}
-          {/* Close button (mobile drawer only) */}
           {onClose && (
             <button className="p-1 text-gray-400 hover:text-gray-600" onClick={onClose}>
               <X className="w-4 h-4" />
@@ -219,11 +202,13 @@ function CartPanel({ onPayClick, onClose }) {
         </div>
       </div>
 
-      {/* Items list */}
+      {/* Items */}
       <ul className="flex-1 overflow-y-auto">
         {items.length === 0 && (
-          <li className="flex items-center justify-center h-full text-gray-300 text-sm py-8">
-            Cart is empty
+          <li className="flex flex-col items-center justify-center h-full text-gray-300 gap-3 py-12">
+            <ShoppingCart className="w-12 h-12" />
+            <p className="text-sm">Cart is empty</p>
+            <p className="text-xs text-gray-300">Tap a product to add it</p>
           </li>
         )}
         {items.map((item) => (
@@ -252,7 +237,6 @@ function CartPanel({ onPayClick, onClose }) {
             <span>Tax</span><span>+{fmt(totals.taxAmount)}</span>
           </div>
         )}
-
         <div className="flex items-center justify-between text-sm text-orange-600">
           <span>Order discount</span>
           <input
@@ -262,7 +246,6 @@ function CartPanel({ onPayClick, onClose }) {
             onChange={(e) => setOrderDiscount(e.target.value)}
           />
         </div>
-
         <div className="flex justify-between font-bold text-gray-900 text-base pt-1
                         border-t border-gray-200">
           <span>Total</span>
@@ -270,7 +253,7 @@ function CartPanel({ onPayClick, onClose }) {
         </div>
       </div>
 
-      {/* Pay button */}
+      {/* Charge button */}
       <div className="px-4 pb-4 pt-2 bg-gray-50 shrink-0">
         <button
           className="btn-primary w-full justify-center py-3 text-base"
@@ -290,7 +273,6 @@ export default function POSPage() {
   const barcodeEnabled = user?.barcode_enabled ?? false;
   const readOnly       = user?.read_only ?? false;
 
-  // Scanner mode from localStorage: 'usb' | 'phone' | 'both'
   const [scannerMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
   const showUsb   = barcodeEnabled && (scannerMode === 'usb'   || scannerMode === 'both');
   const showPhone = barcodeEnabled && (scannerMode === 'phone' || scannerMode === 'both');
@@ -298,15 +280,55 @@ export default function POSPage() {
   const { items, addItem, clearCart } = useCartStore();
   const totals = useCartStore((s) => s.totals);
 
-  const [barcodeInput,    setBarcodeInput]    = useState('');
-  const [scanning,        setScanning]        = useState(false);
-  const [showPayment,     setShowPayment]      = useState(false);
-  const [showPhoneModal,  setShowPhoneModal]   = useState(false);
-  const [showMobileCart,  setShowMobileCart]   = useState(false);
+  // Product browser state
+  const [allProducts,    setAllProducts]    = useState([]);
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [loadingProds,   setLoadingProds]   = useState(false);
+
+  // UI state
+  const [barcodeInput,   setBarcodeInput]   = useState('');
+  const [scanning,       setScanning]       = useState(false);
+  const [showPayment,    setShowPayment]     = useState(false);
+  const [showPhoneModal, setShowPhoneModal]  = useState(false);
+  const [showMobileCart, setShowMobileCart]  = useState(false);
 
   const barcodeRef = useRef();
 
-  // ── Phone scanner WebSocket hook ─────────────────────────────
+  // ── Derived: categories + filtered products ──────────────────
+  const categories = useMemo(() => {
+    const cats = [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort();
+    return ['All', ...cats];
+  }, [allProducts]);
+
+  const filteredProducts = useMemo(() => {
+    let prods = allProducts;
+    if (activeCategory !== 'All') prods = prods.filter((p) => p.category === activeCategory);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      prods = prods.filter((p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.barcode && p.barcode.toLowerCase().includes(q))
+      );
+    }
+    return prods;
+  }, [allProducts, searchQuery, activeCategory]);
+
+  // ── Load products ────────────────────────────────────────────
+  function loadProducts() {
+    setLoadingProds(true);
+    productsApi.list({ limit: 500 })
+      .then(({ data }) => setAllProducts(data.products))
+      .catch(() => toast.error('Failed to load products'))
+      .finally(() => setLoadingProds(false));
+  }
+
+  useEffect(() => {
+    loadProducts();
+    barcodeRef.current?.focus();
+  }, []); // eslint-disable-line
+
+  // ── Phone scanner WebSocket ──────────────────────────────────
   const handlePhoneBarcode = useCallback(async (code) => {
     if (readOnly) return;
     try {
@@ -319,14 +341,6 @@ export default function POSPage() {
   }, [addItem, readOnly]);
 
   const phoneScanner = usePosScanner({ onBarcode: handlePhoneBarcode });
-
-  // Auto-focus barcode on mount
-  useEffect(() => { barcodeRef.current?.focus(); }, []);
-
-  // Re-focus barcode after adding items
-  useEffect(() => {
-    if (!showPayment) setTimeout(() => barcodeRef.current?.focus(), 100);
-  }, [items.length, showPayment]);
 
   // ── USB barcode submit ────────────────────────────────────────
   async function handleBarcodeSubmit(e) {
@@ -346,121 +360,177 @@ export default function POSPage() {
     }
   }
 
+  function handleProductSelect(product) {
+    if (readOnly) return;
+    addItem(product);
+  }
+
   const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 -mx-4 -my-6 p-4
+    <div className="flex flex-col md:flex-row -mx-4 -my-6
                     md:h-[calc(100vh-5rem)] md:overflow-hidden">
 
-      {/* ── LEFT: search / barcode ──────────────────────────── */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 pb-24 md:pb-0">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-900 shrink-0">POS Terminal</h1>
+      {/* ── LEFT: product browser ─────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-50">
 
-          {/* Phone scanner status badge */}
-          {showPhone && phoneScanner.state !== 'idle' && (
-            <button
-              onClick={() => setShowPhoneModal(true)}
-              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium
-                ${phoneScanner.state === 'phone_connected'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-yellow-100 text-yellow-700'}`}
-            >
-              {phoneScanner.state === 'phone_connected'
-                ? <Wifi className="w-3 h-3" />
-                : <WifiOff className="w-3 h-3" />
-              }
-              {phoneScanner.state === 'phone_connected' ? 'Phone connected' : 'Waiting...'}
-            </button>
-          )}
-        </div>
-
-        {readOnly && (
-          <div className="text-sm bg-yellow-50 border border-yellow-200 text-yellow-800
-                          rounded-lg px-3 py-2 shrink-0">
-            Read-only mode - sales disabled. Renew subscription.
-          </div>
-        )}
-
-        {/* USB Barcode input */}
-        {showUsb && (
-          <form onSubmit={handleBarcodeSubmit} className="shrink-0">
-            <label className="label flex items-center gap-1.5">
-              <Barcode className="w-4 h-4 text-gray-400" />
-              Barcode scan (USB)
-            </label>
-            <div className="flex gap-2">
+        {/* Top toolbar */}
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200 shrink-0">
+          {/* USB barcode field */}
+          {showUsb ? (
+            <form onSubmit={handleBarcodeSubmit} className="flex items-center gap-1.5 flex-1 min-w-0">
+              <Barcode className="w-4 h-4 text-gray-400 shrink-0" />
               <input
                 ref={barcodeRef}
-                className="input font-mono flex-1"
-                placeholder="Scan or type barcode, then press Enter..."
+                className="input py-1.5 text-sm font-mono h-8 flex-1 min-w-0"
+                placeholder="Scan barcode..."
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
                 disabled={readOnly}
                 autoComplete="off"
               />
-              <button type="submit" className="btn-secondary shrink-0" disabled={readOnly || scanning}>
+              <button type="submit" className="btn-secondary h-8 px-2.5 text-xs shrink-0"
+                      disabled={readOnly || scanning}>
                 Add
               </button>
-            </div>
-          </form>
-        )}
+            </form>
+          ) : (
+            <span className="font-bold text-gray-900 text-sm shrink-0">POS Terminal</span>
+          )}
 
-        {/* Phone scanner button */}
-        {showPhone && !readOnly && (
-          <div className="shrink-0">
-            <label className="label flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-gray-400" />
-              Phone Scanner (Wireless)
-            </label>
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+            {/* Phone scanner button */}
+            {showPhone && !readOnly && (
+              <button
+                onClick={() => setShowPhoneModal(true)}
+                title="Phone scanner"
+                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border
+                            font-medium transition-colors
+                  ${phoneScanner.state === 'phone_connected'
+                    ? 'bg-green-50 border-green-300 text-green-700'
+                    : phoneScanner.state === 'waiting'
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                {phoneScanner.state === 'phone_connected'
+                  ? <Wifi className="w-3.5 h-3.5" />
+                  : <Smartphone className="w-3.5 h-3.5" />
+                }
+                <span className="hidden sm:inline">
+                  {phoneScanner.state === 'phone_connected' ? 'Phone' : 'Scanner'}
+                </span>
+              </button>
+            )}
+            {/* Reload */}
             <button
-              onClick={() => setShowPhoneModal(true)}
-              className={`btn-secondary w-full sm:w-auto flex items-center gap-2 text-sm
-                ${phoneScanner.state === 'phone_connected' ? 'border-green-300 text-green-700' : ''}`}
+              onClick={loadProducts}
+              disabled={loadingProds}
+              title="Reload products"
+              className="p-1.5 rounded-lg border border-gray-200 text-gray-400
+                         hover:bg-gray-50 transition-colors"
             >
-              {phoneScanner.state === 'phone_connected'
-                ? <><Wifi className="w-4 h-4 text-green-500" /> Phone connected - tap to manage</>
-                : phoneScanner.state === 'waiting'
-                ? <><WifiOff className="w-4 h-4 text-yellow-500" /> Waiting for phone...</>
-                : <><Smartphone className="w-4 h-4" /> Connect Phone Scanner</>
-              }
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingProds ? 'animate-spin' : ''}`} />
             </button>
           </div>
-        )}
-
-        {/* Product search */}
-        <div className="shrink-0">
-          <label className="label">Search by name</label>
-          <ProductSearch onSelect={(p) => !readOnly && addItem(p)} />
         </div>
 
-        {/* Empty state */}
-        {items.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-300 gap-3
-                          md:flex hidden">
-            <ShoppingCart className="w-16 h-16" />
-            <p className="text-sm">
-              {barcodeEnabled
-                ? 'Scan a barcode or search to add products'
-                : 'Search to add products'}
-            </p>
+        {/* Read-only banner */}
+        {readOnly && (
+          <div className="mx-3 mt-2 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800
+                          rounded-lg px-3 py-2 shrink-0">
+            Read-only mode — sales disabled. Renew subscription.
           </div>
         )}
+
+        {/* Search */}
+        <div className="px-3 pt-2.5 pb-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              className="input pl-9 pr-8 py-2 text-sm bg-white"
+              placeholder="Search products by name..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setActiveCategory('All'); }}
+            />
+            {searchQuery && (
+              <button
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category tabs */}
+        {categories.length > 1 && (
+          <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto shrink-0">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => { setActiveCategory(cat); setSearchQuery(''); }}
+                className={`whitespace-nowrap text-xs px-3 py-1.5 rounded-full border
+                            font-medium transition-colors shrink-0
+                  ${activeCategory === cat
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Product grid */}
+        <div className="flex-1 overflow-y-auto px-3 pb-28 md:pb-4">
+          {loadingProds ? (
+            /* Skeleton */
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 pt-1">
+              {[...Array(12)].map((_, i) => (
+                <div key={i} className="rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-gray-200" />
+                  <div className="p-2.5 space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-4/5" />
+                    <div className="h-3 bg-gray-200 rounded w-2/5" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-gray-300 gap-2">
+              <ShoppingCart className="w-12 h-12" />
+              <p className="text-sm">
+                {searchQuery ? 'No products match your search' : 'No products yet'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 pt-1">
+              {filteredProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onSelect={handleProductSelect}
+                  disabled={readOnly}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── RIGHT: cart (desktop only) ───────────────────────── */}
-      <div className="hidden md:flex w-80 xl:w-96 flex-col bg-white border border-gray-200
-                      rounded-xl shadow-sm overflow-hidden shrink-0">
-        <CartPanel
-          onPayClick={() => setShowPayment(true)}
-        />
+      {/* ── RIGHT: cart (desktop) ────────────────────────────── */}
+      <div className="hidden md:flex w-80 xl:w-96 flex-col bg-white border-l border-gray-200
+                      overflow-hidden shrink-0">
+        <CartPanel onPayClick={() => setShowPayment(true)} />
       </div>
 
       {/* ── MOBILE: floating cart button ──────────────────────── */}
-      <div className="md:hidden fixed bottom-20 left-4 right-4 z-30">
+      <div className="md:hidden fixed bottom-16 left-0 right-0 z-30 px-3 pointer-events-none">
         <button
+          className="w-full btn-primary py-3 justify-between text-base shadow-xl rounded-xl
+                     pointer-events-auto"
           onClick={() => setShowMobileCart(true)}
-          className="w-full btn-primary py-3 justify-between text-base shadow-lg rounded-xl"
         >
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
@@ -485,7 +555,6 @@ export default function POSPage() {
                        overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Drag handle */}
             <div className="flex justify-center pt-2 pb-1 shrink-0">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>

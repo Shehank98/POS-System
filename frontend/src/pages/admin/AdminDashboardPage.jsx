@@ -122,7 +122,12 @@ function RejectModal({ paymentId, onClose, onDone }) {
 
 // ── Create Shop Modal ─────────────────────────────────────────
 function CreateShopModal({ onClose, onCreated }) {
-  const empty = { name:'', owner_name:'', email:'', owner_username:'', owner_password:'', subscription_months:'1', barcode_enabled: false };
+  const empty = {
+    name:'', owner_name:'', email:'', phone:'', address:'',
+    logo_url:'', contact_email:'',
+    owner_username:'', owner_password:'',
+    subscription_months:'1', barcode_enabled: false,
+  };
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // shows Shop ID after creation
@@ -194,17 +199,40 @@ function CreateShopModal({ onClose, onCreated }) {
           <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle className="w-5 h-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Info</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-xs text-gray-400 mb-1">Shop Name *</label>
               <input className={inputCls} placeholder="e.g. Kedai Ali" value={form.name} onChange={set('name')} required />
             </div>
             <div>
+              <label className="block text-xs text-gray-400 mb-1">Phone</label>
+              <input className={inputCls} placeholder="+60 12-345 6789" value={form.phone} onChange={set('phone')} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Contact Email</label>
+              <input className={inputCls} type="email" placeholder="shop@email.com" value={form.contact_email} onChange={set('contact_email')} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-400 mb-1">Address</label>
+              <input className={inputCls} placeholder="123 Jalan Utama, Kuala Lumpur" value={form.address} onChange={set('address')} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-400 mb-1">Logo URL
+                <span className="ml-1 text-gray-600">(paste image URL for receipt logo)</span>
+              </label>
+              <input className={inputCls} placeholder="https://..." value={form.logo_url} onChange={set('logo_url')} />
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold pt-1">Owner Account</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="block text-xs text-gray-400 mb-1">Owner Full Name *</label>
               <input className={inputCls} placeholder="Ali bin Abu" value={form.owner_name} onChange={set('owner_name')} required />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Email *</label>
+              <label className="block text-xs text-gray-400 mb-1">Login Email *</label>
               <input className={inputCls} type="email" placeholder="ali@email.com" value={form.email} onChange={set('email')} required />
             </div>
             <div>
@@ -237,24 +265,32 @@ function CreateShopModal({ onClose, onCreated }) {
 
 // ── Extend Subscription Modal ─────────────────────────────────
 function ExtendSubModal({ shop, onClose, onDone }) {
-  const [months,     setMonths]     = useState('0');
-  const [status,     setStatus]     = useState(shop.subscription_status);
-  const [extraSlots, setExtraSlots] = useState(String(shop.extra_staff_slots || 0));
-  const [busy,       setBusy]       = useState(false);
+  const [months,       setMonths]       = useState('0');
+  const [status,       setStatus]       = useState(shop.subscription_status);
+  const [extraSlots,   setExtraSlots]   = useState(String(shop.extra_staff_slots || 0));
+  // Shop info fields
+  const [shopName,     setShopName]     = useState(shop.name || '');
+  const [phone,        setPhone]        = useState(shop.phone || '');
+  const [address,      setAddress]      = useState(shop.address || '');
+  const [logoUrl,      setLogoUrl]      = useState(shop.logo_url || '');
+  const [contactEmail, setContactEmail] = useState(shop.contact_email || '');
+  const [busy,         setBusy]         = useState(false);
 
   async function handleSave() {
     setBusy(true);
     try {
-      // Update subscription
       await adminApi.updateSub(shop.id, {
         subscription_status: status,
         extend_months: parseInt(months, 10) || 0,
       });
-      // Update extra staff slots if changed
-      const newSlots = parseInt(extraSlots, 10) || 0;
-      if (newSlots !== (shop.extra_staff_slots || 0)) {
-        await adminApi.updateShop(shop.id, { extra_staff_slots: newSlots });
-      }
+      await adminApi.updateShop(shop.id, {
+        name:          shopName || undefined,
+        phone:         phone,
+        address:       address,
+        logo_url:      logoUrl,
+        contact_email: contactEmail,
+        extra_staff_slots: parseInt(extraSlots, 10) || 0,
+      });
       toast.success('Shop updated');
       onDone();
     } catch (err) {
@@ -268,11 +304,53 @@ function ExtendSubModal({ shop, onClose, onDone }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 rounded-2xl p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-white">Manage - {shop.name}</p>
+      <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto"
+           onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm font-semibold text-white">Manage — {shop.name}</p>
+
+        {/* Shop Info */}
         <div className="space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Information</p>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Subscription Status</label>
+            <label className="block text-xs text-gray-400 mb-1">Shop Name</label>
+            <input className={`w-full ${inputCls}`} value={shopName} onChange={(e) => setShopName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Phone</label>
+              <input className={`w-full ${inputCls}`} placeholder="+60 12-345 6789" value={phone}
+                     onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Contact Email</label>
+              <input className={`w-full ${inputCls}`} type="email" placeholder="shop@email.com" value={contactEmail}
+                     onChange={(e) => setContactEmail(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Address</label>
+            <input className={`w-full ${inputCls}`} placeholder="123 Jalan Utama..." value={address}
+                   onChange={(e) => setAddress(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Logo URL
+              <span className="ml-1 text-gray-600">(shows on receipt)</span>
+            </label>
+            <input className={`w-full ${inputCls}`} placeholder="https://..." value={logoUrl}
+                   onChange={(e) => setLogoUrl(e.target.value)} />
+            {logoUrl && (
+              <div className="mt-1.5 bg-white rounded-lg p-2 flex items-center justify-center">
+                <img src={logoUrl} alt="logo preview" className="max-h-10 max-w-full object-contain" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Subscription */}
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Subscription</p>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Status</label>
             <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="active">Active</option>
               <option value="trial">Trial</option>
@@ -296,12 +374,11 @@ function ExtendSubModal({ shop, onClose, onDone }) {
             </label>
             <input className={`w-full ${inputCls}`} type="number" min="0" max="20" value={extraSlots}
                    onChange={(e) => setExtraSlots(e.target.value)} />
-            <p className="text-xs text-gray-500 mt-1">
-              Each extra slot allows +1 manager AND +1 cashier
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Each extra slot allows +1 manager AND +1 cashier</p>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 pt-1">
           <button onClick={onClose}
             className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">
             Cancel

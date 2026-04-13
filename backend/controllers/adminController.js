@@ -72,6 +72,7 @@ async function listShops(req, res) {
 async function createShop(req, res) {
   const {
     name, owner_name, email, phone, address,
+    logo_url, contact_email,
     barcode_enabled = false,
     owner_username, owner_password,
     subscription_months = 1,
@@ -93,10 +94,12 @@ async function createShop(req, res) {
 
     const { rows: shopRows } = await client.query(
       `INSERT INTO shops
-         (name, owner_name, email, phone, address, subscription_status, subscription_end_date, barcode_enabled)
-       VALUES ($1,$2,$3,$4,$5,'active',$6,$7)
+         (name, owner_name, email, phone, address, logo_url, contact_email,
+          subscription_status, subscription_end_date, barcode_enabled)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$9)
        RETURNING *`,
-      [name, owner_name, email, phone || null, address || null, subEnd, barcode_enabled]
+      [name, owner_name, email, phone || null, address || null,
+       logo_url || null, contact_email || null, subEnd, barcode_enabled]
     );
     const shop = shopRows[0];
 
@@ -346,7 +349,7 @@ async function changeUserPassword(req, res) {
 
 // ── PUT /api/admin/shops/:id ──────────────────────────────────
 async function updateShop(req, res) {
-  const { name, owner_name, email, phone, address, barcode_enabled, extra_staff_slots } = req.body;
+  const { name, owner_name, email, phone, address, logo_url, contact_email, barcode_enabled, extra_staff_slots } = req.body;
   try {
     const { rows } = await db.query(
       `UPDATE shops
@@ -355,11 +358,16 @@ async function updateShop(req, res) {
               email              = COALESCE($3, email),
               phone              = COALESCE($4, phone),
               address            = COALESCE($5, address),
-              barcode_enabled    = COALESCE($6, barcode_enabled),
-              extra_staff_slots  = COALESCE($7, extra_staff_slots)
-        WHERE id = $8
+              logo_url           = COALESCE($6, logo_url),
+              contact_email      = COALESCE($7, contact_email),
+              barcode_enabled    = COALESCE($8, barcode_enabled),
+              extra_staff_slots  = COALESCE($9, extra_staff_slots)
+        WHERE id = $10
         RETURNING *`,
-      [name, owner_name, email, phone, address, barcode_enabled,
+      [name, owner_name, email, phone, address,
+       logo_url !== undefined ? logo_url || null : undefined,
+       contact_email !== undefined ? contact_email || null : undefined,
+       barcode_enabled,
        extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
        req.params.id]
     );
