@@ -53,12 +53,15 @@ export default function LoginPage() {
         <div className="absolute top-1/3 -right-16 w-64 h-64 bg-primary-400/20 rounded-full" />
 
         <div className="relative z-10 flex flex-col items-center text-center">
-          <img
-            src="/logo.png"
-            alt="Logo"
-            className="h-28 w-auto mb-8 drop-shadow-xl object-contain"
-          />
-          <h1 className="text-4xl font-bold text-white mb-3">POS System</h1>
+          {/* White card so the logo is always legible against the dark-blue gradient */}
+          <div className="bg-white rounded-2xl px-8 py-5 mb-8 shadow-2xl">
+            <img
+              src="/logo.png"
+              alt="BillFlow"
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-3">BillFlow</h1>
           <p className="text-primary-200 text-lg max-w-xs leading-relaxed">
             Manage your shop with ease — sales, inventory, and reports in one place.
           </p>
@@ -75,10 +78,10 @@ export default function LoginPage() {
         <div className="lg:hidden flex flex-col items-center mb-8">
           <img
             src="/logo.png"
-            alt="Logo"
-            className="h-16 w-auto mb-3 object-contain"
+            alt="BillFlow"
+            className="h-14 w-auto mb-3 object-contain"
           />
-          <h1 className="text-2xl font-bold text-primary-900">POS System</h1>
+          <h1 className="text-2xl font-bold text-primary-900">BillFlow</h1>
         </div>
 
         <div className="w-full max-w-sm">

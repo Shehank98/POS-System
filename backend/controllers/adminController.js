@@ -94,14 +94,31 @@ async function createShop(req, res) {
 
     const { rows: shopRows } = await client.query(
       `INSERT INTO shops
-         (name, owner_name, email, phone, address, logo_url, contact_email,
+         (name, owner_name, email, phone, address,
           subscription_status, subscription_end_date, barcode_enabled)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$9)
+       VALUES ($1,$2,$3,$4,$5,'active',$6,$7)
        RETURNING *`,
-      [name, owner_name, email, phone || null, address || null,
-       logo_url || null, contact_email || null, subEnd, barcode_enabled]
+      [name, owner_name, email, phone || null, address || null, subEnd, barcode_enabled]
     );
     const shop = shopRows[0];
+
+    // Set optional columns added by migrations (logo_url, contact_email).
+    // Use a SAVEPOINT so the whole transaction doesn't abort if the columns
+    // don't exist yet on this database instance.
+    if (logo_url || contact_email) {
+      await client.query('SAVEPOINT before_optional_cols');
+      try {
+        await client.query(
+          'UPDATE shops SET logo_url = $1, contact_email = $2 WHERE id = $3',
+          [logo_url || null, contact_email || null, shop.id]
+        );
+        await client.query('RELEASE SAVEPOINT before_optional_cols');
+      } catch (optErr) {
+        await client.query('ROLLBACK TO SAVEPOINT before_optional_cols');
+        if (optErr.code !== '42703') throw optErr; // re-throw unexpected errors
+        // Column doesn't exist yet (run migration 005) — silently skip
+      }
+    }
 
     const hash = await bcrypt.hash(owner_password, 10);
     const { rows: userRows } = await client.query(
@@ -351,6 +368,7 @@ async function changeUserPassword(req, res) {
 async function updateShop(req, res) {
   const { name, owner_name, email, phone, address, logo_url, contact_email, barcode_enabled, extra_staff_slots } = req.body;
   try {
+    // Full update including optional migration columns (logo_url, contact_email, extra_staff_slots)
     const { rows } = await db.query(
       `UPDATE shops
           SET name               = COALESCE($1, name),
@@ -374,6 +392,29 @@ async function updateShop(req, res) {
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json(rows[0]);
   } catch (err) {
+    // Postgres error 42703 = undefined_column: migration(s) not yet applied.
+    // Fall back to updating only the core columns so the operation still succeeds.
+    if (err.code === '42703') {
+      try {
+        const { rows } = await db.query(
+          `UPDATE shops
+              SET name            = COALESCE($1, name),
+                  owner_name      = COALESCE($2, owner_name),
+                  email           = COALESCE($3, email),
+                  phone           = COALESCE($4, phone),
+                  address         = COALESCE($5, address),
+                  barcode_enabled = COALESCE($6, barcode_enabled)
+            WHERE id = $7
+            RETURNING *`,
+          [name, owner_name, email, phone, address, barcode_enabled, req.params.id]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+        return res.json(rows[0]);
+      } catch (fallbackErr) {
+        console.error('updateShop fallback error:', fallbackErr);
+        return res.status(500).json({ error: 'Server error' });
+      }
+    }
     console.error('updateShop error:', err);
     res.status(500).json({ error: 'Server error' });
   }

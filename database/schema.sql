@@ -17,8 +17,15 @@ CREATE TABLE shops (
     subscription_status   VARCHAR(20) NOT NULL DEFAULT 'trial'
                           CHECK (subscription_status IN ('trial','active','expired','suspended')),
     subscription_end_date DATE,
-    barcode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    barcode_enabled       BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Added by migration 003
+    default_tax_rate      NUMERIC(5,2) NOT NULL DEFAULT 0,
+    -- Added by migration 004
+    extra_staff_slots     INTEGER      DEFAULT 0,
+    -- Added by migration 005
+    logo_url              TEXT,
+    contact_email         VARCHAR(255)
 );
 
 -- ============================================================
@@ -89,14 +96,16 @@ CREATE TABLE transaction_items (
 -- PAYMENTS TABLE (subscription payments from shop owners)
 -- ============================================================
 CREATE TABLE payments (
-    id                 SERIAL PRIMARY KEY,
-    shop_id            INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    amount             NUMERIC(12, 2) NOT NULL,
-    payment_date       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    payment_proof      TEXT,
-    status             VARCHAR(20) NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending','verified','rejected')),
-    subscription_months INTEGER NOT NULL DEFAULT 1
+    id                  SERIAL PRIMARY KEY,
+    shop_id             INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+    amount              NUMERIC(12, 2) NOT NULL,
+    payment_date        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    payment_proof       TEXT,
+    status              VARCHAR(20) NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','verified','rejected')),
+    subscription_months INTEGER NOT NULL DEFAULT 1,
+    -- Added by migration 002
+    notes               TEXT
 );
 
 -- ============================================================
