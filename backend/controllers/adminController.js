@@ -51,16 +51,14 @@ async function getDashboard(req, res) {
 // ── GET /api/admin/shops ──────────────────────────────────────
 async function listShops(req, res) {
   try {
+    // Use correlated subqueries to avoid Cartesian-product count inflation
+    // that occurs when LEFT JOINing multiple one-to-many tables simultaneously.
     const { rows } = await db.query(`
       SELECT s.*,
-             COUNT(u.id)                        AS user_count,
-             COUNT(p.id)                        AS product_count,
-             COUNT(t.id)                        AS transaction_count
+             (SELECT COUNT(*) FROM users       u WHERE u.shop_id = s.id) AS user_count,
+             (SELECT COUNT(*) FROM products    p WHERE p.shop_id = s.id) AS product_count,
+             (SELECT COUNT(*) FROM transactions t WHERE t.shop_id = s.id) AS transaction_count
         FROM shops s
-        LEFT JOIN users u        ON u.shop_id = s.id
-        LEFT JOIN products p     ON p.shop_id = s.id
-        LEFT JOIN transactions t ON t.shop_id = s.id
-       GROUP BY s.id
        ORDER BY s.created_at DESC
     `);
     res.json(rows);
@@ -312,21 +310,58 @@ async function rejectPayment(req, res) {
   }
 }
 
+// ── GET /api/admin/shops/:id/users ───────────────────────────
+async function getShopUsers(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, username, role, created_at FROM users WHERE shop_id = $1 ORDER BY role, username`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('getShopUsers error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/shops/:shopId/users/:userId/password ───────
+async function changeUserPassword(req, res) {
+  const { new_password } = req.body;
+  if (!new_password || new_password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+  try {
+    const hash = await bcrypt.hash(new_password, 10);
+    const { rowCount } = await db.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2 AND shop_id = $3`,
+      [hash, req.params.userId, req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'User not found in this shop' });
+    res.json({ message: 'Password changed' });
+  } catch (err) {
+    console.error('changeUserPassword error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── PUT /api/admin/shops/:id ──────────────────────────────────
 async function updateShop(req, res) {
-  const { name, owner_name, email, phone, address, barcode_enabled } = req.body;
+  const { name, owner_name, email, phone, address, barcode_enabled, extra_staff_slots } = req.body;
   try {
     const { rows } = await db.query(
       `UPDATE shops
-          SET name            = COALESCE($1, name),
-              owner_name      = COALESCE($2, owner_name),
-              email           = COALESCE($3, email),
-              phone           = COALESCE($4, phone),
-              address         = COALESCE($5, address),
-              barcode_enabled = COALESCE($6, barcode_enabled)
-        WHERE id = $7
+          SET name               = COALESCE($1, name),
+              owner_name         = COALESCE($2, owner_name),
+              email              = COALESCE($3, email),
+              phone              = COALESCE($4, phone),
+              address            = COALESCE($5, address),
+              barcode_enabled    = COALESCE($6, barcode_enabled),
+              extra_staff_slots  = COALESCE($7, extra_staff_slots)
+        WHERE id = $8
         RETURNING *`,
-      [name, owner_name, email, phone, address, barcode_enabled, req.params.id]
+      [name, owner_name, email, phone, address, barcode_enabled,
+       extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
+       req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json(rows[0]);
@@ -353,6 +388,7 @@ async function getPaymentProof(req, res) {
 module.exports = {
   adminLogin, getDashboard,
   listShops, createShop, getShop, updateShop,
+  getShopUsers, changeUserPassword,
   updateSubscription, getShopSales,
   listPayments, verifyPayment, rejectPayment, getPaymentProof,
 };

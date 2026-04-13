@@ -101,6 +101,29 @@ async function registerUser(req, res) {
       return res.status(403).json({ error: 'Only owners can create manager accounts' });
     }
 
+    // ── Staff limit: default 1 manager + 1 cashier per shop ───
+    // Admin can increase by setting extra_staff_slots on the shop.
+    let extraSlots = 0;
+    try {
+      const slotRes = await db.query(
+        `SELECT COALESCE(extra_staff_slots, 0) AS extra_staff_slots FROM shops WHERE id = $1`,
+        [shop_id]
+      );
+      extraSlots = parseInt(slotRes.rows[0]?.extra_staff_slots, 10) || 0;
+    } catch { /* column may not exist yet - use default 0 */ }
+
+    const maxPerRole = 1 + extraSlots;
+    const countRes = await db.query(
+      `SELECT COUNT(*) AS cnt FROM users WHERE shop_id = $1 AND role = $2`,
+      [shop_id, assignedRole]
+    );
+    const current = parseInt(countRes.rows[0].cnt, 10);
+    if (current >= maxPerRole) {
+      return res.status(403).json({
+        error: `${assignedRole === 'manager' ? 'Manager' : 'Cashier'} limit reached (max ${maxPerRole}). Contact admin to add more staff slots.`,
+      });
+    }
+
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await db.query(
       `INSERT INTO users (shop_id, username, password_hash, role)

@@ -58,10 +58,11 @@ export const transactionsApi = {
 
 // ── Dashboard ─────────────────────────────────────────────────
 export const dashboardApi = {
-  today:    ()              => client.get('/dashboard/today'),
-  week:     ()              => client.get('/dashboard/week'),
-  month:    ()              => client.get('/dashboard/month'),
-  lowStock: (threshold = 10) => client.get('/dashboard/low-stock', { params: { threshold } }),
+  today:     ()              => client.get('/dashboard/today'),
+  yesterday: ()              => client.get('/dashboard/yesterday'),
+  week:      ()              => client.get('/dashboard/week'),
+  month:     ()              => client.get('/dashboard/month'),
+  lowStock:  (threshold = 10) => client.get('/dashboard/low-stock', { params: { threshold } }),
 };
 
 // ── Reports ───────────────────────────────────────────────────
@@ -129,7 +130,9 @@ export const adminApi = {
   getProof:       (id)   => adminClient.get(`/admin/payments/${id}/proof`),
   verifyPayment:  (id)   => adminClient.put(`/admin/payments/${id}/verify`),
   rejectPayment:  (id, data) => adminClient.put(`/admin/payments/${id}/reject`, data),
-  getAuditLog:    (params) => adminClient.get('/admin/audit-log', { params }),
+  getAuditLog:      (params)            => adminClient.get('/admin/audit-log', { params }),
+  getShopUsers:     (shopId)            => adminClient.get(`/admin/shops/${shopId}/users`),
+  changeUserPw:     (shopId, userId, pw) => adminClient.put(`/admin/shops/${shopId}/users/${userId}/password`, { new_password: pw }),
 };
 
 export default client;

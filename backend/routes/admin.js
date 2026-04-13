@@ -14,10 +14,12 @@ router.get('/dashboard',                    ctrl.getDashboard);
 // Shop management
 router.get('/shops',                        ctrl.listShops);
 router.post('/shops',                       ctrl.createShop);
-router.get('/shops/:id',                    ctrl.getShop);
-router.put('/shops/:id',                    ctrl.updateShop);
-router.put('/shops/:id/subscription',       ctrl.updateSubscription);
-router.get('/shops/:id/sales',              ctrl.getShopSales);
+router.get('/shops/:id',                          ctrl.getShop);
+router.put('/shops/:id',                          ctrl.updateShop);
+router.put('/shops/:id/subscription',             ctrl.updateSubscription);
+router.get('/shops/:id/sales',                    ctrl.getShopSales);
+router.get('/shops/:id/users',                    ctrl.getShopUsers);
+router.put('/shops/:id/users/:userId/password',   ctrl.changeUserPassword);
 
 // Payment management
 router.get('/payments',                     ctrl.listPayments);

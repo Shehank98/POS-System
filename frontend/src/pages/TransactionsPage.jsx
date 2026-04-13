@@ -136,7 +136,36 @@ export default function TransactionsPage() {
       )}
 
       {/* Filters */}
-      <div className="card p-4">
+      <div className="card p-4 space-y-3">
+        {/* Quick range presets */}
+        <div>
+          <p className="label mb-1.5">Quick range</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'Today',        s: today,                                    e: today },
+              { label: 'Yesterday',    s: new Date(Date.now()-86400000).toISOString().split('T')[0], e: new Date(Date.now()-86400000).toISOString().split('T')[0] },
+              { label: 'Last 7 days',  s: new Date(Date.now()-6*86400000).toISOString().split('T')[0], e: today },
+              { label: 'This month',   s: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`, e: today },
+              { label: 'Last 30 days', s: new Date(Date.now()-29*86400000).toISOString().split('T')[0], e: today },
+            ].map(({ label, s, e }) => (
+              <button
+                key={label}
+                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors
+                  ${startDate === s && endDate === e
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                onClick={() => {
+                  setStartDate(s); setEndDate(e); setPage(1);
+                  load({ page: 1, start_date: s, end_date: e });
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom date range + method + actions */}
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="label">From</label>
@@ -161,16 +190,6 @@ export default function TransactionsPage() {
           <div className="flex gap-2">
             <button className="btn-primary" onClick={applyFilters}>
               <Search className="w-4 h-4" /> Filter
-            </button>
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                setStartDate(today); setEndDate(today);
-                setFilterMethod(''); setPage(1);
-                load({ page: 1, start_date: today, end_date: today, payment_method: undefined });
-              }}
-            >
-              Today
             </button>
             <button className="btn-secondary" onClick={() => load()} disabled={loading}>
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

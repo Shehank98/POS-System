@@ -3,6 +3,7 @@ import {
   Shield, Store, CreditCard, CheckCircle2, XCircle,
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
   AlertTriangle, Users, ClipboardList, Plus, CalendarPlus,
+  KeyRound, Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -236,18 +237,25 @@ function CreateShopModal({ onClose, onCreated }) {
 
 // ── Extend Subscription Modal ─────────────────────────────────
 function ExtendSubModal({ shop, onClose, onDone }) {
-  const [months, setMonths] = useState('0');
-  const [status, setStatus] = useState(shop.subscription_status);
-  const [busy,   setBusy]   = useState(false);
+  const [months,     setMonths]     = useState('0');
+  const [status,     setStatus]     = useState(shop.subscription_status);
+  const [extraSlots, setExtraSlots] = useState(String(shop.extra_staff_slots || 0));
+  const [busy,       setBusy]       = useState(false);
 
   async function handleSave() {
     setBusy(true);
     try {
+      // Update subscription
       await adminApi.updateSub(shop.id, {
         subscription_status: status,
         extend_months: parseInt(months, 10) || 0,
       });
-      toast.success('Subscription updated');
+      // Update extra staff slots if changed
+      const newSlots = parseInt(extraSlots, 10) || 0;
+      if (newSlots !== (shop.extra_staff_slots || 0)) {
+        await adminApi.updateShop(shop.id, { extra_staff_slots: newSlots });
+      }
+      toast.success('Shop updated');
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update');
@@ -261,10 +269,10 @@ function ExtendSubModal({ shop, onClose, onDone }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="bg-gray-800 rounded-2xl p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-white">Manage Subscription - {shop.name}</p>
+        <p className="text-sm font-semibold text-white">Manage - {shop.name}</p>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Status</label>
+            <label className="block text-xs text-gray-400 mb-1">Subscription Status</label>
             <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="active">Active</option>
               <option value="trial">Trial</option>
@@ -274,20 +282,167 @@ function ExtendSubModal({ shop, onClose, onDone }) {
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">Add months (0 = status change only)</label>
-            <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months} onChange={(e) => setMonths(e.target.value)} />
+            <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months}
+                   onChange={(e) => setMonths(e.target.value)} />
             <p className="text-xs text-gray-500 mt-1">
-              Current expiry: {shop.subscription_end_date ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
+              Current expiry: {shop.subscription_end_date
+                ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">
+              Extra Staff Slots
+              <span className="ml-1 text-gray-600">(default: 1 manager + 1 cashier)</span>
+            </label>
+            <input className={`w-full ${inputCls}`} type="number" min="0" max="20" value={extraSlots}
+                   onChange={(e) => setExtraSlots(e.target.value)} />
+            <p className="text-xs text-gray-500 mt-1">
+              Each extra slot allows +1 manager AND +1 cashier
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">Cancel</button>
+          <button onClick={onClose}
+            className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">
+            Cancel
+          </button>
           <button onClick={handleSave} disabled={busy}
-            className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50">
+            className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg
+                       hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50">
             {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             Save
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Users Modal (per shop) ────────────────────────────────────
+function UsersModal({ shop, onClose }) {
+  const [users,     setUsers]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [changingPw, setChangingPw] = useState({}); // userId -> { open, pw, busy }
+
+  useEffect(() => {
+    adminApi.getShopUsers(shop.id)
+      .then(({ data }) => setUsers(data))
+      .catch(() => toast.error('Failed to load users'))
+      .finally(() => setLoading(false));
+  }, [shop.id]);
+
+  function openPw(userId) {
+    setChangingPw((prev) => ({ ...prev, [userId]: { open: true, pw: '', busy: false } }));
+  }
+
+  function setPw(userId, val) {
+    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], pw: val } }));
+  }
+
+  async function savePw(userId) {
+    const entry = changingPw[userId];
+    if (!entry?.pw || entry.pw.length < 4) {
+      toast.error('Password must be at least 4 characters');
+      return;
+    }
+    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: true } }));
+    try {
+      await adminApi.changeUserPw(shop.id, userId, entry.pw);
+      toast.success('Password changed');
+      setChangingPw((prev) => ({ ...prev, [userId]: { open: false, pw: '', busy: false } }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to change password');
+      setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: false } }));
+    }
+  }
+
+  const ROLE_CLS = {
+    owner:   'bg-yellow-900/40 text-yellow-300',
+    manager: 'bg-blue-900/40 text-blue-300',
+    cashier: 'bg-gray-700 text-gray-300',
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full space-y-4 max-h-[85vh] overflow-y-auto"
+           onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-white">Users - {shop.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {shop.extra_staff_slots > 0
+                ? `Extra staff slots: +${shop.extra_staff_slots}`
+                : 'Limit: 1 manager + 1 cashier (default)'}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          </div>
+        )}
+
+        {!loading && users.length === 0 && (
+          <p className="text-center py-6 text-gray-500 text-sm">No users found</p>
+        )}
+
+        {!loading && users.map((u) => {
+          const cp = changingPw[u.id] || {};
+          return (
+            <div key={u.id} className="bg-gray-900 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-white">{u.username}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize
+                    ${ROLE_CLS[u.role] || ROLE_CLS.cashier}`}>
+                    {u.role}
+                  </span>
+                </div>
+                {!cp.open && (
+                  <button
+                    onClick={() => openPw(u.id)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gray-700
+                               hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" /> Change PW
+                  </button>
+                )}
+              </div>
+              {cp.open && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="New password (min 4)"
+                    className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs
+                               rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    value={cp.pw}
+                    onChange={(e) => setPw(u.id, e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && savePw(u.id)}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => savePw(u.id)}
+                    disabled={cp.busy}
+                    className="px-3 py-2 text-xs bg-primary-600 hover:bg-primary-700 text-white
+                               rounded-lg font-medium flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {cp.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setChangingPw((prev) => ({ ...prev, [u.id]: { open: false, pw: '', busy: false } }))}
+                    className="px-2 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -365,6 +520,7 @@ export default function AdminDashboardPage() {
   const [rejectPayId,  setRejectPayId]  = useState(null);
   const [showCreateShop, setShowCreateShop] = useState(false);
   const [extendShop,     setExtendShop]     = useState(null);
+  const [usersShop,      setUsersShop]      = useState(null);
 
   const AUDIT_PAGE_SIZE = 25;
 
@@ -604,13 +760,23 @@ export default function AdminDashboardPage() {
                       )}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {s.user_count || 0} users · {s.product_count || 0} products · {s.transaction_count || 0} transactions
+                      {s.user_count || 0} user{s.user_count !== 1 ? 's' : ''} ·{' '}
+                      {s.product_count || 0} products ·{' '}
+                      {s.transaction_count || 0} transactions
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${badge.cls}`}>
                       {badge.label}
                     </span>
+                    <button
+                      onClick={() => setUsersShop(s)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-700
+                                 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+                      title="View users / change passwords"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Users
+                    </button>
                     <button
                       onClick={() => setExtendShop(s)}
                       className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-700
@@ -721,7 +887,8 @@ export default function AdminDashboardPage() {
       {proofPayId  && <ProofModal  paymentId={proofPayId}  onClose={() => setProofPayId(null)} />}
       {rejectPayId && <RejectModal paymentId={rejectPayId} onClose={() => setRejectPayId(null)} onDone={() => { setRejectPayId(null); load(); }} />}
       {showCreateShop && <CreateShopModal onClose={() => setShowCreateShop(false)} onCreated={() => { load(); }} />}
-      {extendShop && <ExtendSubModal shop={extendShop} onClose={() => setExtendShop(null)} onDone={() => { setExtendShop(null); load(); }} />}
+      {extendShop  && <ExtendSubModal shop={extendShop}  onClose={() => setExtendShop(null)}  onDone={() => { setExtendShop(null);  load(); }} />}
+      {usersShop   && <UsersModal     shop={usersShop}   onClose={() => setUsersShop(null)} />}
     </div>
   );
 }
