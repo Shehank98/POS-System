@@ -190,7 +190,7 @@ export default function ProductsPage() {
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Category</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Price</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500 hidden sm:table-cell">Stock</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">Stock</th>
                 <th className="text-center px-4 py-3 font-medium text-gray-500 hidden lg:table-cell">Tax %</th>
                 {canEdit && (
                   <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
@@ -233,7 +233,7 @@ export default function ProductsPage() {
                     {p.category || <span className="text-gray-300">-</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(p.price)}</td>
-                  <td className="px-4 py-3 text-right hidden sm:table-cell">
+                  <td className="px-4 py-3 text-right">
                     {p.has_inventory
                       ? <span className={
                           outOfStock  ? 'font-bold text-red-600'
@@ -242,7 +242,7 @@ export default function ProductsPage() {
                         }>
                           {p.stock_quantity}
                         </span>
-                      : <span className="text-gray-400 text-xs">N/A</span>
+                      : <span className="text-gray-400 text-xs">—</span>
                     }
                   </td>
                   <td className="px-4 py-3 text-center text-gray-500 hidden lg:table-cell">
