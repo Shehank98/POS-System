@@ -402,6 +402,14 @@ export default function POSPage() {
   // ── Phone scanner WebSocket ──────────────────────────────────
   const handlePhoneBarcode = useCallback(async (code) => {
     if (readOnly) return;
+
+    // Auto-detect pre-order token (e.g. A001)
+    if (/^[A-Za-z]\d{3}$/.test(code)) {
+      setPreOrderToken(code.toUpperCase());
+      setShowPreOrder(true);
+      return;
+    }
+
     try {
       const { data } = await productsApi.byBarcode(code);
       addItem(data);
