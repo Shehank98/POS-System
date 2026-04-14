@@ -249,6 +249,58 @@ async function cancelStalePreOrders() {
   }
 }
 
+// ── PUBLIC: GET /api/pre-orders/public/track?shop_id=X&token=Y ─
+async function getPublicTrack(req, res) {
+  const { shop_id, token } = req.query;
+  if (!shop_id) return res.status(400).json({ error: 'shop_id is required' });
+  if (!token)   return res.status(400).json({ error: 'token is required' });
+
+  try {
+    const { rows } = await db.query(
+      `SELECT po.id, po.token_number, po.status, po.items,
+              po.total_amount, po.customer_name, po.created_at,
+              s.name AS shop_name
+         FROM pre_orders po
+         JOIN shops s ON s.id = po.shop_id
+        WHERE po.shop_id = $1
+          AND po.token_number = $2
+        ORDER BY po.created_at DESC
+        LIMIT 1`,
+      [shop_id, token.toUpperCase()]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+    res.json({ order: rows[0] });
+  } catch (err) {
+    console.error('getPublicTrack error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
+}
+
+// ── AUTHENTICATED: GET /api/pre-orders/stats ──────────────────
+async function getStats(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'PENDING')                                        AS pending_count,
+         COUNT(*) FILTER (WHERE status = 'PREPARING')                                      AS preparing_count,
+         COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE AND status != 'CANCELLED') AS today_count,
+         COALESCE(SUM(total_amount) FILTER (
+           WHERE created_at::date = CURRENT_DATE AND status != 'CANCELLED'
+         ), 0)                                                                              AS today_amount,
+         COUNT(*) FILTER (
+           WHERE created_at >= CURRENT_DATE - INTERVAL '6 days' AND status != 'CANCELLED'
+         )                                                                                  AS this_week_count
+       FROM pre_orders
+       WHERE shop_id = $1`,
+      [req.shopId]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('getStats error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
+}
+
 module.exports = {
   getPublicProducts,
   getPublicShop,
@@ -257,5 +309,7 @@ module.exports = {
   listPreOrders,
   updateStatus,
   getByToken,
+  getPublicTrack,
+  getStats,
   cancelStalePreOrders,
 };

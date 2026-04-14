@@ -22,7 +22,7 @@ const NAV = [
   { to: '/analytics',    label: 'Analytics',    icon: TrendingUp      },
   { to: '/billing',      label: 'Billing',      icon: CreditCard      },
   { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList,  roles: ['owner', 'manager'] },
-  { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode,         roles: ['owner', 'manager'] },
+  { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode },
   { to: '/settings',     label: 'Settings',     icon: Settings        },
 ];
 
@@ -40,7 +40,7 @@ const MORE_NAV = [
   { to: '/analytics',    label: 'Analytics', icon: TrendingUp     },
   { to: '/billing',      label: 'Billing',   icon: CreditCard     },
   { to: '/audit-log',    label: 'Audit Log', icon: ClipboardList, roles: ['owner', 'manager'] },
-  { to: '/pre-orders',   label: 'Pre Orders',icon: QrCode,        roles: ['owner', 'manager'] },
+  { to: '/pre-orders',   label: 'Pre Orders',icon: QrCode },
   { to: '/settings',     label: 'Settings',  icon: Settings       },
 ];
 
@@ -63,7 +63,7 @@ export default function Layout() {
   const pollBadgeRef = useRef(null);
 
   useEffect(() => {
-    if (!user || !['owner', 'manager'].includes(user.role)) return;
+    if (!user) return;
     const fetchPending = () =>
       preOrdersApi.list('PENDING')
         .then((res) => setPendingCount((res.data.orders || []).length))

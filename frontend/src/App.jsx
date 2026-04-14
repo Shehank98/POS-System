@@ -15,6 +15,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ScannerPage from './pages/ScannerPage';
 import OrderPage from './pages/OrderPage';
+import TrackOrderPage from './pages/TrackOrderPage';
 import PreOrdersPage from './pages/PreOrdersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/scanner" element={<ScannerPage />} />
         <Route path="/order" element={<OrderPage />} />
+        <Route path="/track" element={<TrackOrderPage />} />
 
         {/* Admin section */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

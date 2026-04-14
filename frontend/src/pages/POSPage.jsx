@@ -418,6 +418,15 @@ export default function POSPage() {
     e.preventDefault();
     const code = barcodeInput.trim();
     if (!code) return;
+
+    // Auto-detect pre-order token format (e.g. A001, B123)
+    if (/^[A-Za-z]\d{3}$/.test(code)) {
+      setBarcodeInput('');
+      setPreOrderToken(code.toUpperCase());
+      setShowPreOrder(true);
+      return;
+    }
+
     setScanning(true);
     try {
       const { data } = await productsApi.byBarcode(code);
@@ -783,11 +792,14 @@ export default function POSPage() {
           totals={totals}
           items={items}
           onClose={() => setShowPayment(false)}
-          onComplete={() => {
-            // If this sale came from a pre-order, mark it COMPLETED
+          onComplete={async () => {
             if (activePreOrder) {
-              preOrdersApi.updateStatus(activePreOrder.id, 'COMPLETED')
-                .catch(() => {}); // fire-and-forget
+              try {
+                await preOrdersApi.updateStatus(activePreOrder.id, 'COMPLETED');
+                toast.success(`Pre-order ${activePreOrder.token_number} marked complete`);
+              } catch {
+                toast.error('Payment done but could not update pre-order status. Please mark it manually.');
+              }
               setActivePreOrder(null);
             }
             setShowPayment(false);

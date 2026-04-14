@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Search, CheckCircle, X, RotateCcw, Phone } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { ShoppingCart, Plus, Minus, Search, CheckCircle, X, RotateCcw, Phone, MapPin } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
 
@@ -53,28 +54,58 @@ function ProductCard({ product, qty, onAdd, onRemove }) {
 }
 
 // ── Success Screen ────────────────────────────────────────────
-function SuccessScreen({ token, shopName, onPlaceAnother }) {
+function SuccessScreen({ token, shopId, shopName, onPlaceAnother }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-6 z-50">
-      <CheckCircle size={64} className="text-green-500 mb-4" />
-      <h1 className="text-2xl font-bold text-gray-800 mb-1">Order Placed!</h1>
-      <p className="text-gray-500 mb-6 text-center text-sm">Your pre-order at {shopName} is confirmed.</p>
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-6 z-50 overflow-y-auto">
+      <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+        <CheckCircle size={52} className="text-green-500 mb-3" />
+        <h1 className="text-2xl font-bold text-gray-800 mb-1">Order Placed!</h1>
+        <p className="text-gray-500 mb-5 text-center text-sm">
+          Your pre-order at <strong>{shopName}</strong> is confirmed.
+        </p>
 
-      <div className="bg-primary-50 border-2 border-primary-200 rounded-2xl px-10 py-6 mb-6 text-center">
-        <p className="text-xs text-primary-500 uppercase tracking-widest mb-1">Your Token</p>
-        <p className="text-6xl font-black text-primary-700 tracking-wider">{token}</p>
+        {/* Token + QR card */}
+        <div className="w-full bg-primary-50 border-2 border-primary-200 rounded-2xl p-5 mb-4 text-center">
+          <p className="text-xs text-primary-500 uppercase tracking-widest mb-1">Your Token</p>
+          <p className="text-5xl font-black text-primary-700 tracking-wider mb-4">{token}</p>
+
+          <div className="flex justify-center mb-3">
+            <div className="bg-white p-2.5 rounded-xl border border-primary-100 inline-block">
+              <QRCodeSVG value={token} size={130} level="M" />
+            </div>
+          </div>
+
+          <p className="text-xs text-primary-500">
+            Show this QR or token at the counter
+          </p>
+        </div>
+
+        {/* Instruction */}
+        <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 flex gap-2.5">
+          <MapPin size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700">
+            Visit the shop, show your token to pay and collect your items.
+          </p>
+        </div>
+
+        {/* Action buttons */}
+        <div className="w-full flex flex-col gap-2.5">
+          <button
+            onClick={() => navigate(`/track?shop_id=${shopId}&token=${token}`)}
+            className="w-full py-3 rounded-xl border-2 border-primary-600 text-primary-700 font-semibold text-sm hover:bg-primary-50 transition-colors"
+          >
+            Track Order Status
+          </button>
+          <button
+            onClick={onPlaceAnother}
+            className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors"
+          >
+            Place Another Order
+          </button>
+        </div>
       </div>
-
-      <p className="text-gray-600 text-center text-sm mb-8 max-w-xs">
-        Show this token at the counter. Items will be prepared — visit the shop to pay and collect.
-      </p>
-
-      <button
-        onClick={onPlaceAnother}
-        className="px-8 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold"
-      >
-        Place Another Order
-      </button>
     </div>
   );
 }
@@ -210,6 +241,7 @@ export default function OrderPage() {
     return (
       <SuccessScreen
         token={token}
+        shopId={shopId}
         shopName={shop?.name || 'the shop'}
         onPlaceAnother={() => { setToken(null); setPhone(''); setName(''); }}
       />

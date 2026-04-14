@@ -116,10 +116,12 @@ export const preOrdersApi = {
   getShop:      (shopId)        => publicClient.get(`/pre-orders/public/shop?shop_id=${shopId}`),
   create:       (data)          => publicClient.post('/pre-orders/public', data),
   getHistory:   (shopId, phone) => publicClient.get(`/pre-orders/public/history?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
+  trackOrder:   (shopId, token) => publicClient.get(`/pre-orders/public/track?shop_id=${shopId}&token=${encodeURIComponent(token)}`),
   // Authenticated — shop owner / POS staff
   list:         (status)        => client.get('/pre-orders', { params: status ? { status } : {} }),
   updateStatus: (id, status)    => client.put(`/pre-orders/${id}/status`, { status }),
   getByToken:   (token)         => client.get(`/pre-orders/by-token/${encodeURIComponent(token)}`),
+  getStats:     ()              => client.get('/pre-orders/stats'),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────

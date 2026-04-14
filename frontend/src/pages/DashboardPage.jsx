@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, ShoppingCart, Package, AlertTriangle,
-  RefreshCw, BarChart2, Loader2, Receipt,
+  RefreshCw, BarChart2, Loader2, Receipt, QrCode, Clock,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line,
@@ -10,7 +10,7 @@ import {
   BarChart, Bar,
 } from 'recharts';
 import useAuthStore from '../store/authStore';
-import { dashboardApi, transactionsApi } from '../api/client';
+import { dashboardApi, transactionsApi, preOrdersApi } from '../api/client';
 
 const fmt  = (n) => Number(n || 0).toFixed(2);
 const fmtN = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -149,6 +149,10 @@ export default function DashboardPage() {
   const [summary,      setSummary]      = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
 
+  // Pre-order stats
+  const [preOrderStats,        setPreOrderStats]        = useState(null);
+  const [loadingPreOrderStats, setLoadingPreOrderStats] = useState(true);
+
   // Charts always show today (hourly) or week (7-day trend)
   const [todayData,    setTodayData]    = useState(null);
   const [weekData,     setWeekData]     = useState(null);
@@ -203,6 +207,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCharts();
     fetchSummary('today');
+    preOrdersApi.getStats()
+      .then(({ data }) => setPreOrderStats(data))
+      .catch(() => {})
+      .finally(() => setLoadingPreOrderStats(false));
     timerRef.current = setInterval(() => {
       fetchCharts(true);
     }, POLL_INTERVAL);
@@ -317,6 +325,48 @@ export default function DashboardPage() {
           color={lowStock.length > 0 ? 'red' : 'green'}
           loading={loadingStock}
         />
+      </div>
+
+      {/* Pre-orders stats */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <QrCode className="w-4 h-4 text-gray-400" />
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Pre-Orders</h2>
+          <button
+            onClick={() => navigate('/pre-orders')}
+            className="ml-auto text-xs text-primary-600 hover:underline font-medium"
+          >
+            View all →
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard
+            label="Pending Now"
+            value={preOrderStats?.pending_count ?? 0}
+            sub={Number(preOrderStats?.preparing_count) > 0
+              ? `${preOrderStats.preparing_count} preparing`
+              : 'None pending'}
+            icon={Clock}
+            color={Number(preOrderStats?.pending_count) > 0 ? 'orange' : 'green'}
+            loading={loadingPreOrderStats}
+          />
+          <StatCard
+            label="Today's Pre-Orders"
+            value={preOrderStats?.today_count ?? 0}
+            sub={`Rs ${Number(preOrderStats?.today_amount || 0).toFixed(2)}`}
+            icon={QrCode}
+            color="primary"
+            loading={loadingPreOrderStats}
+          />
+          <StatCard
+            label="This Week"
+            value={preOrderStats?.this_week_count ?? 0}
+            sub="pre-orders (excl. cancelled)"
+            icon={TrendingUp}
+            color="purple"
+            loading={loadingPreOrderStats}
+          />
+        </div>
       </div>
 
       {/* Payment method breakdown (today only) */}
