@@ -110,9 +110,20 @@ function SuccessScreen({ token, shopId, shopName, onPlaceAnother }) {
   );
 }
 
+// ── Status badge helper ───────────────────────────────────────
+const STATUS_BADGE = {
+  PENDING:   { label: 'Pending',   cls: 'bg-yellow-100 text-yellow-700' },
+  PREPARING: { label: 'Preparing', cls: 'bg-blue-100 text-blue-700'    },
+  READY:     { label: 'Ready!',    cls: 'bg-green-100 text-green-700'   },
+  COMPLETED: { label: 'Completed', cls: 'bg-gray-100 text-gray-500'    },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-red-100 text-red-500'      },
+};
+const ACTIVE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+
 // ── Main OrderPage ────────────────────────────────────────────
 export default function OrderPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const shopId = searchParams.get('shop_id');
 
   const [shop, setShop]               = useState(null);
@@ -128,6 +139,12 @@ export default function OrderPage() {
   const [showCart, setShowCart]       = useState(false);
   const [error, setError]             = useState('');
 
+  // Saved order (localStorage — persists across page closes)
+  const [savedOrder,   setSavedOrder]   = useState(null); // { token, shopId, createdAt }
+  const [showSavedQR,  setShowSavedQR]  = useState(false);
+
+  const LS_KEY = shopId ? `pos_last_order_${shopId}` : null;
+
   // Load shop + products
   useEffect(() => {
     if (!shopId) { setError('Invalid link — no shop ID found.'); setLoading(false); return; }
@@ -142,6 +159,30 @@ export default function OrderPage() {
       .catch((err) => setError(err.response?.data?.error || 'Could not load shop. Please check your link.'))
       .finally(() => setLoading(false));
   }, [shopId]);
+
+  // Check localStorage for a previously placed order on this device
+  useEffect(() => {
+    if (!LS_KEY) return;
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const hoursAgo = (Date.now() - new Date(parsed.createdAt)) / 3_600_000;
+      if (hoursAgo >= 24) { localStorage.removeItem(LS_KEY); return; }
+      // Verify the order is still active before showing the banner
+      preOrdersApi.trackOrder(shopId, parsed.token)
+        .then(({ data }) => {
+          if (ACTIVE_STATUSES.includes(data.order.status)) {
+            setSavedOrder({ ...parsed, status: data.order.status });
+          } else {
+            localStorage.removeItem(LS_KEY); // completed or cancelled — don't show
+          }
+        })
+        .catch(() => setSavedOrder(parsed)); // network error — show it anyway
+    } catch {
+      localStorage.removeItem(LS_KEY);
+    }
+  }, [LS_KEY]); // eslint-disable-line
 
   // Fetch order history when phone is provided
   const fetchHistory = useCallback(async () => {
@@ -203,9 +244,19 @@ export default function OrderPage() {
         items,
         total_amount:   cartTotal,
       });
-      setToken(res.data.token);
+      const newToken = res.data.token;
+      setToken(newToken);
       setCart({});
       setHistory([]);
+      // Persist so customer can find this token if they close the tab
+      if (LS_KEY) {
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          token: newToken,
+          shopId,
+          createdAt: new Date().toISOString(),
+        }));
+        setSavedOrder(null); // success screen is showing, banner not needed yet
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to place order. Please try again.');
     } finally {
@@ -243,7 +294,14 @@ export default function OrderPage() {
         token={token}
         shopId={shopId}
         shopName={shop?.name || 'the shop'}
-        onPlaceAnother={() => { setToken(null); setPhone(''); setName(''); }}
+        onPlaceAnother={() => {
+          setToken(null);
+          setPhone('');
+          setName('');
+          if (LS_KEY) localStorage.removeItem(LS_KEY);
+          setSavedOrder(null);
+          setShowSavedQR(false);
+        }}
       />
     );
   }
@@ -268,6 +326,57 @@ export default function OrderPage() {
           )}
         </button>
       </div>
+
+      {/* Active Order Banner (shown when customer has an existing order on this device) */}
+      {savedOrder && (
+        <div className="mx-4 mt-3 bg-primary-50 border border-primary-200 rounded-2xl overflow-hidden">
+          <div className="flex items-start justify-between px-4 pt-3 pb-2">
+            <div>
+              <p className="text-xs font-semibold text-primary-500 uppercase tracking-wide">Your Active Order</p>
+              <p className="text-4xl font-black text-primary-700 tracking-wider leading-none mt-0.5">
+                {savedOrder.token}
+              </p>
+              {savedOrder.status && (
+                <span className={`inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full
+                  ${STATUS_BADGE[savedOrder.status]?.cls || ''}`}>
+                  {STATUS_BADGE[savedOrder.status]?.label || savedOrder.status}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => { setSavedOrder(null); setShowSavedQR(false); if (LS_KEY) localStorage.removeItem(LS_KEY); }}
+              className="text-primary-300 hover:text-primary-500 p-1 -mr-1 -mt-0.5"
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* QR code — collapsible */}
+          {showSavedQR && (
+            <div className="flex justify-center pb-3">
+              <div className="bg-white p-2.5 rounded-xl border border-primary-100 inline-block">
+                <QRCodeSVG value={savedOrder.token} size={140} level="M" />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 px-4 pb-3">
+            <button
+              onClick={() => navigate(`/track?shop_id=${shopId}&token=${savedOrder.token}`)}
+              className="flex-1 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors"
+            >
+              Track Status
+            </button>
+            <button
+              onClick={() => setShowSavedQR((v) => !v)}
+              className="flex-1 py-2 rounded-xl border border-primary-300 text-primary-700 text-sm font-semibold hover:bg-primary-100 transition-colors"
+            >
+              {showSavedQR ? 'Hide QR' : 'Show QR'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="px-4 py-3">
@@ -377,22 +486,44 @@ export default function OrderPage() {
                   <div className="space-y-2">
                     {history.map((order) => {
                       const items = Array.isArray(order.items) ? order.items : [];
+                      const badge = STATUS_BADGE[order.status];
+                      const isActive = ACTIVE_STATUSES.includes(order.status);
                       return (
-                        <div key={order.id} className="bg-gray-50 rounded-xl p-3 flex items-center justify-between gap-2">
+                        <div key={order.id} className="bg-gray-50 rounded-xl p-3 flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-700 truncate">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs font-semibold text-gray-700 truncate">
+                                Token <strong>{order.token_number}</strong>
+                              </p>
+                              {badge && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                                  {badge.label}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">
                               {items.map((i) => i.name).join(', ')}
                             </p>
-                            <p className="text-xs text-gray-400 mt-0.5">
+                            <p className="text-xs text-gray-400">
                               Rs {Number(order.total_amount).toFixed(2)} · {timeAgo(order.created_at)}
                             </p>
                           </div>
-                          <button
-                            onClick={() => applyReorder(order)}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-primary-100 text-primary-700 font-medium whitespace-nowrap hover:bg-primary-200"
-                          >
-                            Reorder
-                          </button>
+                          <div className="flex flex-col gap-1.5 shrink-0">
+                            {isActive && (
+                              <button
+                                onClick={() => navigate(`/track?shop_id=${shopId}&token=${order.token_number}`)}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 font-medium whitespace-nowrap hover:bg-blue-200"
+                              >
+                                Track →
+                              </button>
+                            )}
+                            <button
+                              onClick={() => applyReorder(order)}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-primary-100 text-primary-700 font-medium whitespace-nowrap hover:bg-primary-200"
+                            >
+                              Reorder
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
