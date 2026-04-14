@@ -49,8 +49,13 @@ async function getPublicProducts(req, res) {
       `SELECT id, name, price, category, stock_quantity, has_inventory
          FROM products
         WHERE shop_id = $1
-          AND is_active = TRUE
-        ORDER BY category, name`,
+        ORDER BY
+          CASE
+            WHEN has_inventory = true AND stock_quantity <= 0 THEN 1
+            ELSE 0
+          END ASC,
+          category ASC,
+          name ASC`,
       [shop_id]
     );
     res.json({ products: rows });

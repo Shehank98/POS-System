@@ -108,7 +108,7 @@ export default function OrderPage() {
         setShop(shopRes.data.shop);
         setProducts(prodRes.data.products || []);
       })
-      .catch(() => setError('Could not load shop. Please check your link.'))
+      .catch((err) => setError(err.response?.data?.error || 'Could not load shop. Please check your link.'))
       .finally(() => setLoading(false));
   }, [shopId]);
 
