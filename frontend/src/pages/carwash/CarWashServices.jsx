@@ -130,7 +130,7 @@ export default function CarWashServices() {
               <div>
                 <p className="font-semibold text-gray-900 text-sm">{svc.name}</p>
                 <p className="text-xs text-gray-400">
-                  ${parseFloat(svc.price).toFixed(2)}
+                  Rs. {parseFloat(svc.price).toFixed(2)}
                   {svc.duration_minutes && ` · ${svc.duration_minutes} min`}
                   {!svc.is_active && ' · Inactive'}
                 </p>

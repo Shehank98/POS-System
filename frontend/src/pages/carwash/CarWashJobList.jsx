@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Car, Search, Loader2, ChevronRight } from 'lucide-react';
 import { carwashApi } from '../../api/client';
+import useAuthStore from '../../store/authStore';
 
 const STATUSES = [
   { value: '',            label: 'All'        },
@@ -19,6 +20,8 @@ const STATUS_BADGE = {
 };
 
 export default function CarWashJobList() {
+  const user    = useAuthStore((s) => s.user);
+  const isStaff = user?.role === 'staff';
   const [jobs,    setJobs]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [status,  setStatus]  = useState('');
@@ -146,8 +149,8 @@ export default function CarWashJobList() {
                     <span className={`block text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>
                       {badge.label}
                     </span>
-                    {parseFloat(total) > 0 && (
-                      <p className="text-xs text-gray-500 mt-0.5">${total}</p>
+                    {!isStaff && parseFloat(total) > 0 && (
+                      <p className="text-xs text-gray-500 mt-0.5">Rs. {total}</p>
                     )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />

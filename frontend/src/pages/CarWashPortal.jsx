@@ -83,7 +83,7 @@ function BookingForm({ shopId, services, onBooked }) {
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">— Select service —</option>
             {services.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} — ${parseFloat(s.price).toFixed(2)}</option>
+              <option key={s.id} value={s.id}>{s.name} — Rs. {parseFloat(s.price).toFixed(2)}</option>
             ))}
           </select>
         </div>
@@ -229,7 +229,7 @@ export default function CarWashPortal() {
                                   month: 'short', day: 'numeric',
                                   hour: '2-digit', minute: '2-digit',
                                 })}
-                                {parseFloat(job.total_amount) > 0 && ` · $${parseFloat(job.total_amount).toFixed(2)}`}
+                                {parseFloat(job.total_amount) > 0 && ` · Rs. ${parseFloat(job.total_amount).toFixed(2)}`}
                               </p>
                             </div>
                           </div>

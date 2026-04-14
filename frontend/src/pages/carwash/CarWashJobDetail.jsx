@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { carwashApi, authApi } from '../../api/client';
+import useAuthStore from '../../store/authStore';
 
 const STATUS_FLOW = {
   waiting:     { next: 'in_progress', label: 'Start Job',     cls: 'bg-blue-600 hover:bg-blue-700'   },
@@ -72,7 +73,7 @@ function AddItemModal({ onClose, onAdd, services, products }) {
           <option value="">— Select {tab} —</option>
           {list.map((i) => (
             <option key={i.id} value={i.id}>
-              {i.name} — ${parseFloat(i.price).toFixed(2)}
+              {i.name} — Rs. {parseFloat(i.price).toFixed(2)}
               {tab === 'product' ? ` (${i.stock_quantity} in stock)` : ''}
             </option>
           ))}
@@ -92,7 +93,7 @@ function AddItemModal({ onClose, onAdd, services, products }) {
 
         {selected && (
           <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-            Subtotal: <strong>${(parseFloat(selected.price) * qty).toFixed(2)}</strong>
+            Subtotal: <strong>Rs. {(parseFloat(selected.price) * qty).toFixed(2)}</strong>
           </p>
         )}
 
@@ -184,6 +185,8 @@ function PayModal({ totalDue, onClose, onPay }) {
 export default function CarWashJobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user    = useAuthStore((s) => s.user);
+  const isStaff = user?.role === 'staff';
 
   const [job,       setJob]       = useState(null);
   const [services,  setServices]  = useState([]);
@@ -303,7 +306,7 @@ export default function CarWashJobDetail() {
               {flow.label}
             </button>
           )}
-          {job.status === 'completed' && (
+          {job.status === 'completed' && !isStaff && (
             <button
               onClick={() => setShowPay(true)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
@@ -363,7 +366,7 @@ export default function CarWashJobDetail() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-gray-900">
-                    ${parseFloat(item.subtotal).toFixed(2)}
+                    Rs. {parseFloat(item.subtotal).toFixed(2)}
                   </span>
                   {job.status !== 'paid' && (
                     <button
@@ -379,36 +382,38 @@ export default function CarWashJobDetail() {
           </div>
         )}
 
-        {/* Totals */}
-        <div className="pt-2 border-t border-gray-100 space-y-1">
-          <div className="flex justify-between text-sm font-bold text-gray-900">
-            <span>Total</span>
-            <span>${totalAmount.toFixed(2)}</span>
+        {/* Totals — hidden from staff */}
+        {!isStaff && (
+          <div className="pt-2 border-t border-gray-100 space-y-1">
+            <div className="flex justify-between text-sm font-bold text-gray-900">
+              <span>Total</span>
+              <span>Rs. {totalAmount.toFixed(2)}</span>
+            </div>
+            {totalPaid > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Paid</span>
+                <span>Rs. {totalPaid.toFixed(2)}</span>
+              </div>
+            )}
+            {totalDue > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-red-600">
+                <span>Balance Due</span>
+                <span>Rs. {totalDue.toFixed(2)}</span>
+              </div>
+            )}
           </div>
-          {totalPaid > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Paid</span>
-              <span>${totalPaid.toFixed(2)}</span>
-            </div>
-          )}
-          {totalDue > 0 && (
-            <div className="flex justify-between text-sm font-semibold text-red-600">
-              <span>Balance Due</span>
-              <span>${totalDue.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Payment history */}
-      {job.payments && job.payments.length > 0 && (
+      {/* Payment history — hidden from staff */}
+      {!isStaff && job.payments && job.payments.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
           <h2 className="font-semibold text-gray-700 text-sm">Payments</h2>
           {job.payments.map((p) => (
             <div key={p.id} className="flex justify-between text-sm text-gray-600">
               <span className="capitalize">{p.payment_method}</span>
               <div className="text-right">
-                <span className="font-semibold text-gray-900">${parseFloat(p.amount).toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">Rs. {parseFloat(p.amount).toFixed(2)}</span>
                 <span className="block text-xs text-gray-400">
                   {new Date(p.paid_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </span>

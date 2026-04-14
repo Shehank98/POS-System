@@ -180,7 +180,7 @@ export default function CarWashJobCreate() {
                     {svc.duration_minutes && (
                       <span className="text-xs text-gray-400">{svc.duration_minutes}min</span>
                     )}
-                    <span className="font-semibold">${parseFloat(svc.price).toFixed(2)}</span>
+                    <span className="font-semibold">Rs. {parseFloat(svc.price).toFixed(2)}</span>
                     {selectedSvcs[svc.id] && (
                       <span className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
                         <span className="text-white text-[9px] font-bold">✓</span>
@@ -213,7 +213,7 @@ export default function CarWashJobCreate() {
                     <div>
                       <p className="text-sm font-medium text-gray-800">{prod.name}</p>
                       <p className="text-xs text-gray-400">
-                        ${parseFloat(prod.price).toFixed(2)}/{prod.unit}
+                        Rs. {parseFloat(prod.price).toFixed(2)}/{prod.unit}
                         {' · '}{prod.stock_quantity} in stock
                       </p>
                     </div>
@@ -281,7 +281,7 @@ export default function CarWashJobCreate() {
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-4">
             <span className="font-semibold text-gray-700">Estimated Total</span>
-            <span className="text-xl font-bold text-gray-900">${grandTotal.toFixed(2)}</span>
+            <span className="text-xl font-bold text-gray-900">Rs. {grandTotal.toFixed(2)}</span>
           </div>
           <button
             type="submit"

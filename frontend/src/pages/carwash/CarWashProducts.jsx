@@ -165,7 +165,7 @@ export default function CarWashProducts() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400">
-                    ${parseFloat(prod.price).toFixed(2)}/{prod.unit}
+                    Rs. {parseFloat(prod.price).toFixed(2)}/{prod.unit}
                     {' · '}<strong className="text-gray-600">{prod.stock_quantity}</strong> in stock
                     {!prod.is_active && ' · Inactive'}
                   </p>

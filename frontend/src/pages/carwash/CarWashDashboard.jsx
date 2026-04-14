@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Plus, DollarSign, ClipboardList, Clock, Loader2,
+  Plus, TrendingUp, ClipboardList, Clock, Loader2,
   AlertTriangle, Car, CheckCircle2, ArrowRight,
 } from 'lucide-react';
 import { carwashApi } from '../../api/client';
+import useAuthStore from '../../store/authStore';
 
 const STATUS_BADGE = {
   waiting:     { label: 'Waiting',     cls: 'bg-yellow-100 text-yellow-700' },
@@ -35,6 +36,8 @@ function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
 }
 
 export default function CarWashDashboard() {
+  const user    = useAuthStore((s) => s.user);
+  const isStaff = user?.role === 'staff';
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,10 +89,12 @@ export default function CarWashDashboard() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={DollarSign} label="Today's Revenue"  value={`$${revenue}`}          color="green"  />
-        <StatCard icon={ClipboardList} label="Jobs Today"    value={data?.today_jobs ?? 0}   color="blue"   />
-        <StatCard icon={Clock}        label="Waiting"        value={data?.waiting_jobs ?? 0} color="yellow" />
-        <StatCard icon={Car}          label="In Progress"    value={data?.in_progress_jobs ?? 0} color="purple" />
+        {!isStaff && (
+          <StatCard icon={TrendingUp} label="Today's Revenue" value={`Rs. ${revenue}`} color="green" />
+        )}
+        <StatCard icon={ClipboardList} label="Jobs Today"    value={data?.today_jobs ?? 0}       color="blue"   />
+        <StatCard icon={Clock}        label="Waiting"         value={data?.waiting_jobs ?? 0}     color="yellow" />
+        <StatCard icon={Car}          label="In Progress"     value={data?.in_progress_jobs ?? 0} color="purple" />
       </div>
 
       {/* Recent jobs */}
