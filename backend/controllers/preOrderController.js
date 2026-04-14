@@ -61,7 +61,7 @@ async function getPublicProducts(req, res) {
     res.json({ products: rows });
   } catch (err) {
     console.error('getPublicProducts error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 }
 
@@ -71,15 +71,27 @@ async function getPublicShop(req, res) {
   if (!shop_id) return res.status(400).json({ error: 'shop_id is required' });
 
   try {
+    // Use only base-schema columns (id, name always exist)
     const { rows } = await db.query(
-      `SELECT id, name, logo_url FROM shops WHERE id = $1`,
+      `SELECT id, name FROM shops WHERE id = $1`,
       [shop_id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
-    res.json({ shop: rows[0] });
+
+    const shop = { ...rows[0], logo_url: null };
+
+    // logo_url was added in migration 005 — try to fetch it gracefully
+    try {
+      const { rows: extra } = await db.query(
+        `SELECT logo_url FROM shops WHERE id = $1`, [shop_id]
+      );
+      if (extra.length > 0) shop.logo_url = extra[0].logo_url || null;
+    } catch { /* column may not exist yet — continue without logo */ }
+
+    res.json({ shop });
   } catch (err) {
     console.error('getPublicShop error:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 }
 
