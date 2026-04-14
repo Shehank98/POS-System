@@ -85,74 +85,99 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
   }
 
   return (
-    <li className="flex flex-col gap-1 px-3 py-2.5 border-b border-gray-100 last:border-0">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-gray-900 leading-snug flex-1">{item.name}</p>
+    <li className="group px-4 py-3.5 border-b border-gray-100/80 last:border-0
+                   hover:bg-gray-50/60 transition-colors duration-100">
+      {/* Top row: name + delete */}
+      <div className="flex items-start gap-2.5 mb-2.5">
+        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${accent(item.name)}`} />
+        <p className="text-[13px] font-semibold text-gray-900 leading-snug flex-1 min-w-0 pr-1">
+          {item.name}
+        </p>
         <button
-          className="text-gray-300 hover:text-red-500 shrink-0 mt-0.5"
+          className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center
+                     rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50
+                     transition-all duration-150 shrink-0"
           onClick={() => onRemove(item.cartId)}
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
+      {/* Bottom row: qty stepper + unit price + discount + subtotal */}
+      <div className="flex items-center gap-2 pl-4">
+        {/* Pill stepper */}
+        <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden shrink-0">
           <button
-            className="w-6 h-6 flex items-center justify-center rounded border border-gray-200
-                       hover:bg-gray-100 text-gray-600"
+            className="w-7 h-7 flex items-center justify-center text-gray-500
+                       hover:bg-gray-200 transition-colors"
             onClick={() => onQty(item.cartId, item.quantity - 1)}
           >
             <Minus className="w-3 h-3" />
           </button>
           <input
-            className="w-12 h-6 text-center text-sm border border-gray-200 rounded"
+            className="w-8 h-7 text-center text-[13px] font-bold text-gray-900
+                       bg-transparent focus:outline-none"
             type="number" min="1"
             value={item.quantity}
             onChange={(e) => onQty(item.cartId, parseInt(e.target.value, 10) || 1)}
           />
           <button
-            className="w-6 h-6 flex items-center justify-center rounded border border-gray-200
-                       hover:bg-gray-100 text-gray-600"
+            className="w-7 h-7 flex items-center justify-center text-gray-500
+                       hover:bg-gray-200 transition-colors"
             onClick={() => onQty(item.cartId, item.quantity + 1)}
           >
             <Plus className="w-3 h-3" />
           </button>
         </div>
 
-        <span className="text-xs text-gray-400">× {fmt(item.unit_price)}</span>
+        <span className="text-xs text-gray-400 flex-1 truncate">× {fmt(item.unit_price)}</span>
 
+        {/* Discount pill */}
         <button
-          className={`flex items-center gap-0.5 text-xs rounded px-1.5 py-0.5 transition-colors
+          className={`flex items-center gap-0.5 text-xs rounded-md px-1.5 py-1 font-medium
+                      transition-colors shrink-0
             ${item.discount_pct > 0
-              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
           onClick={() => { setEditDisc(true); setDiscInput(String(item.discount_pct)); }}
         >
           <Percent className="w-3 h-3" />
-          {item.discount_pct > 0 ? `${item.discount_pct}%` : 'Disc'}
+          {item.discount_pct > 0 ? `${item.discount_pct}%` : ''}
         </button>
 
-        <span className="text-sm font-semibold text-gray-900 min-w-[50px] text-right">
-          {fmt(item.subtotal)}
+        <span className="text-sm font-bold text-gray-900 min-w-[52px] text-right shrink-0">
+          ${fmt(item.subtotal)}
         </span>
       </div>
 
+      {/* Inline discount editor */}
       {editDisc && (
-        <div className="flex items-center gap-2 bg-orange-50 rounded px-2 py-1.5">
-          <Percent className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+        <div className="flex items-center gap-2 mt-2.5 ml-4 bg-amber-50 border border-amber-100
+                        rounded-xl px-3 py-2">
+          <Percent className="w-3.5 h-3.5 text-amber-500 shrink-0" />
           <input
-            className="input h-6 text-xs py-0 px-2 w-20"
+            className="flex-1 bg-transparent text-sm font-semibold text-amber-800
+                       focus:outline-none min-w-0 w-16"
             type="number" min="0" max="100" step="1"
             autoFocus
             value={discInput}
             onChange={(e) => setDiscInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && commitDiscount()}
           />
-          <span className="text-xs text-orange-600">%</span>
-          <button className="btn-primary text-xs py-0.5 px-2 h-6" onClick={commitDiscount}>OK</button>
-          <button className="btn-secondary text-xs py-0.5 px-2 h-6"
-                  onClick={() => setEditDisc(false)}>×</button>
+          <span className="text-xs text-amber-500 font-medium">%</span>
+          <button
+            className="text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white
+                       rounded-lg px-2.5 py-1 transition-colors"
+            onClick={commitDiscount}
+          >
+            Apply
+          </button>
+          <button
+            className="text-xs text-amber-400 hover:text-amber-600 transition-colors"
+            onClick={() => setEditDisc(false)}
+          >
+            Cancel
+          </button>
         </div>
       )}
     </li>
@@ -166,93 +191,134 @@ function CartPanel({ onPayClick, onClose }) {
     setQty, setItemDiscount, removeItem, setOrderDiscount, clearCart,
   } = useCartStore();
   const totals = useCartStore((s) => s.totals);
+  const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
-        <span className="font-semibold text-gray-800">
-          Cart
+    <div className="flex flex-col h-full bg-white">
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+            <ShoppingCart className="w-4 h-4 text-primary-600" />
+          </div>
+          <div className="leading-none">
+            <p className="text-sm font-bold text-gray-900">Order</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {totalQty > 0
+                ? `${totalQty} item${totalQty !== 1 ? 's' : ''}`
+                : 'Empty'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
           {items.length > 0 && (
-            <span className="ml-2 text-xs bg-primary-100 text-primary-700 rounded-full px-2 py-0.5">
-              {items.reduce((s, i) => s + i.quantity, 0)} items
-            </span>
-          )}
-        </span>
-        <div className="flex items-center gap-2">
-          {items.length > 0 && (
-            <button className="text-xs text-red-400 hover:text-red-600" onClick={clearCart}>
+            <button
+              className="text-xs text-gray-400 hover:text-red-500 hover:bg-red-50
+                         px-2 py-1 rounded-lg transition-colors font-medium"
+              onClick={clearCart}
+            >
               Clear
             </button>
           )}
           {onClose && (
-            <button className="p-1 text-gray-400 hover:text-gray-600" onClick={onClose}>
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400
+                         hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              onClick={onClose}
+            >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Items */}
+      {/* ── Items list ── */}
       <ul className="flex-1 overflow-y-auto">
-        {items.length === 0 && (
-          <li className="flex flex-col items-center justify-center h-full text-gray-300 gap-3 py-12">
-            <ShoppingCart className="w-12 h-12" />
-            <p className="text-sm">Cart is empty</p>
-            <p className="text-xs text-gray-300">Tap a product to add it</p>
+        {items.length === 0 ? (
+          <li className="flex flex-col items-center justify-center h-full px-6 py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+              <ShoppingCart className="w-7 h-7 text-gray-300" />
+            </div>
+            <p className="text-sm font-semibold text-gray-400">Cart is empty</p>
+            <p className="text-xs text-gray-300 mt-1">Tap a product to add it</p>
           </li>
+        ) : (
+          items.map((item) => (
+            <CartRow
+              key={item.cartId}
+              item={item}
+              onQty={setQty}
+              onDiscount={setItemDiscount}
+              onRemove={removeItem}
+            />
+          ))
         )}
-        {items.map((item) => (
-          <CartRow
-            key={item.cartId}
-            item={item}
-            onQty={setQty}
-            onDiscount={setItemDiscount}
-            onRemove={removeItem}
-          />
-        ))}
       </ul>
 
-      {/* Totals */}
-      <div className="border-t border-gray-200 px-4 py-3 space-y-1.5 bg-gray-50 shrink-0">
-        <div className="flex justify-between text-sm text-gray-600">
-          <span>Subtotal</span><span>{fmt(totals.itemsSubtotal)}</span>
-        </div>
-        {totals.itemsDiscount > 0 && (
-          <div className="flex justify-between text-sm text-orange-600">
-            <span>Item discounts</span><span>-{fmt(totals.itemsDiscount)}</span>
+      {/* ── Totals + Charge ── */}
+      <div className="border-t border-gray-100 bg-gray-50/50 shrink-0">
+        <div className="px-4 pt-3 pb-2 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Subtotal</span>
+            <span className="font-medium text-gray-700">${fmt(totals.itemsSubtotal)}</span>
           </div>
-        )}
-        {totals.taxAmount > 0 && (
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Tax</span><span>+{fmt(totals.taxAmount)}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between text-sm text-orange-600">
-          <span>Order discount</span>
-          <input
-            className="w-20 h-6 text-xs text-right border border-orange-200 rounded px-1"
-            type="number" min="0" step="0.01" placeholder="0.00"
-            value={orderDiscount || ''}
-            onChange={(e) => setOrderDiscount(e.target.value)}
-          />
-        </div>
-        <div className="flex justify-between font-bold text-gray-900 text-base pt-1
-                        border-t border-gray-200">
-          <span>Total</span>
-          <span className="text-primary-700">{fmt(totals.grandTotal)}</span>
-        </div>
-      </div>
 
-      {/* Charge button */}
-      <div className="px-4 pb-4 pt-2 bg-gray-50 shrink-0">
-        <button
-          className="btn-primary w-full justify-center py-3 text-base"
-          disabled={items.length === 0}
-          onClick={onPayClick}
-        >
-          <CreditCard className="w-5 h-5" /> Charge {fmt(totals.grandTotal)}
-        </button>
+          {totals.itemsDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-amber-600">Item discounts</span>
+              <span className="font-medium text-amber-600">−${fmt(totals.itemsDiscount)}</span>
+            </div>
+          )}
+
+          {totals.taxAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Tax</span>
+              <span className="font-medium text-gray-700">+${fmt(totals.taxAmount)}</span>
+            </div>
+          )}
+
+          {/* Order discount */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Order discount</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400 text-xs">$</span>
+              <input
+                className="w-20 h-7 text-sm text-right bg-white border border-gray-200
+                           rounded-lg px-2 focus:border-primary-300 focus:outline-none
+                           focus:ring-2 focus:ring-primary-100 transition-colors"
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={orderDiscount || ''}
+                onChange={(e) => setOrderDiscount(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Total row */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+          <span className="font-bold text-gray-900">Total</span>
+          <span className="text-xl font-extrabold text-primary-700">${fmt(totals.grandTotal)}</span>
+        </div>
+
+        {/* Charge button */}
+        <div className="px-4 pb-4 pt-2">
+          <button
+            className="w-full flex items-center justify-between
+                       bg-primary-600 hover:bg-primary-700 active:bg-primary-800
+                       text-white rounded-xl px-5 py-3.5 shadow-sm
+                       transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={items.length === 0}
+            onClick={onPayClick}
+          >
+            <div className="flex items-center gap-2.5">
+              <CreditCard className="w-5 h-5" />
+              <span className="text-base font-semibold">Charge</span>
+            </div>
+            <span className="text-lg font-extrabold">${fmt(totals.grandTotal)}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -533,37 +599,49 @@ export default function POSPage() {
         <CartPanel onPayClick={() => setShowPayment(true)} />
       </div>
 
-      {/* ── MOBILE: floating cart button (sits between bottom nav h-14=56px and content) ── */}
+      {/* ── MOBILE: floating cart button ── */}
       <div className="md:hidden fixed bottom-[3.75rem] left-0 right-0 z-30 px-3 pointer-events-none">
         <button
-          className="w-full btn-primary py-3 justify-between text-sm shadow-xl rounded-xl
-                     pointer-events-auto"
+          className="w-full flex items-center justify-between
+                     bg-primary-600 hover:bg-primary-700 active:bg-primary-800
+                     text-white rounded-2xl px-4 py-3.5 shadow-xl pointer-events-auto
+                     transition-colors"
           onClick={() => setShowMobileCart(true)}
         >
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            <span>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <ShoppingCart className="w-5 h-5" />
+              {totalItemCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-white text-primary-700
+                                 rounded-full text-[10px] font-extrabold flex items-center
+                                 justify-center leading-none">
+                  {totalItemCount > 9 ? '9+' : totalItemCount}
+                </span>
+              )}
+            </div>
+            <span className="text-sm font-semibold">
               {totalItemCount > 0
-                ? `Cart (${totalItemCount} item${totalItemCount !== 1 ? 's' : ''})`
+                ? `${totalItemCount} item${totalItemCount !== 1 ? 's' : ''}`
                 : 'Cart is empty'}
             </span>
           </div>
-          <span className="font-bold">{fmt(totals.grandTotal)}</span>
+          <span className="text-base font-extrabold">${fmt(totals.grandTotal)}</span>
         </button>
       </div>
 
       {/* ── MOBILE: cart drawer ───────────────────────────────── */}
       {showMobileCart && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={() => setShowMobileCart(false)}
         >
           <div
-            className="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white rounded-t-2xl
-                       overflow-hidden flex flex-col"
+            className="absolute bottom-0 left-0 right-0 max-h-[88vh] bg-white
+                       rounded-t-3xl overflow-hidden flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-center pt-2 pb-1 shrink-0">
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-2 shrink-0">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
