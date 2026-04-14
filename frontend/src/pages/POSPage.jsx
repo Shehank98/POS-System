@@ -2,12 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Barcode, Search, X, Plus, Minus,
   ShoppingCart, Percent, CreditCard, Smartphone,
-  Wifi, RefreshCw, Camera,
+  Wifi, RefreshCw, Camera, QrCode,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useCartStore   from '../store/cartStore';
 import useAuthStore   from '../store/authStore';
-import { productsApi } from '../api/client';
+import { productsApi, preOrdersApi } from '../api/client';
 import PaymentModal      from '../components/PaymentModal';
 import usePosScanner     from '../hooks/usePosScanner';
 import PhoneScannerModal from '../components/PhoneScannerModal';
@@ -358,6 +358,12 @@ export default function POSPage() {
   const [showMobileCart, setShowMobileCart]  = useState(false);
   const [showCamera,     setShowCamera]      = useState(false);
 
+  // Pre-order token lookup
+  const [showPreOrder,   setShowPreOrder]   = useState(false);
+  const [preOrderToken,  setPreOrderToken]  = useState('');
+  const [loadingToken,   setLoadingToken]   = useState(false);
+  const [activePreOrder, setActivePreOrder] = useState(null); // { id, token_number }
+
   const barcodeRef = useRef();
 
   // ── Derived: categories + filtered products ──────────────────
@@ -430,6 +436,38 @@ export default function POSPage() {
     addItem(product);
   }
 
+  async function loadPreOrder() {
+    const token = preOrderToken.trim().toUpperCase();
+    if (!token) { toast.error('Enter a token number'); return; }
+    setLoadingToken(true);
+    try {
+      const { data } = await preOrdersApi.getByToken(token);
+      const order = data.order;
+      const orderItems = Array.isArray(order.items) ? order.items : [];
+      // Match items to loaded products and add to cart
+      let added = 0;
+      orderItems.forEach((item) => {
+        const match = allProducts.find((p) => p.id === item.product_id);
+        if (match) {
+          addItem(match, item.quantity || 1);
+          added++;
+        }
+      });
+      if (added === 0) {
+        toast.error('No matching products found in this order');
+        return;
+      }
+      setActivePreOrder({ id: order.id, token_number: order.token_number });
+      setShowPreOrder(false);
+      setPreOrderToken('');
+      toast.success(`Token ${order.token_number} loaded — ${added} item(s) added to cart`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Token not found');
+    } finally {
+      setLoadingToken(false);
+    }
+  }
+
   const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
@@ -499,6 +537,22 @@ export default function POSPage() {
                 <span className="hidden sm:inline">Camera</span>
               </button>
             )}
+            {/* Pre Orders token lookup */}
+            {!readOnly && (
+              <button
+                onClick={() => setShowPreOrder((v) => !v)}
+                title="Load pre-order by token"
+                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border font-medium transition-colors
+                  ${activePreOrder
+                    ? 'bg-primary-50 border-primary-300 text-primary-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">
+                  {activePreOrder ? activePreOrder.token_number : 'Pre Orders'}
+                </span>
+              </button>
+            )}
             {/* Reload */}
             <button
               onClick={loadProducts}
@@ -511,6 +565,42 @@ export default function POSPage() {
             </button>
           </div>
         </div>
+
+        {/* Pre-order token search panel */}
+        {showPreOrder && !readOnly && (
+          <div className="px-3 py-2.5 bg-primary-50 border-b border-primary-100 shrink-0">
+            <p className="text-xs font-semibold text-primary-700 mb-1.5">Load Pre-Order by Token</p>
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                className="input py-1.5 text-sm font-mono h-8 flex-1 uppercase"
+                placeholder="e.g. A001"
+                value={preOrderToken}
+                onChange={(e) => setPreOrderToken(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && loadPreOrder()}
+                maxLength={5}
+              />
+              <button
+                onClick={loadPreOrder}
+                disabled={loadingToken}
+                className="btn-primary h-8 px-3 text-xs shrink-0 disabled:opacity-60"
+              >
+                {loadingToken ? 'Loading...' : 'Load Order'}
+              </button>
+              <button
+                onClick={() => { setShowPreOrder(false); setPreOrderToken(''); }}
+                className="h-8 px-2 text-gray-400 hover:text-gray-600 rounded-lg border border-gray-200 bg-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {activePreOrder && (
+              <p className="text-xs text-primary-600 mt-1.5 font-medium">
+                ✓ Token <strong>{activePreOrder.token_number}</strong> is loaded. Complete payment to finish.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Read-only banner */}
         {readOnly && (
@@ -694,6 +784,12 @@ export default function POSPage() {
           items={items}
           onClose={() => setShowPayment(false)}
           onComplete={() => {
+            // If this sale came from a pre-order, mark it COMPLETED
+            if (activePreOrder) {
+              preOrdersApi.updateStatus(activePreOrder.id, 'COMPLETED')
+                .catch(() => {}); // fire-and-forget
+              setActivePreOrder(null);
+            }
             setShowPayment(false);
             clearCart();
             loadProducts();

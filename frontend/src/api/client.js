@@ -106,6 +106,22 @@ export const paymentsApi = {
   submit:   (data) => client.post('/payments', data),
 };
 
+// ── Pre-Orders ───────────────────────────────────────────────
+// Public endpoints use plain axios (no auth header needed)
+const publicClient = axios.create({ baseURL: BASE_URL });
+
+export const preOrdersApi = {
+  // Public — customer ordering (no auth)
+  getProducts:  (shopId)        => publicClient.get(`/pre-orders/public/products?shop_id=${shopId}`),
+  getShop:      (shopId)        => publicClient.get(`/pre-orders/public/shop?shop_id=${shopId}`),
+  create:       (data)          => publicClient.post('/pre-orders/public', data),
+  getHistory:   (shopId, phone) => publicClient.get(`/pre-orders/public/history?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
+  // Authenticated — shop owner / POS staff
+  list:         (status)        => client.get('/pre-orders', { params: status ? { status } : {} }),
+  updateStatus: (id, status)    => client.put(`/pre-orders/${id}/status`, { status }),
+  getByToken:   (token)         => client.get(`/pre-orders/by-token/${encodeURIComponent(token)}`),
+};
+
 // ── Admin API (uses separate admin token) ────────────────────
 const adminClient = axios.create({ baseURL: BASE_URL });
 adminClient.interceptors.request.use((config) => {

@@ -3,13 +3,14 @@ import {
   ShoppingCart, Package, Settings, LogOut,
   LayoutDashboard, Receipt, Menu, X, CreditCard,
   ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, QrCode,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/authStore';
 import ConnectionStatus, { ConnectionDot } from './ConnectionStatus';
 import NotificationBell from './NotificationBell';
 import { syncPending, cacheUserSubscription } from '../utils/syncService';
+import { preOrdersApi } from '../api/client';
 
 // Full sidebar nav
 const NAV = [
@@ -21,6 +22,7 @@ const NAV = [
   { to: '/analytics',    label: 'Analytics',    icon: TrendingUp      },
   { to: '/billing',      label: 'Billing',      icon: CreditCard      },
   { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList,  roles: ['owner', 'manager'] },
+  { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode,         roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',     icon: Settings        },
 ];
 
@@ -38,6 +40,7 @@ const MORE_NAV = [
   { to: '/analytics',    label: 'Analytics', icon: TrendingUp     },
   { to: '/billing',      label: 'Billing',   icon: CreditCard     },
   { to: '/audit-log',    label: 'Audit Log', icon: ClipboardList, roles: ['owner', 'manager'] },
+  { to: '/pre-orders',   label: 'Pre Orders',icon: QrCode,        roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',  icon: Settings       },
 ];
 
@@ -55,6 +58,20 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('sidebarCollapsed') === 'true'
   );
+  // Pending pre-order badge count
+  const [pendingCount, setPendingCount] = useState(0);
+  const pollBadgeRef = useRef(null);
+
+  useEffect(() => {
+    if (!user || !['owner', 'manager'].includes(user.role)) return;
+    const fetchPending = () =>
+      preOrdersApi.list('PENDING')
+        .then((res) => setPendingCount((res.data.orders || []).length))
+        .catch(() => {});
+    fetchPending();
+    pollBadgeRef.current = setInterval(fetchPending, 15000);
+    return () => clearInterval(pollBadgeRef.current);
+  }, [user]);
 
   function toggleSidebar() {
     setCollapsed((v) => {
@@ -146,8 +163,20 @@ export default function Layout() {
                     : 'text-gray-600 hover:bg-gray-100'}`
                 }
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <div className="relative shrink-0">
+                  <Icon className="w-4 h-4" />
+                  {to === '/pre-orders' && pendingCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
+                </div>
                 {!collapsed && label}
+                {!collapsed && to === '/pre-orders' && pendingCount > 0 && (
+                  <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {pendingCount}
+                  </span>
+                )}
               </NavLink>
             ))
           }
@@ -281,6 +310,11 @@ export default function Layout() {
                   >
                     <Icon className="w-5 h-5 shrink-0 text-gray-400" />
                     {label}
+                    {to === '/pre-orders' && pendingCount > 0 && (
+                      <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                        {pendingCount}
+                      </span>
+                    )}
                   </NavLink>
                 ))
               }

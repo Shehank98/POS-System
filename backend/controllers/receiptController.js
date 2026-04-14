@@ -1,4 +1,5 @@
-const db = require('../config/database');
+const db      = require('../config/database');
+const QRCode  = require('qrcode');
 
 // ── GET /api/transactions/:id/receipt ────────────────────────
 async function getReceipt(req, res) {
@@ -44,6 +45,20 @@ async function getReceipt(req, res) {
 
     const t = txnRows[0];
     const fmt = (n) => Number(n || 0).toFixed(2);
+
+    // Generate QR code pointing to the pre-order page for this shop
+    let qrBlock = '';
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const orderUrl = `${frontendUrl}/order?shop_id=${t.shop_id}`;
+      const qrDataUrl = await QRCode.toDataURL(orderUrl, { width: 120, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
+      qrBlock = `
+<div class="divider"></div>
+<div style="text-align:center; margin:3mm 0 2mm;">
+  <img src="${qrDataUrl}" width="90" height="90" alt="Pre-order QR" style="display:block; margin:0 auto 1.5mm;" />
+  <p style="font-size:0.8em; color:#555;">Scan to pre-order next time</p>
+</div>`;
+    } catch { /* QR generation failed — receipt still works */ }
 
     // Server-side fallback date (will be overridden by client-side JS for correct timezone)
     const serverDate = new Date(t.transaction_date);
@@ -187,6 +202,7 @@ ${t.status === 'void' ? '<div class="voided-stamp">★ VOID ★</div>' : ''}
 
 <p class="payment-method">Payment: <strong>${capitalize(t.payment_method)}</strong></p>
 
+${qrBlock}
 <div class="divider"></div>
 <p class="thank-you">Thank you for your purchase!</p>
 <p class="thank-you" style="font-size:0.8em; margin-top:1mm; color:#555;">

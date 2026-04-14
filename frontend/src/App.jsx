@@ -14,6 +14,8 @@ import BillingPage from './pages/BillingPage';
 import AuditLogPage from './pages/AuditLogPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ScannerPage from './pages/ScannerPage';
+import OrderPage from './pages/OrderPage';
+import PreOrdersPage from './pages/PreOrdersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -41,6 +43,7 @@ export default function App() {
         {/* Public routes (no auth required) */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/scanner" element={<ScannerPage />} />
+        <Route path="/order" element={<OrderPage />} />
 
         {/* Admin section */}
         <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -72,6 +75,7 @@ export default function App() {
           <Route path="billing"     element={<BillingPage />} />
           <Route path="audit-log"   element={<AuditLogPage />} />
           <Route path="settings"    element={<SettingsPage />} />
+          <Route path="pre-orders"  element={<PreOrdersPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

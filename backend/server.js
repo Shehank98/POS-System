@@ -15,8 +15,10 @@ const reportRoutes       = require('./routes/reports');
 const notificationRoutes = require('./routes/notifications');
 const paymentRoutes      = require('./routes/payments');
 const auditRoutes        = require('./routes/audit');
+const preOrderRoutes     = require('./routes/preOrders');
 
-const { runDailyChecks } = require('./controllers/notificationController');
+const { runDailyChecks }        = require('./controllers/notificationController');
+const { cancelStalePreOrders }  = require('./controllers/preOrderController');
 
 const app = express();
 
@@ -41,6 +43,7 @@ app.use('/api/reports',       reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments',      paymentRoutes);
 app.use('/api/audit-log',     auditRoutes);
+app.use('/api/pre-orders',    preOrderRoutes);
 
 // ── Serve React frontend in production ────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -64,6 +67,10 @@ app.use((err, _req, res, _next) => {
 // ── Cron: daily checks at 09:00 server time ───────────────────
 cron.schedule('0 9 * * *', runDailyChecks);
 console.log('[Cron] Daily check scheduled at 09:00');
+
+// ── Cron: cancel stale pre-orders every 30 minutes ────────────
+cron.schedule('*/30 * * * *', cancelStalePreOrders);
+console.log('[Cron] Stale pre-order cleanup scheduled every 30 minutes');
 
 // ── Start ─────────────────────────────────────────────────────
 const PORT   = process.env.PORT || 3001;
