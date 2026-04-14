@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
 
@@ -9,6 +9,7 @@ const TABS = [
   { key: 'PREPARING',  label: 'Preparing', icon: ChefHat,      color: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-200'   },
   { key: 'READY',      label: 'Ready',     icon: PackageCheck, color: 'text-green-600',  bg: 'bg-green-50',   border: 'border-green-200'  },
   { key: 'COMPLETED',  label: 'Completed', icon: CheckCircle,  color: 'text-gray-500',   bg: 'bg-gray-50',    border: 'border-gray-200'   },
+  { key: 'CANCELLED',  label: 'Cancelled', icon: Ban,          color: 'text-red-500',    bg: 'bg-red-50',     border: 'border-red-200'    },
 ];
 
 const STATUS_ACTIONS = {
@@ -16,6 +17,7 @@ const STATUS_ACTIONS = {
   PREPARING: [{ label: 'Mark Ready',     next: 'READY',     style: 'bg-green-600 hover:bg-green-700 text-white' }],
   READY:     [{ label: 'Complete Order', next: 'COMPLETED', style: 'bg-gray-800 hover:bg-gray-900 text-white' }],
   COMPLETED: [],
+  CANCELLED: [],
 };
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -35,6 +37,7 @@ function ageColor(dateStr) {
 
 // ── Order Card ────────────────────────────────────────────────
 function OrderCard({ order, onStatusChange, updating }) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const items = Array.isArray(order.items) ? order.items : [];
   const actions = STATUS_ACTIONS[order.status] || [];
 
@@ -78,7 +81,7 @@ function OrderCard({ order, onStatusChange, updating }) {
       </div>
 
       {/* Actions */}
-      {(actions.length > 0 || order.status !== 'COMPLETED') && (
+      {(actions.length > 0 || (order.status !== 'COMPLETED' && order.status !== 'CANCELLED')) && (
         <div className="px-4 pb-4 flex flex-wrap gap-2">
           {actions.map((action) => (
             <button
@@ -91,14 +94,36 @@ function OrderCard({ order, onStatusChange, updating }) {
             </button>
           ))}
           {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && (
-            <button
-              disabled={updating === order.id}
-              onClick={() => onStatusChange(order.id, 'CANCELLED')}
-              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-sm transition-colors disabled:opacity-60"
-              title="Cancel order"
-            >
-              <XCircle size={16} />
-            </button>
+            !confirmCancel ? (
+              <button
+                disabled={updating === order.id}
+                onClick={() => setConfirmCancel(true)}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-gray-400
+                           hover:bg-red-50 hover:text-red-500 hover:border-red-200
+                           text-sm transition-colors disabled:opacity-60"
+                title="Cancel order"
+              >
+                <XCircle size={16} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 flex-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <span className="text-xs text-red-700 font-medium flex-1">
+                  Cancel <strong>{order.token_number}</strong>?
+                </span>
+                <button
+                  onClick={() => { setConfirmCancel(false); onStatusChange(order.id, 'CANCELLED'); }}
+                  className="px-2.5 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setConfirmCancel(false)}
+                  className="px-2.5 py-1 text-xs border border-gray-300 bg-white rounded-lg text-gray-500 hover:bg-gray-50"
+                >
+                  Keep
+                </button>
+              </div>
+            )
           )}
           {/* WhatsApp notify — visible on READY status */}
           {order.status === 'READY' && (
@@ -144,7 +169,7 @@ export default function PreOrdersPage() {
   useEffect(() => {
     fetchOrders();
     if (pollRef.current) clearInterval(pollRef.current);
-    if (activeTab !== 'COMPLETED') {
+    if (activeTab !== 'COMPLETED' && activeTab !== 'CANCELLED') {
       pollRef.current = setInterval(() => fetchOrders(true), 15000);
     }
     return () => clearInterval(pollRef.current);
@@ -211,6 +236,9 @@ export default function PreOrdersPage() {
           <p className="font-medium">No {activeTab.toLowerCase()} orders</p>
           {activeTab === 'PENDING' && (
             <p className="text-sm mt-1">New orders will appear here automatically</p>
+          )}
+          {activeTab === 'CANCELLED' && (
+            <p className="text-sm mt-1">No cancelled orders today</p>
           )}
         </div>
       ) : (
