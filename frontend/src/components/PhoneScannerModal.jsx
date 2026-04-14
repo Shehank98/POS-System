@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Smartphone, Wifi, WifiOff, Loader2, Copy, Check, QrCode } from 'lucide-react';
 
-export default function PhoneScannerModal({ state, code, onClose, onConnect, onDisconnect }) {
+export default function PhoneScannerModal({ state, code, onClose, onConnect, onDisconnect, hint }) {
   const [qrUrl,  setQrUrl]  = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -115,7 +115,7 @@ export default function PhoneScannerModal({ state, code, onClose, onConnect, onD
                 <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
                   <p className="text-sm font-semibold text-green-700">Phone connected!</p>
                   <p className="text-xs text-green-600 mt-0.5">
-                    Barcodes scanned on your phone appear in the cart automatically.
+                    {hint || 'Barcodes scanned on your phone appear in the cart automatically.'}
                   </p>
                 </div>
               )}

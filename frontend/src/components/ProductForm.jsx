@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Barcode, Loader2, Camera } from 'lucide-react';
+import { X, Barcode, Loader2, Camera, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 import CameraScanner from './CameraScanner';
+import PhoneScannerModal from './PhoneScannerModal';
+import usePosScanner from '../hooks/usePosScanner';
 
 function emptyForm(defaultTaxRate = 0) {
   return {
@@ -22,6 +24,8 @@ export default function ProductForm({ product, onSaved, onClose }) {
   const user           = useAuthStore((s) => s.user);
   const barcodeEnabled = user?.barcode_enabled ?? false;
   const defaultTaxRate = user?.default_tax_rate ?? 0;
+  const scannerMode    = localStorage.getItem('scannerMode') || 'both';
+  const showPhone      = barcodeEnabled && (scannerMode === 'phone' || scannerMode === 'both');
 
   const [form,    setForm]    = useState(product ? {
     name:           product.name           || '',
@@ -33,13 +37,23 @@ export default function ProductForm({ product, onSaved, onClose }) {
     category:       product.category      || '',
     tax_rate:       product.tax_rate       ?? '',
   } : emptyForm(defaultTaxRate));
-  const [saving,      setSaving]      = useState(false);
-  const [errors,      setErrors]      = useState({});
-  const [categories,  setCategories]  = useState([]);
-  const [showCamera,  setShowCamera]  = useState(false);
+  const [saving,         setSaving]         = useState(false);
+  const [errors,         setErrors]         = useState({});
+  const [categories,     setCategories]     = useState([]);
+  const [showCamera,     setShowCamera]     = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
 
   const barcodeRef = useRef();
   const nameRef    = useRef();
+
+  const phoneScanner = usePosScanner({
+    onBarcode: (code) => {
+      setForm((f) => ({ ...f, barcode: code }));
+      setShowPhoneModal(false);
+      toast.success('Barcode scanned');
+      nameRef.current?.focus();
+    },
+  });
 
   useEffect(() => {
     productsApi.categories().then(({ data }) => setCategories(data)).catch(() => {});
@@ -133,9 +147,10 @@ export default function ProductForm({ product, onSaved, onClose }) {
                 onKeyDown={handleBarcodeKey}
                 autoFocus={!product}
               />
+              {/* Camera scanner button */}
               <button
                 type="button"
-                title="Use camera to scan barcode"
+                title="Use device camera to scan barcode"
                 onClick={() => setShowCamera(true)}
                 className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg
                            border border-gray-300 bg-white text-gray-500
@@ -144,6 +159,23 @@ export default function ProductForm({ product, onSaved, onClose }) {
               >
                 <Camera className="w-4 h-4" />
               </button>
+              {/* Phone scanner button — only when barcode feature + phone mode enabled */}
+              {showPhone && (
+                <button
+                  type="button"
+                  title="Use connected phone to scan barcode"
+                  onClick={() => { phoneScanner.connect(); setShowPhoneModal(true); }}
+                  className={`shrink-0 flex items-center justify-center w-9 h-9 rounded-lg
+                              border transition-colors
+                              ${phoneScanner.state === 'phone_connected'
+                                ? 'bg-green-50 border-green-400 text-green-600'
+                                : phoneScanner.state === 'waiting'
+                                ? 'bg-yellow-50 border-yellow-400 text-yellow-600'
+                                : 'border-gray-300 bg-white text-gray-500 hover:bg-primary-50 hover:border-primary-400 hover:text-primary-600'}`}
+                >
+                  <Smartphone className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -156,6 +188,18 @@ export default function ProductForm({ product, onSaved, onClose }) {
                 setShowCamera(false);
               }}
               onClose={() => setShowCamera(false)}
+            />
+          )}
+
+          {/* Phone scanner modal */}
+          {showPhoneModal && (
+            <PhoneScannerModal
+              state={phoneScanner.state}
+              code={phoneScanner.code}
+              onClose={() => setShowPhoneModal(false)}
+              onConnect={phoneScanner.connect}
+              onDisconnect={phoneScanner.disconnect}
+              hint="Scan a barcode with your phone and it will fill the barcode field."
             />
           )}
 
