@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, authApi } from '../api/client';
 import useAuthStore from '../store/authStore';
@@ -46,9 +46,10 @@ export default function SettingsPage() {
   const canEdit     = !user?.read_only && user?.role === 'owner';
 
   // ── Inventory toggle per product ────────────────────────────
-  const [products, setProducts] = useState([]);
-  const [loadingProds, setLoadingProds] = useState(false);
-  const [togglingId,   setTogglingId]   = useState(null);
+  const [products, setProducts]           = useState([]);
+  const [loadingProds, setLoadingProds]   = useState(false);
+  const [togglingId,   setTogglingId]     = useState(null);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   useEffect(() => {
     setLoadingProds(true);
@@ -150,44 +151,65 @@ export default function SettingsPage() {
 
       {/* Per-product inventory toggle */}
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-          <Package className="w-4 h-4 text-gray-400" />
-          <h2 className="text-sm font-semibold text-gray-700">Inventory Tracking per Product</h2>
-        </div>
-        {loadingProds ? (
-          <div className="flex items-center justify-center py-8 text-gray-400">
-            <Loader2 className="w-5 h-5 animate-spin" />
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {products.length === 0 && (
-              <li className="text-center py-8 text-gray-400 text-sm">No products yet.</li>
+        {/* Clickable header to expand/collapse */}
+        <button
+          onClick={() => setInventoryOpen((v) => !v)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-gray-400" />
+            <h2 className="text-sm font-semibold text-gray-700">Inventory Tracking per Product</h2>
+            {!loadingProds && products.length > 0 && (
+              <span className="text-xs text-gray-400 font-normal">
+                ({products.filter((p) => p.has_inventory).length}/{products.length} tracked)
+              </span>
             )}
-            {products.map((p) => (
-              <li key={p.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                  {p.category && <p className="text-xs text-gray-400">{p.category}</p>}
-                </div>
-                <button
-                  onClick={() => toggleInventory(p)}
-                  disabled={!canEdit || togglingId === p.id}
-                  className="flex items-center gap-1.5 text-sm disabled:opacity-50"
-                  title={p.has_inventory ? 'Click to disable inventory tracking' : 'Click to enable'}
-                >
-                  {togglingId === p.id
-                    ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                    : p.has_inventory
-                      ? <ToggleRight className="w-6 h-6 text-primary-600" />
-                      : <ToggleLeft  className="w-6 h-6 text-gray-300" />
-                  }
-                  <span className={p.has_inventory ? 'text-primary-600' : 'text-gray-400'}>
-                    {p.has_inventory ? 'Tracked' : 'Unlimited'}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          </div>
+          {inventoryOpen
+            ? <ChevronUp   className="w-4 h-4 text-gray-400 shrink-0" />
+            : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+          }
+        </button>
+
+        {/* Collapsible body */}
+        {inventoryOpen && (
+          <>
+            {loadingProds ? (
+              <div className="flex items-center justify-center py-8 text-gray-400 border-t border-gray-100">
+                <Loader2 className="w-5 h-5 animate-spin" />
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-100 border-t border-gray-100 max-h-80 overflow-y-auto">
+                {products.length === 0 && (
+                  <li className="text-center py-8 text-gray-400 text-sm">No products yet.</li>
+                )}
+                {products.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="min-w-0 flex-1 mr-4">
+                      <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                      {p.category && <p className="text-xs text-gray-400">{p.category}</p>}
+                    </div>
+                    <button
+                      onClick={() => toggleInventory(p)}
+                      disabled={!canEdit || togglingId === p.id}
+                      className="flex items-center gap-1.5 text-sm disabled:opacity-50 shrink-0"
+                      title={p.has_inventory ? 'Click to disable inventory tracking' : 'Click to enable'}
+                    >
+                      {togglingId === p.id
+                        ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                        : p.has_inventory
+                          ? <ToggleRight className="w-6 h-6 text-primary-600" />
+                          : <ToggleLeft  className="w-6 h-6 text-gray-300" />
+                      }
+                      <span className={p.has_inventory ? 'text-primary-600' : 'text-gray-400'}>
+                        {p.has_inventory ? 'Tracked' : 'Unlimited'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 
