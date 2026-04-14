@@ -2,7 +2,7 @@ const db = require('../config/database');
 
 // ── GET /api/products ─────────────────────────────────────────
 async function listProducts(req, res) {
-  const { search, category, page = 1, limit = 50 } = req.query;
+  const { search, category, low_stock, page = 1, limit = 50 } = req.query;
   const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
   const params = [req.shopId];
   const conditions = ['shop_id = $1'];
@@ -15,6 +15,9 @@ async function listProducts(req, res) {
     params.push(category);
     conditions.push(`category = $${params.length}`);
   }
+  if (low_stock === 'true') {
+    conditions.push(`has_inventory = true AND stock_quantity <= 10`);
+  }
 
   const where = conditions.join(' AND ');
 
@@ -25,7 +28,13 @@ async function listProducts(req, res) {
     params.push(parseInt(limit, 10), offset);
     const { rows } = await db.query(
       `SELECT * FROM products WHERE ${where}
-       ORDER BY name ASC
+       ORDER BY
+         CASE
+           WHEN has_inventory = true AND stock_quantity <= 0  THEN 0
+           WHEN has_inventory = true AND stock_quantity <= 10 THEN 1
+           ELSE 2
+         END ASC,
+         name ASC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );

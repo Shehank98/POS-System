@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, Barcode, Pencil, Trash2,
-  ChevronLeft, ChevronRight, Upload, RefreshCw, X,
+  ChevronLeft, ChevronRight, Upload, RefreshCw, X, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi } from '../api/client';
@@ -26,6 +26,7 @@ export default function ProductsPage() {
   const [page,       setPage]       = useState(1);
   const [search,     setSearch]     = useState('');
   const [category,   setCategory]   = useState('');
+  const [lowStock,   setLowStock]   = useState(false);
   const [categories, setCategories] = useState([]);
 
   // UI state
@@ -39,7 +40,7 @@ export default function ProductsPage() {
   async function load(overrides = {}) {
     setLoading(true);
     try {
-      const params = { page, limit: LIMIT, search, category, ...overrides };
+      const params = { page, limit: LIMIT, search, category, low_stock: lowStock, ...overrides };
       const { data } = await productsApi.list(params);
       setProducts(data.products);
       setTotal(data.total);
@@ -50,7 +51,7 @@ export default function ProductsPage() {
     }
   }
 
-  useEffect(() => { load(); }, [page, category]); // eslint-disable-line
+  useEffect(() => { load(); }, [page, category, lowStock]); // eslint-disable-line
 
   useEffect(() => {
     productsApi.categories().then(({ data }) => setCategories(data)).catch(() => {});
@@ -143,6 +144,20 @@ export default function ProductsPage() {
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
 
+          {/* Low stock filter */}
+          <button
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium
+                        shrink-0 transition-colors
+                        ${lowStock
+                          ? 'bg-orange-500 border-orange-500 text-white'
+                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => { setLowStock((v) => !v); setPage(1); }}
+            title="Show only low / out-of-stock items"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            Low stock
+          </button>
+
           <button
             className="btn-secondary shrink-0"
             onClick={() => load()}
@@ -185,9 +200,22 @@ export default function ProductsPage() {
                     No products found.{canEdit && ' Click "Add Product" to get started.'}
                   </td>
                 </tr>
-              ) : products.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+              ) : products.map((p) => {
+                const outOfStock = p.has_inventory && p.stock_quantity <= 0;
+                const lowStockRow = p.has_inventory && p.stock_quantity > 0 && p.stock_quantity <= 10;
+                return (
+                <tr key={p.id}
+                    className={`transition-colors
+                      ${outOfStock  ? 'bg-red-50 hover:bg-red-100'
+                      : lowStockRow ? 'bg-orange-50 hover:bg-orange-100'
+                      : 'hover:bg-gray-50'}`}>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    <div className="flex items-center gap-2">
+                      {outOfStock  && <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded shrink-0">OUT</span>}
+                      {lowStockRow && <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded shrink-0">LOW</span>}
+                      {p.name}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs hidden md:table-cell">
                     {p.barcode || <span className="text-gray-300">-</span>}
                   </td>
@@ -197,7 +225,11 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(p.price)}</td>
                   <td className="px-4 py-3 text-right hidden sm:table-cell">
                     {p.has_inventory
-                      ? <span className={p.stock_quantity <= 0 ? 'text-red-600 font-medium' : ''}>
+                      ? <span className={
+                          outOfStock  ? 'font-bold text-red-600'
+                        : lowStockRow ? 'font-bold text-orange-600'
+                        : 'text-gray-700'
+                        }>
                           {p.stock_quantity}
                         </span>
                       : <span className="text-gray-400 text-xs">N/A</span>
@@ -229,7 +261,8 @@ export default function ProductsPage() {
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
