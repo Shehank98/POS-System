@@ -193,6 +193,13 @@ function CartPanel({ onPayClick, onClose }) {
   const totals = useCartStore((s) => s.totals);
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
+  // Scroll to top whenever the first item changes (new item added or re-added)
+  const listRef = useRef(null);
+  const firstItemId = items[0]?.cartId;
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [firstItemId]);
+
   return (
     <div className="flex flex-col h-full bg-white">
 
@@ -235,7 +242,7 @@ function CartPanel({ onPayClick, onClose }) {
       </div>
 
       {/* ── Items list ── */}
-      <ul className="flex-1 overflow-y-auto">
+      <ul ref={listRef} className="flex-1 overflow-y-auto">
         {items.length === 0 ? (
           <li className="flex flex-col items-center justify-center h-full px-6 py-16 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
@@ -555,8 +562,8 @@ export default function POSPage() {
         )}
 
         {/* Product grid */}
-        {/* pb accounts for: bottom nav (56px) + cart button (~52px) + gap = ~120px */}
-        <div className="flex-1 overflow-y-auto px-3 pb-32 md:pb-4">
+        {/* pb-28 = 112px: bottom nav 56px + cart button ~52px + 4px gap */}
+        <div className="flex-1 overflow-y-auto px-3 pb-28 md:pb-4">
           {loadingProds ? (
             /* Skeleton — matches compact card shape */
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pt-1">

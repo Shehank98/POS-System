@@ -26,16 +26,17 @@ const useCartStore = create((set, get) => ({
   totals:        EMPTY_TOTALS,
 
   // ── Add product (or increment qty if already in cart) ──────
+  // Always floats the affected item to the TOP of the list so users
+  // can see and edit it without scrolling.
   addItem(product, qty = 1) {
     set((state) => {
       let items;
       const existing = state.items.find((i) => i.product_id === product.id);
       if (existing) {
-        items = state.items.map((i) => {
-          if (i.product_id !== product.id) return i;
-          const updated = { ...i, quantity: i.quantity + qty };
-          return { ...updated, ...calcItemTotal(updated) };
-        });
+        // Update qty and move to top
+        const updated = { ...existing, quantity: existing.quantity + qty };
+        const updatedItem = { ...updated, ...calcItemTotal(updated) };
+        items = [updatedItem, ...state.items.filter((i) => i.product_id !== product.id)];
       } else {
         const newItem = {
           cartId:       `${product.id}-${Date.now()}`,
@@ -48,7 +49,7 @@ const useCartStore = create((set, get) => ({
           discAmt:      0,
           subtotal:     parseFloat(product.price) * qty,
         };
-        items = [...state.items, newItem];
+        items = [newItem, ...state.items];
       }
       return { items, totals: calcTotals(items, state.orderDiscount) };
     });
