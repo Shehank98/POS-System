@@ -128,6 +128,7 @@ function CreateShopModal({ onClose, onCreated }) {
     logo_url:'', contact_email:'',
     owner_username:'', owner_password:'',
     subscription_months:'1', barcode_enabled: false,
+    shop_type: 'retail',
   };
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
@@ -251,6 +252,15 @@ function CreateShopModal({ onClose, onCreated }) {
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Subscription (months)</label>
                 <input className={inputCls} type="number" min="1" max="36" value={form.subscription_months} onChange={set('subscription_months')} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
+                <select className={inputCls} value={form.shop_type} onChange={set('shop_type')}>
+                  <option value="retail">Retail / General</option>
+                  <option value="car_wash">Car Wash</option>
+                  <option value="grocery">Grocery / Supermarket</option>
+                  <option value="restaurant">Restaurant / Cafe</option>
+                </select>
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <input type="checkbox" id="bc" className="w-4 h-4 rounded accent-primary-600" checked={form.barcode_enabled} onChange={set('barcode_enabled')} />
@@ -1108,11 +1118,16 @@ export default function AdminDashboardPage() {
               return (
                 <div key={s.id} className="bg-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-white">{s.name}</p>
                       <span className="text-xs font-mono bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
                         ID: {s.id}
                       </span>
+                      {s.shop_type && s.shop_type !== 'retail' && (
+                        <span className="text-xs bg-blue-900 text-blue-300 px-1.5 py-0.5 rounded font-medium capitalize">
+                          {s.shop_type.replace('_', ' ')}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {s.owner_name} · {s.email}

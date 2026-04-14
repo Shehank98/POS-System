@@ -124,6 +124,45 @@ export const preOrdersApi = {
   getStats:     ()              => client.get('/pre-orders/stats'),
 };
 
+// ── Car Wash (authenticated) ──────────────────────────────────
+export const carwashApi = {
+  dashboard:           ()            => client.get('/carwash/dashboard'),
+  staffView:           ()            => client.get('/carwash/staff/my-view'),
+  // services
+  listServices:        (p)           => client.get('/carwash/services', { params: p }),
+  createService:       (data)        => client.post('/carwash/services', data),
+  updateService:       (id, data)    => client.put(`/carwash/services/${id}`, data),
+  deleteService:       (id)          => client.delete(`/carwash/services/${id}`),
+  // products
+  listProducts:        (p)           => client.get('/carwash/products', { params: p }),
+  createProduct:       (data)        => client.post('/carwash/products', data),
+  updateProduct:       (id, data)    => client.put(`/carwash/products/${id}`, data),
+  deleteProduct:       (id)          => client.delete(`/carwash/products/${id}`),
+  // jobs
+  listJobs:            (params)      => client.get('/carwash/jobs', { params }),
+  getJob:              (id)          => client.get(`/carwash/jobs/${id}`),
+  createJob:           (data)        => client.post('/carwash/jobs', data),
+  updateJobStatus:     (id, status, staffId) => client.put(`/carwash/jobs/${id}/status`, { status, assigned_staff_id: staffId }),
+  addJobItem:          (id, data)    => client.post(`/carwash/jobs/${id}/items`, data),
+  removeJobItem:       (id, itemId)  => client.delete(`/carwash/jobs/${id}/items/${itemId}`),
+  payJob:              (id, data)    => client.post(`/carwash/jobs/${id}/pay`, data),
+  // bookings
+  listBookings:        (params)      => client.get('/carwash/bookings', { params }),
+  createBooking:       (data)        => client.post('/carwash/bookings', data),
+  updateBooking:       (id, data)    => client.put(`/carwash/bookings/${id}`, data),
+  updateBookingStatus: (id, status)  => client.put(`/carwash/bookings/${id}/status`, { status }),
+  convertBooking:      (id)          => client.post(`/carwash/bookings/${id}/convert`),
+};
+
+// ── Car Wash Public (no auth — customer portal) ───────────────
+export const carwashPublicApi = {
+  lookup:        (shopId, phone, vehicle) =>
+    publicClient.get('/carwash/public/lookup', { params: { shop_id: shopId, phone, vehicle } }),
+  shopInfo:      (shopId) =>
+    publicClient.get('/carwash/public/shop-info', { params: { shop_id: shopId } }),
+  createBooking: (data)   => publicClient.post('/carwash/public/bookings', data),
+};
+
 // ── Admin API (uses separate admin token) ────────────────────
 const adminClient = axios.create({ baseURL: BASE_URL });
 adminClient.interceptors.request.use((config) => {

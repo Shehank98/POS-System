@@ -74,6 +74,7 @@ async function createShop(req, res) {
     name, owner_name, email, phone, address,
     logo_url, contact_email,
     barcode_enabled = false,
+    shop_type = 'retail',
     owner_username, owner_password,
     subscription_months = 1,
   } = req.body;
@@ -95,10 +96,10 @@ async function createShop(req, res) {
     const { rows: shopRows } = await client.query(
       `INSERT INTO shops
          (name, owner_name, email, phone, address,
-          subscription_status, subscription_end_date, barcode_enabled)
-       VALUES ($1,$2,$3,$4,$5,'active',$6,$7)
+          subscription_status, subscription_end_date, barcode_enabled, shop_type)
+       VALUES ($1,$2,$3,$4,$5,'active',$6,$7,$8)
        RETURNING *`,
-      [name, owner_name, email, phone || null, address || null, subEnd, barcode_enabled]
+      [name, owner_name, email, phone || null, address || null, subEnd, barcode_enabled, shop_type || 'retail']
     );
     const shop = shopRows[0];
 

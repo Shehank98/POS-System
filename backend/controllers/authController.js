@@ -14,7 +14,8 @@ async function login(req, res) {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.password_hash, u.role, u.shop_id,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
-              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate
+              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
+              COALESCE(s.shop_type, 'retail') AS shop_type
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.username = $1 AND u.shop_id = $2`,
@@ -55,6 +56,7 @@ async function login(req, res) {
         role:            user.role,
         username:        user.username,
         barcode_enabled: user.barcode_enabled,
+        shop_type:       user.shop_type || 'retail',
         read_only:       readOnly,
       },
       process.env.JWT_SECRET,
@@ -73,6 +75,7 @@ async function login(req, res) {
         subscription_end_date: user.subscription_end_date,
         barcode_enabled:       user.barcode_enabled,
         default_tax_rate:      parseFloat(user.default_tax_rate) || 0,
+        shop_type:             user.shop_type || 'retail',
         read_only:             readOnly,
       },
     });
@@ -148,7 +151,8 @@ async function getMe(req, res) {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.role, u.shop_id, u.created_at,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
-              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate
+              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
+              COALESCE(s.shop_type, 'retail') AS shop_type
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,
