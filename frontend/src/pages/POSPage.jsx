@@ -611,6 +611,7 @@ export default function POSPage() {
           onComplete={() => {
             setShowPayment(false);
             clearCart();
+            loadProducts();
             barcodeRef.current?.focus();
           }}
         />
