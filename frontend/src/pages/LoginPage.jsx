@@ -36,7 +36,7 @@ export default function LoginPage() {
       } else {
         toast.success(`Welcome, ${data.user.username}!`);
       }
-      navigate('/products');
+      navigate('/');
     } catch (err) {
       setError(err.message);
     }
