@@ -310,18 +310,23 @@ function ExtendSubModal({ shop, onClose, onDone }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto"
+      <div className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full space-y-4 max-h-[90vh] overflow-y-auto"
            onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm font-semibold text-white">Manage — {shop.name}</p>
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-white text-lg">Manage — {shop.name}</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle className="w-5 h-5" /></button>
+        </div>
 
-        {/* Shop Info */}
-        <div className="space-y-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Information</p>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Shop Name</label>
-            <input className={`w-full ${inputCls}`} value={shopName} onChange={(e) => setShopName(e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        {/* Two-column layout matching Create Shop modal */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+
+          {/* ── Left column: Shop Info ── */}
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Information</p>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Shop Name</label>
+              <input className={`w-full ${inputCls}`} value={shopName} onChange={(e) => setShopName(e.target.value)} />
+            </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Phone</label>
               <input className={`w-full ${inputCls}`} placeholder="+60 12-345 6789" value={phone}
@@ -332,55 +337,55 @@ function ExtendSubModal({ shop, onClose, onDone }) {
               <input className={`w-full ${inputCls}`} type="email" placeholder="shop@email.com" value={contactEmail}
                      onChange={(e) => setContactEmail(e.target.value)} />
             </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Address</label>
+              <input className={`w-full ${inputCls}`} placeholder="123 Jalan Utama..." value={address}
+                     onChange={(e) => setAddress(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Logo URL
+                <span className="ml-1 text-gray-600">(shows on receipt)</span>
+              </label>
+              <input className={`w-full ${inputCls}`} placeholder="https://..." value={logoUrl}
+                     onChange={(e) => setLogoUrl(e.target.value)} />
+              {logoUrl && (
+                <div className="mt-1.5 bg-white rounded-lg p-2 flex items-center justify-center">
+                  <img src={logoUrl} alt="logo preview" className="max-h-10 max-w-full object-contain" />
+                </div>
+              )}
+            </div>
           </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Address</label>
-            <input className={`w-full ${inputCls}`} placeholder="123 Jalan Utama..." value={address}
-                   onChange={(e) => setAddress(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Logo URL
-              <span className="ml-1 text-gray-600">(shows on receipt)</span>
-            </label>
-            <input className={`w-full ${inputCls}`} placeholder="https://..." value={logoUrl}
-                   onChange={(e) => setLogoUrl(e.target.value)} />
-            {logoUrl && (
-              <div className="mt-1.5 bg-white rounded-lg p-2 flex items-center justify-center">
-                <img src={logoUrl} alt="logo preview" className="max-h-10 max-w-full object-contain" />
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Subscription */}
-        <div className="space-y-3 pt-1">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Subscription</p>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Status</label>
-            <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="active">Active</option>
-              <option value="trial">Trial</option>
-              <option value="expired">Expired</option>
-              <option value="suspended">Suspended</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Add months (0 = status change only)</label>
-            <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months}
-                   onChange={(e) => setMonths(e.target.value)} />
-            <p className="text-xs text-gray-500 mt-1">
-              Current expiry: {shop.subscription_end_date
-                ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">
-              Extra Staff Slots
-              <span className="ml-1 text-gray-600">(default: 1 manager + 1 cashier)</span>
-            </label>
-            <input className={`w-full ${inputCls}`} type="number" min="0" max="20" value={extraSlots}
-                   onChange={(e) => setExtraSlots(e.target.value)} />
-            <p className="text-xs text-gray-500 mt-1">Each extra slot allows +1 manager AND +1 cashier</p>
+          {/* ── Right column: Subscription ── */}
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Subscription</p>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Status</label>
+              <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="active">Active</option>
+                <option value="trial">Trial</option>
+                <option value="expired">Expired</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Add months (0 = status change only)</label>
+              <input className={`w-full ${inputCls}`} type="number" min="0" max="36" value={months}
+                     onChange={(e) => setMonths(e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">
+                Current expiry: {shop.subscription_end_date
+                  ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">
+                Extra Staff Slots
+                <span className="ml-1 text-gray-600">(default: 1 manager + 1 cashier)</span>
+              </label>
+              <input className={`w-full ${inputCls}`} type="number" min="0" max="20" value={extraSlots}
+                     onChange={(e) => setExtraSlots(e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">Each extra slot allows +1 manager AND +1 cashier</p>
+            </div>
           </div>
         </div>
 
