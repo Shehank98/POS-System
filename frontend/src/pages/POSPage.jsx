@@ -146,7 +146,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
         </button>
 
         <span className="text-sm font-bold text-gray-900 min-w-[52px] text-right shrink-0">
-          ${fmt(item.subtotal)}
+          Rs. {fmt(item.subtotal)}
         </span>
       </div>
 
@@ -262,20 +262,20 @@ function CartPanel({ onPayClick, onClose }) {
         <div className="px-4 pt-3 pb-2 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Subtotal</span>
-            <span className="font-medium text-gray-700">${fmt(totals.itemsSubtotal)}</span>
+            <span className="font-medium text-gray-700">Rs. {fmt(totals.itemsSubtotal)}</span>
           </div>
 
           {totals.itemsDiscount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-amber-600">Item discounts</span>
-              <span className="font-medium text-amber-600">−${fmt(totals.itemsDiscount)}</span>
+              <span className="font-medium text-amber-600">−Rs. {fmt(totals.itemsDiscount)}</span>
             </div>
           )}
 
           {totals.taxAmount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Tax</span>
-              <span className="font-medium text-gray-700">+${fmt(totals.taxAmount)}</span>
+              <span className="font-medium text-gray-700">+Rs. {fmt(totals.taxAmount)}</span>
             </div>
           )}
 
@@ -283,7 +283,7 @@ function CartPanel({ onPayClick, onClose }) {
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-500">Order discount</span>
             <div className="flex items-center gap-1">
-              <span className="text-gray-400 text-xs">$</span>
+              <span className="text-gray-400 text-xs">Rs.</span>
               <input
                 className="w-20 h-7 text-sm text-right bg-white border border-gray-200
                            rounded-lg px-2 focus:border-primary-300 focus:outline-none
@@ -299,7 +299,7 @@ function CartPanel({ onPayClick, onClose }) {
         {/* Total row */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
           <span className="font-bold text-gray-900">Total</span>
-          <span className="text-xl font-extrabold text-primary-700">${fmt(totals.grandTotal)}</span>
+          <span className="text-xl font-extrabold text-primary-700">Rs. {fmt(totals.grandTotal)}</span>
         </div>
 
         {/* Charge button */}
@@ -316,7 +316,7 @@ function CartPanel({ onPayClick, onClose }) {
               <CreditCard className="w-5 h-5" />
               <span className="text-base font-semibold">Charge</span>
             </div>
-            <span className="text-lg font-extrabold">${fmt(totals.grandTotal)}</span>
+            <span className="text-lg font-extrabold">Rs. {fmt(totals.grandTotal)}</span>
           </button>
         </div>
       </div>
@@ -625,7 +625,7 @@ export default function POSPage() {
                 : 'Cart is empty'}
             </span>
           </div>
-          <span className="text-base font-extrabold">${fmt(totals.grandTotal)}</span>
+          <span className="text-base font-extrabold">Rs. {fmt(totals.grandTotal)}</span>
         </button>
       </div>
 
