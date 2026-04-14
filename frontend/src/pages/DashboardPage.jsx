@@ -37,17 +37,17 @@ function StatCard({ label, value, sub, icon: Icon, color = 'primary', loading })
     purple:  'bg-purple-50 text-purple-600',
   };
   return (
-    <div className="card p-5 flex items-start gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${colors[color]}`}>
-        <Icon className="w-5 h-5" />
+    <div className="card p-3 sm:p-5 flex items-start gap-2.5 sm:gap-4">
+      <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${colors[color]}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
+        <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide leading-tight">{label}</p>
         {loading
-          ? <div className="h-7 w-24 bg-gray-100 animate-pulse rounded mt-1" />
-          : <p className="text-2xl font-bold text-gray-900 mt-0.5 truncate">{value}</p>
+          ? <div className="h-5 sm:h-7 w-20 sm:w-24 bg-gray-100 animate-pulse rounded mt-1" />
+          : <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-0.5 truncate">{value}</p>
         }
-        {sub && !loading && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        {sub && !loading && <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 leading-tight">{sub}</p>}
       </div>
     </div>
   );

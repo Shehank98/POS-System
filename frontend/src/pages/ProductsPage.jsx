@@ -89,15 +89,25 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Products</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-bold text-gray-900 shrink-0">Products</h1>
         {canEdit && (
           <div className="flex gap-2">
-            <button className="btn-secondary" onClick={() => setShowImport(true)}>
-              <Upload className="w-4 h-4" /> Import Excel
+            <button
+              className="btn-secondary px-2.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
+              onClick={() => setShowImport(true)}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Import Excel</span>
+              <span className="sm:hidden">Import</span>
             </button>
-            <button className="btn-primary" onClick={openAdd}>
-              <Plus className="w-4 h-4" /> Add Product
+            <button
+              className="btn-primary px-2.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
+              onClick={openAdd}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add Product</span>
+              <span className="sm:hidden">Add</span>
             </button>
           </div>
         )}
