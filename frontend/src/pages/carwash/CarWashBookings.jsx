@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
-import { CalendarDays, Plus, ChevronRight, Loader2, CheckCircle2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CalendarDays, Plus, Loader2, CheckCircle2, X, Printer } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { carwashApi, authApi } from '../../api/client';
+import useAuthStore from '../../store/authStore';
 
 const STATUS_BADGE = {
-  booked:           { label: 'Booked',      cls: 'bg-blue-100  text-blue-700'   },
-  arrived:          { label: 'Arrived',     cls: 'bg-yellow-100 text-yellow-700' },
-  converted_to_job: { label: 'Converted',   cls: 'bg-green-100 text-green-700'  },
-  cancelled:        { label: 'Cancelled',   cls: 'bg-gray-100  text-gray-400'   },
+  booked:           { label: 'Booked',    cls: 'bg-blue-100   text-blue-700'   },
+  arrived:          { label: 'Arrived',   cls: 'bg-yellow-100 text-yellow-700' },
+  converted_to_job: { label: 'Converted', cls: 'bg-green-100  text-green-700'  },
+  cancelled:        { label: 'Cancelled', cls: 'bg-gray-100   text-gray-400'   },
 };
 
+// ── Booking Form ─────────────────────────────────────────────
 function BookingForm({ initial, services, staff, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
     vehicle_number: '', phone_number: '', customer_name: '',
@@ -63,9 +66,9 @@ function BookingForm({ initial, services, staff, onSave, onClose }) {
             </div>
           </div>
           {[
-            { key: 'vehicle_number', label: 'Plate Number', placeholder: 'ABC-1234' },
-            { key: 'customer_name',  label: 'Customer Name', placeholder: 'John Doe' },
-            { key: 'phone_number',   label: 'Phone', placeholder: '+1 234 567 8900' },
+            { key: 'vehicle_number', label: 'Plate Number',  placeholder: 'ABC-1234'       },
+            { key: 'customer_name',  label: 'Customer Name', placeholder: 'John Doe'        },
+            { key: 'phone_number',   label: 'Phone',         placeholder: '+1 234 567 8900' },
           ].map(({ key, label, placeholder }) => (
             <div key={key}>
               <label className="block text-xs text-gray-500 mb-1">{label}</label>
@@ -115,27 +118,150 @@ function BookingForm({ initial, services, staff, onSave, onClose }) {
   );
 }
 
+// ── QR Slip Modal ─────────────────────────────────────────────
+function SlipModal({ booking, shopId, shopName, onClose }) {
+  const slipRef = useRef(null);
+  const portalUrl = `${window.location.origin}/cw-portal?shop_id=${shopId}`;
+
+  function handlePrint() {
+    const style = document.createElement('style');
+    style.id = 'slip-print-style';
+    style.innerHTML = `
+      @media print {
+        body > *:not(#slip-print-root) { display: none !important; }
+        #slip-print-root { display: flex !important; position: fixed; inset: 0; align-items: center; justify-content: center; }
+        #slip-print-root > * { box-shadow: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    document.head.removeChild(style);
+  }
+
+  const formattedDate = booking.booking_date
+    ? new Date(booking.booking_date + 'T00:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      })
+    : '';
+
+  return (
+    <div id="slip-print-root" className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-xs overflow-hidden shadow-2xl">
+        {/* Modal header (hidden on print) */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 print:hidden">
+          <p className="font-semibold text-gray-900 text-sm">Customer Slip</p>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        {/* Slip content */}
+        <div ref={slipRef} className="p-5 flex flex-col items-center text-center space-y-3">
+          {/* Shop name */}
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+            <span className="text-white font-bold text-sm">{shopName?.charAt(0) || 'W'}</span>
+          </div>
+          <div>
+            <p className="font-bold text-gray-900">{shopName || 'Car Wash'}</p>
+            <p className="text-xs text-gray-400">Booking Confirmation</p>
+          </div>
+
+          {/* Divider */}
+          <div className="w-full border-t border-dashed border-gray-200" />
+
+          {/* Booking details */}
+          <div className="w-full text-left space-y-1.5">
+            {booking.customer_name && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Customer</span>
+                <span className="font-medium text-gray-900">{booking.customer_name}</span>
+              </div>
+            )}
+            {booking.vehicle_number && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Vehicle</span>
+                <span className="font-medium text-gray-900">{booking.vehicle_number}</span>
+              </div>
+            )}
+            {booking.phone_number && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Phone</span>
+                <span className="font-medium text-gray-900">{booking.phone_number}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Date</span>
+              <span className="font-medium text-gray-900">{formattedDate}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Time</span>
+              <span className="font-medium text-gray-900">{booking.time_slot}</span>
+            </div>
+            {booking.service_name && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Service</span>
+                <span className="font-medium text-gray-900">{booking.service_name}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="w-full border-t border-dashed border-gray-200" />
+
+          {/* QR Code */}
+          <div className="flex flex-col items-center gap-2">
+            <QRCodeSVG
+              value={portalUrl}
+              size={160}
+              level="M"
+              includeMargin={true}
+            />
+            <p className="text-xs text-gray-500 max-w-[180px]">
+              Scan to book your next wash or track your car
+            </p>
+          </div>
+
+          <p className="text-xs text-gray-300">Powered by BillFlow</p>
+        </div>
+
+        {/* Print button (hidden on print) */}
+        <div className="px-4 pb-4 print:hidden">
+          <button
+            onClick={handlePrint}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600
+                       hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Printer className="w-4 h-4" /> Print Slip
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────
 export default function CarWashBookings() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const today = new Date().toISOString().slice(0, 10);
 
-  const [bookings,  setBookings]  = useState([]);
-  const [services,  setServices]  = useState([]);
-  const [staff,     setStaff]     = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [date,      setDate]      = useState(today);
-  const [showForm,  setShowForm]  = useState(false);
-  const [editing,   setEditing]   = useState(null);
+  const [bookings,    setBookings]    = useState([]);
+  const [services,    setServices]    = useState([]);
+  const [staff,       setStaff]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [date,        setDate]        = useState('');        // '' = all upcoming
+  const [showForm,    setShowForm]    = useState(false);
+  const [editing,     setEditing]     = useState(null);
+  const [slipBooking, setSlipBooking] = useState(null);
 
   function loadBookings(d) {
-    return carwashApi.listBookings({ date: d })
+    const params = d ? { date: d } : {};
+    return carwashApi.listBookings(params)
       .then((r) => setBookings(r.data))
       .catch(() => {});
   }
 
   useEffect(() => {
     Promise.all([
-      loadBookings(date),
+      loadBookings(''),
       carwashApi.listServices(),
       authApi.listUsers(),
     ]).then(([, s, u]) => {
@@ -183,6 +309,10 @@ export default function CarWashBookings() {
     }
   }
 
+  const headerLabel = date
+    ? `Bookings — ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+    : 'Upcoming Bookings';
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -197,9 +327,9 @@ export default function CarWashBookings() {
         </button>
       </div>
 
-      {/* Date picker */}
-      <div className="flex items-center gap-2">
-        <CalendarDays className="w-4 h-4 text-gray-400" />
+      {/* Date filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
         <input
           type="date"
           value={date}
@@ -209,11 +339,25 @@ export default function CarWashBookings() {
         />
         <button
           onClick={() => setDate(today)}
-          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-sm text-gray-600 rounded-lg transition-colors"
+          className={`px-3 py-2 text-sm rounded-lg transition-colors
+                      ${date === today
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
         >
           Today
         </button>
+        {date && (
+          <button
+            onClick={() => setDate('')}
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-sm text-gray-600 rounded-lg transition-colors"
+          >
+            All Upcoming
+          </button>
+        )}
       </div>
+
+      {/* Section label */}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{headerLabel}</p>
 
       {/* Booking list */}
       {loading ? (
@@ -221,19 +365,26 @@ export default function CarWashBookings() {
       ) : bookings.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100 text-gray-400">
           <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No bookings on this date</p>
+          <p className="text-sm">{date ? 'No bookings on this date' : 'No upcoming bookings'}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {bookings.map((b) => {
             const badge = STATUS_BADGE[b.status] || { label: b.status, cls: 'bg-gray-100 text-gray-500' };
+            const bookingDateFmt = b.booking_date
+              ? new Date(b.booking_date + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                })
+              : '';
             return (
-              <div key={b.id}
-                className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
+              <div key={b.id} className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-900 text-sm">{b.time_slot}</span>
+                      {!date && (
+                        <span className="text-xs text-gray-400">{bookingDateFmt}</span>
+                      )}
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>
                         {badge.label}
                       </span>
@@ -249,9 +400,17 @@ export default function CarWashBookings() {
                       <p className="text-xs text-gray-400">Staff: {b.staff_name}</p>
                     )}
                   </div>
+                  {/* Print slip button — always visible */}
+                  <button
+                    onClick={() => setSlipBooking(b)}
+                    title="Print customer slip"
+                    className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 transition-colors shrink-0"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {b.status === 'booked' || b.status === 'arrived' ? (
+                {(b.status === 'booked' || b.status === 'arrived') && (
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => handleConvert(b)}
@@ -275,7 +434,7 @@ export default function CarWashBookings() {
                       Cancel
                     </button>
                   </div>
-                ) : null}
+                )}
               </div>
             );
           })}
@@ -289,6 +448,15 @@ export default function CarWashBookings() {
           staff={staff}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditing(null); }}
+        />
+      )}
+
+      {slipBooking && (
+        <SlipModal
+          booking={slipBooking}
+          shopId={user?.shop_id}
+          shopName={user?.shop_name}
+          onClose={() => setSlipBooking(null)}
         />
       )}
     </div>

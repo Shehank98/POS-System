@@ -481,7 +481,14 @@ async function listBookings(req, res) {
   const params = [req.shopId];
   const conditions = ['b.shop_id = $1'];
 
-  if (date)   { params.push(date);   conditions.push(`b.booking_date = $${params.length}`); }
+  if (date) {
+    params.push(date);
+    conditions.push(`b.booking_date = $${params.length}`);
+  } else {
+    // No date filter: show all upcoming (today + future), exclude cancelled by default
+    conditions.push(`b.booking_date >= CURRENT_DATE`);
+  }
+
   if (status) { params.push(status); conditions.push(`b.status = $${params.length}`); }
 
   try {
