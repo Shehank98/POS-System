@@ -27,6 +27,8 @@ async function getDailySummary(req, res) {
       const { rows: [stats] } = await db.query(
         `SELECT
            COUNT(*) FILTER (WHERE status = 'completed')                          AS transaction_count,
+           COUNT(*) FILTER (WHERE status = 'voided')                             AS voided_count,
+           COUNT(*) FILTER (WHERE status = 'refunded' AND refund_of IS NOT NULL) AS refunded_count,
            COALESCE(SUM(total_amount)    FILTER (WHERE status = 'completed'), 0) AS total_sales,
            COALESCE(SUM(tax_amount)      FILTER (WHERE status = 'completed'), 0) AS total_tax,
            COALESCE(SUM(discount_amount) FILTER (WHERE status = 'completed'), 0) AS total_discounts,
@@ -44,9 +46,22 @@ async function getDailySummary(req, res) {
         [shop.id]
       );
 
-      const net_sales = parseFloat(stats.total_sales) - parseFloat(stats.total_refunds);
+      const txCount       = parseInt(stats.transaction_count, 10) || 0;
+      const net_sales     = parseFloat(stats.total_sales) - parseFloat(stats.total_refunds);
+      const avg_transaction = txCount > 0 ? net_sales / txCount : 0;
 
-      // Top 5 products sold today
+      // Total items sold today
+      const { rows: [itemStats] } = await db.query(
+        `SELECT COALESCE(SUM(ti.quantity), 0) AS total_items_sold
+           FROM transaction_items ti
+           JOIN transactions t ON t.id = ti.transaction_id
+          WHERE t.shop_id = $1
+            AND t.status  = 'completed'
+            AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE`,
+        [shop.id]
+      );
+
+      // Top 10 products sold today (by revenue)
       const { rows: top_products } = await db.query(
         `SELECT p.name,
                 SUM(ti.quantity)  AS qty_sold,
@@ -58,8 +73,8 @@ async function getDailySummary(req, res) {
             AND t.status  = 'completed'
             AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE
           GROUP BY p.name
-          ORDER BY qty_sold DESC
-          LIMIT 5`,
+          ORDER BY revenue DESC
+          LIMIT 10`,
         [shop.id]
       );
 
@@ -69,9 +84,13 @@ async function getDailySummary(req, res) {
         email:             shop.email,
         phone:             shop.phone  || '',
         address:           shop.address || '',
-        transaction_count: parseInt(stats.transaction_count, 10) || 0,
+        transaction_count: txCount,
+        voided_count:      parseInt(stats.voided_count, 10) || 0,
+        refunded_count:    parseInt(stats.refunded_count, 10) || 0,
+        total_items_sold:  Math.round(parseFloat(itemStats.total_items_sold) || 0),
         total_sales:       fmt(stats.total_sales),
         net_sales:         fmt(net_sales),
+        avg_transaction:   fmt(avg_transaction),
         total_tax:         fmt(stats.total_tax),
         total_discounts:   fmt(stats.total_discounts),
         total_refunds:     fmt(stats.total_refunds),
@@ -79,7 +98,7 @@ async function getDailySummary(req, res) {
         card_sales:        fmt(stats.card_sales),
         mobile_sales:      fmt(stats.mobile_sales),
         top_products:      top_products.map((p) => ({
-          name:    p.name,
+          name:     p.name,
           qty_sold: parseFloat(p.qty_sold),
           revenue:  fmt(p.revenue),
         })),
