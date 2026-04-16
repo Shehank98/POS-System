@@ -14,13 +14,13 @@
 
 var CONFIG = {
   // Your deployed backend URL (no trailing slash)
-  apiUrl: 'https://your-backend.railway.app',
+  apiUrl: 'https://pos-system-production-74ed.up.railway.app',
 
-  // Matches DAILY_SUMMARY_KEY in your .env
+  // Matches DAILY_SUMMARY_KEY in your Railway environment variables
   apiKey: 'replace_with_your_daily_summary_key',
 
-  // BillFlow logo — replace with your actual hosted image URL
-  logoUrl: 'https://your-domain.com/billflow-logo.png',
+  // BillFlow logo (Google Drive direct image URL)
+  logoUrl: 'https://drive.google.com/uc?export=view&id=1aV5lJE-QiWDsrSeKElmD0eLE72JJMliB',
 
   // BillFlow contact shown in email footer
   phone: '0706421998',
