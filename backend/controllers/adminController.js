@@ -372,6 +372,12 @@ async function updateShop(req, res) {
     logo_url, contact_email, barcode_enabled,
     extra_staff_slots, shop_type,
   } = req.body;
+
+  // Treat empty string as null so COALESCE keeps the existing DB value
+  const emailVal        = email        && email.trim()        ? email.trim()        : null;
+  const logoUrlVal      = logo_url     !== undefined          ? (logo_url     || null) : undefined;
+  const contactEmailVal = contact_email !== undefined         ? (contact_email || null) : undefined;
+
   try {
     const { rows } = await db.query(
       `UPDATE shops
@@ -387,9 +393,9 @@ async function updateShop(req, res) {
               shop_type          = COALESCE($10, shop_type)
         WHERE id = $11
         RETURNING *`,
-      [name, owner_name, email, phone, address,
-       logo_url !== undefined ? logo_url || null : undefined,
-       contact_email !== undefined ? contact_email || null : undefined,
+      [name, owner_name, emailVal, phone, address,
+       logoUrlVal,
+       contactEmailVal,
        barcode_enabled,
        extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
        shop_type || null,
@@ -398,6 +404,9 @@ async function updateShop(req, res) {
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json(rows[0]);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'A shop with this email already exists' });
+    }
     if (err.code === '42703') {
       try {
         const { rows } = await db.query(
@@ -410,16 +419,16 @@ async function updateShop(req, res) {
                   barcode_enabled = COALESCE($6, barcode_enabled)
             WHERE id = $7
             RETURNING *`,
-          [name, owner_name, email, phone, address, barcode_enabled, req.params.id]
+          [name, owner_name, emailVal, phone, address, barcode_enabled, req.params.id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
         return res.json(rows[0]);
       } catch (fallbackErr) {
-        console.error('updateShop fallback error:', fallbackErr);
+        console.error('updateShop fallback error:', fallbackErr.code, fallbackErr.message);
         return res.status(500).json({ error: 'Server error' });
       }
     }
-    console.error('updateShop error:', err);
+    console.error('updateShop error:', err.code, err.message);
     res.status(500).json({ error: 'Server error' });
   }
 }
