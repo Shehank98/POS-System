@@ -28,7 +28,7 @@ function CustomerInsightsCard({ data }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={ShoppingBag} label="Total Orders" value={data.total_orders} />
         <StatCard icon={TrendingUp}  label="Total Spent"  value={`Rs. ${fmt(data.total_spent)}`} bg="bg-green-50" color="text-green-600" />
-        <StatCard icon={Clock}       label="Last Order"   value={data.last_order_date ? new Date(data.last_order_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'} bg="bg-blue-50" color="text-blue-600" />
+        <StatCard icon={Clock}       label="Last Order"   value={data.last_order_date ? new Date(data.last_order_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Never'} bg="bg-blue-50" color="text-blue-600" />
         <StatCard
           icon={AlertTriangle}
           label="Cancellations"
@@ -163,7 +163,7 @@ export default function CustomersPage() {
             <Users className="w-4 h-4 text-gray-500" />
             <p className="text-sm font-semibold text-gray-700">{insights.customer_phone}</p>
             {insights.customer_name && (
-              <span className="text-sm text-gray-400">— {insights.customer_name}</span>
+              <span className="text-sm text-gray-400">{insights.customer_name}</span>
             )}
           </div>
           <CustomerInsightsCard data={insights} />

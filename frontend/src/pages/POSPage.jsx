@@ -66,12 +66,12 @@ function WeightInputModal({ product, onConfirm, onClose }) {
         <div className="px-5 py-4 space-y-4">
           <p className="text-sm text-gray-600">
             <span className="font-semibold">{product.name}</span>
-            <span className="text-gray-400 ml-1">— Rs. {fmt(product.price)}/kg</span>
+            <span className="text-gray-400 ml-1">Rs. {fmt(product.price)}/kg</span>
           </p>
           {product.has_inventory && parseFloat(product.stock_quantity) > 0 &&
            parseFloat(product.stock_quantity) <= 10 && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-700 font-medium">
-              Low stock — Only {parseFloat(product.stock_quantity).toFixed(2)} KG remaining
+              Low stock: Only {parseFloat(product.stock_quantity).toFixed(2)} KG remaining
             </div>
           )}
           {product.has_inventory && parseFloat(product.stock_quantity) <= 0 && (

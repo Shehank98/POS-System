@@ -59,7 +59,7 @@ function BookingForm({ shopId, services, onBooked }) {
           <select required value={form.time_slot}
             onChange={(e) => setForm({ ...form, time_slot: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">— Pick time —</option>
+            <option value="">Select a time</option>
             {TIME_SLOTS.map((t) => <option key={t}>{t}</option>)}
           </select>
         </div>
@@ -81,9 +81,9 @@ function BookingForm({ shopId, services, onBooked }) {
           <label className="block text-xs text-gray-500 mb-1">Service</label>
           <select value={form.service_id} onChange={(e) => setForm({ ...form, service_id: e.target.value })}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">— Select service —</option>
+            <option value="">Select a service</option>
             {services.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} — Rs. {parseFloat(s.price).toFixed(2)}</option>
+              <option key={s.id} value={s.id}>{s.name} (Rs. {parseFloat(s.price).toFixed(2)})</option>
             ))}
           </select>
         </div>
@@ -188,7 +188,7 @@ export default function CarWashPortal() {
                 <input type="tel" placeholder="Phone number (e.g. +1234567890)"
                   value={phone} onChange={(e) => setPhone(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <p className="text-center text-xs text-gray-400">— or —</p>
+                <p className="text-center text-xs text-gray-400">or</p>
                 <input type="text" placeholder="Plate number (e.g. ABC-1234)"
                   value={vehicle} onChange={(e) => setVehicle(e.target.value.toUpperCase())}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />

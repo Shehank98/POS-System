@@ -248,7 +248,7 @@ export default function ProductsPage() {
                             ? `${parseFloat(p.stock_quantity).toFixed(2)} KG`
                             : p.stock_quantity}
                         </span>
-                      : <span className="text-gray-400 text-xs">—</span>
+                      : <span className="text-gray-400 text-xs">Unlimited</span>
                     }
                   </td>
                   <td className="px-4 py-3 text-center text-gray-500 hidden lg:table-cell">

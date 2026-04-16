@@ -17,8 +17,9 @@ const notificationRoutes = require('./routes/notifications');
 const paymentRoutes      = require('./routes/payments');
 const auditRoutes        = require('./routes/audit');
 const preOrderRoutes     = require('./routes/preOrders');
-const customerRoutes     = require('./routes/customers');
-const carwashRoutes      = require('./routes/carwash');
+const customerRoutes      = require('./routes/customers');
+const emailSummaryRoutes  = require('./routes/emailSummary');
+const carwashRoutes       = require('./routes/carwash');
 const carwashPublicRoutes = require('./routes/carwashPublic');
 
 const { runDailyChecks }        = require('./controllers/notificationController');
@@ -49,6 +50,7 @@ app.use('/api/payments',      paymentRoutes);
 app.use('/api/audit-log',     auditRoutes);
 app.use('/api/pre-orders',    preOrderRoutes);
 app.use('/api/customers',     customerRoutes);
+app.use('/api/email-summary', emailSummaryRoutes);
 // Car Wash module — public routes BEFORE authenticated to avoid JWT guard
 app.use('/api/carwash/public', carwashPublicRoutes);
 app.use('/api/carwash',        carwashRoutes);
