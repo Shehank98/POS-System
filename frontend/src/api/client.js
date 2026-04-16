@@ -112,14 +112,17 @@ const publicClient = axios.create({ baseURL: BASE_URL });
 
 export const preOrdersApi = {
   // Public — customer ordering (no auth)
-  getProducts:  (shopId)        => publicClient.get(`/pre-orders/public/products?shop_id=${shopId}`),
-  getShop:      (shopId)        => publicClient.get(`/pre-orders/public/shop?shop_id=${shopId}`),
-  create:       (data)          => publicClient.post('/pre-orders/public', data),
-  getHistory:   (shopId, phone) => publicClient.get(`/pre-orders/public/history?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
-  trackOrder:   (shopId, token) => publicClient.get(`/pre-orders/public/track?shop_id=${shopId}&token=${encodeURIComponent(token)}`),
+  getProducts:          (shopId)        => publicClient.get(`/pre-orders/public/products?shop_id=${shopId}`),
+  getShop:              (shopId)        => publicClient.get(`/pre-orders/public/shop?shop_id=${shopId}`),
+  create:               (data)          => publicClient.post('/pre-orders/public', data),
+  getHistory:           (shopId, phone) => publicClient.get(`/pre-orders/public/history?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
+  trackOrder:           (shopId, token) => publicClient.get(`/pre-orders/public/track?shop_id=${shopId}&token=${encodeURIComponent(token)}`),
+  getCancellationStatus:(shopId, phone) => publicClient.get(`/pre-orders/public/cancellation-status?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
   // Authenticated — shop owner / POS staff
   list:         (status)        => client.get('/pre-orders', { params: status ? { status } : {} }),
+  getCounts:    ()              => client.get('/pre-orders/counts'),
   updateStatus: (id, status)    => client.put(`/pre-orders/${id}/status`, { status }),
+  markAsPaid:   (id)            => client.put(`/pre-orders/${id}/pay`),
   getByToken:   (token)         => client.get(`/pre-orders/by-token/${encodeURIComponent(token)}`),
   getStats:     ()              => client.get('/pre-orders/stats'),
 };

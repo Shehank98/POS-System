@@ -98,11 +98,11 @@ export default function TransactionsPage() {
   async function handleVoid() {
     try {
       await transactionsApi.void(voidId);
-      toast.success('Transaction voided');
+      toast.success('Transaction voided successfully. Stock has been restored.');
       setVoidId(null);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Void failed');
+      toast.error(err.response?.data?.error || 'Something went wrong. Please try again.');
     }
   }
 
@@ -345,6 +345,7 @@ export default function TransactionsPage() {
       {voidId && (
         <ConfirmDialog
           message="Void this transaction? Stock will be restored. This cannot be undone."
+          confirmLabel="Void Transaction"
           onConfirm={handleVoid}
           onCancel={() => setVoidId(null)}
         />

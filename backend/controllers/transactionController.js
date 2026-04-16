@@ -207,7 +207,10 @@ async function voidTransaction(req, res) {
     }
     if (rows[0].status !== 'completed') {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Only completed transactions can be voided' });
+      const msg = rows[0].status === 'void'
+        ? 'This transaction has already been voided'
+        : 'Only completed transactions can be voided';
+      return res.status(400).json({ error: msg });
     }
 
     // Restore stock (LEFT JOIN so items with deleted products are not skipped)
@@ -222,7 +225,7 @@ async function voidTransaction(req, res) {
       if (item.has_inventory && item.product_id) {
         await client.query(
           `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
-          [item.quantity, item.product_id]
+          [parseFloat(item.quantity), item.product_id]
         );
       }
     }
@@ -232,11 +235,12 @@ async function voidTransaction(req, res) {
       [req.params.id, req.shopId]
     );
 
-    // ── Commit the real work BEFORE the audit trail ───────────
-    // The audit insert must NOT be inside this transaction — if the
-    // deleted_records table is missing or the insert fails for any
-    // reason, it would abort the whole transaction and roll back the
-    // void, leaving stock and status inconsistent.
+    if (!updated.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Transaction not found or already modified' });
+    }
+
+    // Commit real work BEFORE audit trail — audit failure must never roll back the void
     await client.query('COMMIT');
 
     // Audit trail — fire-and-forget after commit (best effort)
@@ -251,10 +255,10 @@ async function voidTransaction(req, res) {
 
     res.json(updated[0]);
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch { /* ignore rollback error */ }
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     console.error('voidTransaction error — code:', err.code,
                   '| message:', err.message, '| detail:', err.detail);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   } finally {
     client.release();
   }

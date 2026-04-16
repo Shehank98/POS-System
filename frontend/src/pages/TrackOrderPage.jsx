@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Clock, ChefHat, PackageCheck, XCircle, RefreshCw, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Clock, ChefHat, PackageCheck, XCircle, RefreshCw, ArrowLeft, CreditCard, CheckCheck } from 'lucide-react';
 import { preOrdersApi } from '../api/client';
 
 // ── Status config ─────────────────────────────────────────────
@@ -246,6 +246,25 @@ export default function TrackOrderPage() {
             {stepInfo && !isCancelled && (
               <div className={`rounded-xl px-4 py-3 border ${stepInfo.bg} border-opacity-50`}>
                 <p className={`text-sm font-medium ${stepInfo.color}`}>{stepInfo.message}</p>
+              </div>
+            )}
+
+            {/* Payment status */}
+            {order.payment_status === 'paid' ? (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2.5">
+                <CheckCheck size={18} className="text-green-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700">Payment Confirmed</p>
+                  <p className="text-xs text-green-600 mt-0.5">Your payment has been received by the cashier.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-2.5">
+                <CreditCard size={18} className="text-orange-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-700">Payment Pending</p>
+                  <p className="text-xs text-orange-600 mt-0.5">Please pay at the counter when collecting your order.</p>
+                </div>
               </div>
             )}
 

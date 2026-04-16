@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 
-export default function ConfirmDialog({ message, onConfirm, onCancel }) {
+export default function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = 'Delete' }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card p-6 w-full max-w-sm space-y-4">
@@ -16,7 +16,7 @@ export default function ConfirmDialog({ message, onConfirm, onCancel }) {
         </div>
         <div className="flex gap-2 justify-end">
           <button className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button className="btn-danger"    onClick={onConfirm}>Delete</button>
+          <button className="btn-danger"    onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
     </div>

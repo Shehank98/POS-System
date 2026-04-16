@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Search, CheckCircle, X, RotateCcw, Phone, MapPin } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Search, CheckCircle, X, RotateCcw, Phone, MapPin, AlertTriangle, Clock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
@@ -118,6 +118,10 @@ const STATUS_BADGE = {
   COMPLETED: { label: 'Completed', cls: 'bg-gray-100 text-gray-500'    },
   CANCELLED: { label: 'Cancelled', cls: 'bg-red-100 text-red-500'      },
 };
+const PAYMENT_BADGE = {
+  paid:    { label: 'Paid',    cls: 'bg-green-100 text-green-700' },
+  pending: { label: 'Unpaid',  cls: 'bg-orange-100 text-orange-600' },
+};
 const ACTIVE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
 // ── Main OrderPage ────────────────────────────────────────────
@@ -126,18 +130,19 @@ export default function OrderPage() {
   const navigate = useNavigate();
   const shopId = searchParams.get('shop_id');
 
-  const [shop, setShop]               = useState(null);
-  const [products, setProducts]       = useState([]);
-  const [search, setSearch]           = useState('');
-  const [cart, setCart]               = useState({});   // { productId: qty }
-  const [phone, setPhone]             = useState('');
-  const [name, setName]               = useState('');
-  const [loading, setLoading]         = useState(true);
-  const [submitting, setSubmitting]   = useState(false);
-  const [token, setToken]             = useState(null);
-  const [history, setHistory]         = useState([]);
-  const [showCart, setShowCart]       = useState(false);
-  const [error, setError]             = useState('');
+  const [shop, setShop]                         = useState(null);
+  const [products, setProducts]                 = useState([]);
+  const [search, setSearch]                     = useState('');
+  const [cart, setCart]                         = useState({});   // { productId: qty }
+  const [phone, setPhone]                       = useState('');
+  const [name, setName]                         = useState('');
+  const [loading, setLoading]                   = useState(true);
+  const [submitting, setSubmitting]             = useState(false);
+  const [token, setToken]                       = useState(null);
+  const [history, setHistory]                   = useState([]);
+  const [showCart, setShowCart]                 = useState(false);
+  const [error, setError]                       = useState('');
+  const [cancellationStatus, setCancellationStatus] = useState(null); // { total_cancellations, cooldown_active, cooldown_until }
 
   // Saved order (localStorage — persists across page closes)
   const [savedOrder,   setSavedOrder]   = useState(null); // { token, shopId, createdAt }
@@ -184,12 +189,16 @@ export default function OrderPage() {
     }
   }, [LS_KEY]); // eslint-disable-line
 
-  // Fetch order history when phone is provided
+  // Fetch order history + cancellation status when phone is provided
   const fetchHistory = useCallback(async () => {
     if (!phone || phone.length < 7 || !shopId) return;
     try {
-      const res = await preOrdersApi.getHistory(shopId, phone);
-      setHistory(res.data.orders || []);
+      const [histRes, cancelRes] = await Promise.all([
+        preOrdersApi.getHistory(shopId, phone),
+        preOrdersApi.getCancellationStatus(shopId, phone).catch(() => ({ data: null })),
+      ]);
+      setHistory(histRes.data.orders || []);
+      if (cancelRes.data) setCancellationStatus(cancelRes.data);
     } catch { /* silent */ }
   }, [phone, shopId]);
 
@@ -227,6 +236,14 @@ export default function OrderPage() {
   const handleSubmit = async () => {
     if (!phone.trim()) { toast.error('Please enter your phone number'); return; }
     if (cartCount === 0) { toast.error('Your cart is empty'); return; }
+
+    // Block if on cooldown
+    if (cancellationStatus?.cooldown_active) {
+      const until = new Date(cancellationStatus.cooldown_until);
+      const hoursLeft = Math.ceil((until - Date.now()) / 3600000);
+      toast.error(`Pre-order disabled due to repeated cancellations. Try again after ${hoursLeft} hour(s).`);
+      return;
+    }
 
     const items = cartItems.map((p) => ({
       product_id: p.id,
@@ -463,7 +480,7 @@ export default function OrderPage() {
                     type="tel"
                     placeholder="Phone number *"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => { setPhone(e.target.value); setCancellationStatus(null); }}
                     onBlur={fetchHistory}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                   />
@@ -475,6 +492,36 @@ export default function OrderPage() {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                 />
+
+                {/* Cancellation warning / cooldown block */}
+                {cancellationStatus?.cooldown_active && (
+                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                    <Clock size={15} className="text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-700">Pre-order temporarily disabled</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        Due to repeated cancellations. Try again after{' '}
+                        {Math.ceil((new Date(cancellationStatus.cooldown_until) - Date.now()) / 3600000)} hour(s).
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {!cancellationStatus?.cooldown_active && cancellationStatus?.total_cancellations >= 2 && (
+                  <div className="flex items-start gap-2.5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                    <AlertTriangle size={15} className="text-orange-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-orange-700">
+                      You have cancelled multiple orders. If this continues, pre-order access will be limited.
+                    </p>
+                  </div>
+                )}
+                {!cancellationStatus?.cooldown_active && cancellationStatus?.total_cancellations === 1 && (
+                  <div className="flex items-start gap-2.5 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+                    <AlertTriangle size={15} className="text-yellow-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-yellow-700">
+                      You have a previous cancellation on record. Please ensure you collect your order after placing.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Previous Orders — Reorder */}
@@ -500,6 +547,14 @@ export default function OrderPage() {
                                   {badge.label}
                                 </span>
                               )}
+                              {(() => {
+                                const pb = PAYMENT_BADGE[order.payment_status || 'pending'];
+                                return pb ? (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${pb.cls}`}>
+                                    {pb.label}
+                                  </span>
+                                ) : null;
+                              })()}
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5 truncate">
                               {items.map((i) => i.name).join(', ')}
@@ -536,10 +591,14 @@ export default function OrderPage() {
             <div className="px-4 py-4 border-t border-gray-100 bg-white">
               <button
                 onClick={handleSubmit}
-                disabled={submitting || cartCount === 0}
+                disabled={submitting || cartCount === 0 || cancellationStatus?.cooldown_active}
                 className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold text-base transition-colors"
               >
-                {submitting ? 'Placing Order...' : `Place Order · Rs ${cartTotal.toFixed(2)}`}
+                {submitting
+                  ? 'Placing Order...'
+                  : cancellationStatus?.cooldown_active
+                    ? 'Pre-order Disabled'
+                    : `Place Order · Rs ${cartTotal.toFixed(2)}`}
               </button>
             </div>
           </div>

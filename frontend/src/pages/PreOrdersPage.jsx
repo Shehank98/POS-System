@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban, CreditCard, CheckCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
 
@@ -35,11 +35,28 @@ function ageColor(dateStr) {
   return 'bg-red-100 border-red-300 text-red-800';
 }
 
+// ── Payment badge ─────────────────────────────────────────────
+function PaymentBadge({ status }) {
+  if (status === 'paid') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+        <CheckCheck size={10} /> Paid
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
+      <CreditCard size={10} /> Unpaid
+    </span>
+  );
+}
+
 // ── Order Card ────────────────────────────────────────────────
-function OrderCard({ order, onStatusChange, updating }) {
+function OrderCard({ order, onStatusChange, onMarkPaid, updating, markingPaid }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const items = Array.isArray(order.items) ? order.items : [];
   const actions = STATUS_ACTIONS[order.status] || [];
+  const isPaid = order.payment_status === 'paid';
 
   const waLink = `https://wa.me/${order.customer_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
     `Hi ${order.customer_name || ''}! Your order token ${order.token_number} is ready for pickup. Please visit us to pay and collect. Thank you!`
@@ -54,6 +71,9 @@ function OrderCard({ order, onStatusChange, updating }) {
           <p className="text-3xl font-black tracking-wider leading-none">{order.token_number}</p>
         </div>
         <div className="text-right">
+          <div className="flex items-center justify-end gap-2 mb-0.5">
+            <PaymentBadge status={order.payment_status || 'pending'} />
+          </div>
           <p className="text-xs opacity-70 flex items-center gap-1 justify-end">
             <Clock size={11} /> {elapsed(order.created_at)}
           </p>
@@ -81,7 +101,7 @@ function OrderCard({ order, onStatusChange, updating }) {
       </div>
 
       {/* Actions */}
-      {(actions.length > 0 || (order.status !== 'COMPLETED' && order.status !== 'CANCELLED')) && (
+      {(actions.length > 0 || (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') || !isPaid) && (
         <div className="px-4 pb-4 flex flex-wrap gap-2">
           {actions.map((action) => (
             <button
@@ -93,6 +113,20 @@ function OrderCard({ order, onStatusChange, updating }) {
               {updating === order.id ? 'Updating...' : action.label}
             </button>
           ))}
+
+          {/* Mark as Paid button — shown when not yet paid and order is active */}
+          {!isPaid && order.status !== 'CANCELLED' && (
+            <button
+              disabled={markingPaid === order.id}
+              onClick={() => onMarkPaid(order.id)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              title="Mark as paid"
+            >
+              <CreditCard size={14} />
+              {markingPaid === order.id ? 'Marking...' : 'Mark Paid'}
+            </button>
+          )}
+
           {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && (
             !confirmCancel ? (
               <button
@@ -125,6 +159,7 @@ function OrderCard({ order, onStatusChange, updating }) {
               </div>
             )
           )}
+
           {/* WhatsApp notify — visible on READY status */}
           {order.status === 'READY' && (
             <a
@@ -143,14 +178,35 @@ function OrderCard({ order, onStatusChange, updating }) {
   );
 }
 
+// ── Notification badge ────────────────────────────────────────
+function TabBadge({ count }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1
+                     rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 // ── Main PreOrdersPage ────────────────────────────────────────
 export default function PreOrdersPage() {
-  const [activeTab, setActiveTab]   = useState('PENDING');
-  const [orders, setOrders]         = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [updating, setUpdating]     = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(Date.now());
-  const pollRef = useRef(null);
+  const [activeTab,    setActiveTab]   = useState('PENDING');
+  const [orders,       setOrders]      = useState([]);
+  const [counts,       setCounts]      = useState({ PENDING: 0, PREPARING: 0, READY: 0, COMPLETED: 0, CANCELLED: 0 });
+  const [loading,      setLoading]     = useState(true);
+  const [updating,     setUpdating]    = useState(null);
+  const [markingPaid,  setMarkingPaid] = useState(null);
+  const [lastRefresh,  setLastRefresh] = useState(Date.now());
+  const pollRef   = useRef(null);
+  const countRef  = useRef(null);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await preOrdersApi.getCounts();
+      setCounts(res.data);
+    } catch { /* silent */ }
+  }, []);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -165,15 +221,25 @@ export default function PreOrdersPage() {
     }
   }, [activeTab]);
 
-  // Initial fetch + auto-refresh every 15s for active tabs
+  // Initial fetch + polling for active tabs
   useEffect(() => {
     fetchOrders();
+    fetchCounts();
+
     if (pollRef.current) clearInterval(pollRef.current);
+    if (countRef.current) clearInterval(countRef.current);
+
     if (activeTab !== 'COMPLETED' && activeTab !== 'CANCELLED') {
       pollRef.current = setInterval(() => fetchOrders(true), 15000);
     }
-    return () => clearInterval(pollRef.current);
-  }, [fetchOrders, activeTab]);
+    // Always refresh counts every 15s
+    countRef.current = setInterval(fetchCounts, 15000);
+
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(countRef.current);
+    };
+  }, [fetchOrders, fetchCounts, activeTab]);
 
   const handleStatusChange = async (id, status) => {
     setUpdating(id);
@@ -181,10 +247,24 @@ export default function PreOrdersPage() {
       await preOrdersApi.updateStatus(id, status);
       toast.success(`Order marked as ${status.toLowerCase()}`);
       fetchOrders(true);
+      fetchCounts();
     } catch {
       toast.error('Failed to update order status');
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleMarkPaid = async (id) => {
+    setMarkingPaid(id);
+    try {
+      await preOrdersApi.markAsPaid(id);
+      toast.success('Order marked as paid');
+      fetchOrders(true);
+    } catch {
+      toast.error('Failed to mark as paid');
+    } finally {
+      setMarkingPaid(null);
     }
   };
 
@@ -197,29 +277,37 @@ export default function PreOrdersPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-800">Pre-Orders</h1>
         <button
-          onClick={() => fetchOrders()}
+          onClick={() => { fetchOrders(); fetchCounts(); }}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 transition-colors"
         >
           <RefreshCw size={13} /> {refreshLabel}
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs with notification badges */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
         {TABS.map((tab) => {
           const Icon = tab.icon;
+          const badgeCount = counts[tab.key] || 0;
+          const isActive = activeTab === tab.key;
+          // Highlight Preparing and Ready tabs if they have orders
+          const hasNewOrders = (tab.key === 'PREPARING' || tab.key === 'READY') && badgeCount > 0 && !isActive;
+
           return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === tab.key
+              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold transition-all relative ${
+                isActive
                   ? `bg-white shadow ${tab.color}`
-                  : 'text-gray-500 hover:text-gray-700'
+                  : hasNewOrders
+                    ? 'text-gray-700 bg-white/60 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               <Icon size={13} />
               <span className="hidden sm:inline">{tab.label}</span>
+              <TabBadge count={badgeCount} />
             </button>
           );
         })}
@@ -248,7 +336,9 @@ export default function PreOrdersPage() {
               key={order.id}
               order={order}
               onStatusChange={handleStatusChange}
+              onMarkPaid={handleMarkPaid}
               updating={updating}
+              markingPaid={markingPaid}
             />
           ))}
         </div>
