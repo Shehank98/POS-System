@@ -19,6 +19,7 @@ import ScannerPage from './pages/ScannerPage';
 import OrderPage from './pages/OrderPage';
 import TrackOrderPage from './pages/TrackOrderPage';
 import PreOrdersPage from './pages/PreOrdersPage';
+import CustomersPage from './pages/CustomersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="audit-log"   element={<AuditLogPage />} />
           <Route path="settings"    element={<SettingsPage />} />
           <Route path="pre-orders"  element={<PreOrdersPage />} />
+          <Route path="customers"   element={<CustomersPage />} />
         </Route>
 
         {/* ── Car Wash module ───────────────────────────────── */}

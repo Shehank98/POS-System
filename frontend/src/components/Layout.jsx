@@ -3,7 +3,7 @@ import {
   ShoppingCart, Package, Settings, LogOut,
   LayoutDashboard, Receipt, Menu, X, CreditCard,
   ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
-  PanelLeftClose, PanelLeftOpen, QrCode,
+  PanelLeftClose, PanelLeftOpen, QrCode, Users,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/authStore';
@@ -23,6 +23,7 @@ const NAV = [
   { to: '/billing',      label: 'Billing',      icon: CreditCard      },
   { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList,  roles: ['owner', 'manager'] },
   { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode },
+  { to: '/customers',    label: 'Customers',    icon: Users,          roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',     icon: Settings        },
 ];
 
@@ -41,6 +42,7 @@ const MORE_NAV = [
   { to: '/billing',      label: 'Billing',   icon: CreditCard     },
   { to: '/audit-log',    label: 'Audit Log', icon: ClipboardList, roles: ['owner', 'manager'] },
   { to: '/pre-orders',   label: 'Pre Orders',icon: QrCode },
+  { to: '/customers',    label: 'Customers', icon: Users,         roles: ['owner', 'manager'] },
   { to: '/settings',     label: 'Settings',  icon: Settings       },
 ];
 

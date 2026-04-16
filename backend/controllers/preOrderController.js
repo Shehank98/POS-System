@@ -161,7 +161,50 @@ async function getCancellationStatus(req, res) {
   }
 }
 
-// ── PUBLIC: POST /api/pre-orders/public ───────────────────────
+// ── PUBLIC: POST /api/pre-orders/public/cancel ────────────────
+// Lets a customer cancel their own PENDING order.
+// Only PENDING orders can be self-cancelled (staff handles the rest).
+async function publicCancelOrder(req, res) {
+  const { shop_id, order_id, phone } = req.body;
+  if (!shop_id)  return res.status(400).json({ error: 'shop_id is required' });
+  if (!order_id) return res.status(400).json({ error: 'order_id is required' });
+  if (!phone)    return res.status(400).json({ error: 'phone is required' });
+
+  try {
+    // Verify the order belongs to this customer and is still PENDING
+    const { rows } = await db.query(
+      `SELECT * FROM pre_orders
+        WHERE id = $1 AND shop_id = $2 AND customer_phone = $3`,
+      [order_id, shop_id, phone.trim()]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found or phone number does not match' });
+    }
+    const order = rows[0];
+    if (order.status !== 'PENDING') {
+      return res.status(400).json({
+        error: order.status === 'CANCELLED'
+          ? 'This order has already been cancelled'
+          : 'Only pending orders can be cancelled. Your order is already being prepared.',
+      });
+    }
+
+    await db.query(
+      `UPDATE pre_orders SET status = 'CANCELLED' WHERE id = $1`,
+      [order_id]
+    );
+
+    // Track cancellation
+    upsertCancellationTracking(shop_id, phone.trim(), { incrementCancellations: true })
+      .catch((e) => console.warn('public cancel tracking failed:', e.message));
+
+    res.json({ success: true, message: 'Order cancelled successfully' });
+  } catch (err) {
+    console.error('publicCancelOrder error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 async function createPreOrder(req, res) {
   const { shop_id, customer_phone, customer_name, items, total_amount } = req.body;
 
@@ -477,6 +520,7 @@ module.exports = {
   getPublicShop,
   getCancellationStatus,
   createPreOrder,
+  publicCancelOrder,
   getOrderHistory,
   getStatusCounts,
   listPreOrders,

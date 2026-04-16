@@ -17,6 +17,7 @@ function emptyForm(defaultTaxRate = 0) {
     has_inventory:  true,
     category:       '',
     tax_rate:       defaultTaxRate > 0 ? String(defaultTaxRate) : '',
+    unit_type:      'unit',
   };
 }
 
@@ -36,6 +37,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
     has_inventory:  product.has_inventory  ?? true,
     category:       product.category      || '',
     tax_rate:       product.tax_rate       ?? '',
+    unit_type:      product.unit_type      || 'unit',
   } : emptyForm(defaultTaxRate));
   const [saving,         setSaving]         = useState(false);
   const [errors,         setErrors]         = useState({});
@@ -89,6 +91,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
       has_inventory:  form.has_inventory,
       category:       form.category.trim() || null,
       tax_rate:       parseFloat(form.tax_rate) || 0,
+      unit_type:      form.unit_type || 'unit',
     };
 
     setSaving(true);
@@ -234,7 +237,10 @@ export default function ProductForm({ product, onSaved, onClose }) {
           {/* Price & Cost */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">Selling Price <span className="text-red-500">*</span></label>
+              <label className="label">
+                {form.unit_type === 'kg' ? 'Price per kg' : 'Selling Price'}{' '}
+                <span className="text-red-500">*</span>
+              </label>
               <input
                 className={`input ${errors.price ? 'border-red-400' : ''}`}
                 type="number" min="0" step="0.01"
@@ -266,6 +272,38 @@ export default function ProductForm({ product, onSaved, onClose }) {
               value={form.tax_rate}
               onChange={set('tax_rate')}
             />
+          </div>
+
+          {/* Unit type */}
+          <div>
+            <label className="label">Unit Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, unit_type: 'unit' }))}
+                className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors
+                  ${form.unit_type !== 'kg'
+                    ? 'bg-primary-600 border-primary-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-primary-400'}`}
+              >
+                Unit / Per piece
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, unit_type: 'kg' }))}
+                className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors
+                  ${form.unit_type === 'kg'
+                    ? 'bg-primary-600 border-primary-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-primary-400'}`}
+              >
+                Per kg (weight)
+              </button>
+            </div>
+            {form.unit_type === 'kg' && (
+              <p className="text-xs text-gray-500 mt-1">
+                Price is per kg. Cashier enters weight at checkout; receipt shows grams or kg.
+              </p>
+            )}
           </div>
 
           {/* Inventory toggle */}

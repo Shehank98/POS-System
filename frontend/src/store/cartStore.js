@@ -46,6 +46,7 @@ const useCartStore = create((set, get) => ({
           quantity:     qty,
           discount_pct: 0,
           tax_rate:     parseFloat(product.tax_rate) || 0,
+          unit_type:    product.unit_type || 'unit',
           discAmt:      0,
           subtotal:     parseFloat(product.price) * qty,
         };

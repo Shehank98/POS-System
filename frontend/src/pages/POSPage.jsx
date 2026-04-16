@@ -15,6 +15,104 @@ import PosCameraScanner  from '../components/PosCameraScanner';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
+function fmtWeight(kg) {
+  const g = kg * 1000;
+  if (g < 1000) return `${Math.round(g)}g`;
+  return `${parseFloat(kg.toFixed(3))}kg`;
+}
+
+// ── Weight input modal for kg products ───────────────────────
+function WeightInputModal({ product, onConfirm, onClose }) {
+  const [input, setInput] = useState('');
+  const [unit,  setUnit]  = useState('g');
+  const inputRef = useRef();
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  function parseWeight() {
+    const raw = input.trim().toLowerCase();
+    if (!raw) return null;
+    if (raw.endsWith('kg')) {
+      const v = parseFloat(raw);
+      return isNaN(v) || v <= 0 ? null : v;
+    }
+    if (raw.endsWith('g')) {
+      const v = parseFloat(raw);
+      return isNaN(v) || v <= 0 ? null : v / 1000;
+    }
+    const v = parseFloat(raw);
+    if (isNaN(v) || v <= 0) return null;
+    return unit === 'g' ? v / 1000 : v;
+  }
+
+  function handleConfirm() {
+    const kg = parseWeight();
+    if (!kg) { toast.error('Enter a valid weight'); return; }
+    onConfirm(kg);
+  }
+
+  const previewKg = parseWeight();
+  const subtotal  = previewKg ? product.price * previewKg : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="card w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-900">Enter Weight</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <p className="text-sm text-gray-600">
+            <span className="font-semibold">{product.name}</span>
+            <span className="text-gray-400 ml-1">— Rs. {fmt(product.price)}/kg</span>
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              className="input flex-1 text-lg font-mono"
+              placeholder={unit === 'g' ? '500' : '0.5'}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
+              type="number" min="0" step={unit === 'g' ? '1' : '0.001'}
+            />
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
+              {['g', 'kg'].map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => setUnit(u)}
+                  className={`px-3 py-2 text-sm font-semibold transition-colors
+                    ${unit === u ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {previewKg && (
+            <p className="text-sm text-gray-500">
+              Weight: <strong>{fmtWeight(previewKg)}</strong>
+              {subtotal !== null && (
+                <> &nbsp;·&nbsp; Total: <strong className="text-primary-700">Rs. {fmt(subtotal)}</strong></>
+              )}
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn-primary" onClick={handleConfirm}>Add to Cart</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Colour accent strip (by first letter, Tailwind classes kept literal for purge) ──
 const ACCENTS = [
   'bg-red-400',    'bg-orange-400', 'bg-amber-400',  'bg-lime-500',
@@ -54,7 +152,7 @@ function ProductCard({ product, onSelect, disabled }) {
             </span>
           )}
           <span className="text-[13px] font-bold text-primary-700 shrink-0 ml-auto">
-            {fmt(product.price)}
+            {fmt(product.price)}{product.unit_type === 'kg' ? '/kg' : ''}
           </span>
         </div>
       </div>
@@ -105,32 +203,62 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
 
       {/* Bottom row: qty stepper + unit price + discount + subtotal */}
       <div className="flex items-center gap-2 pl-4">
-        {/* Pill stepper */}
-        <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden shrink-0">
-          <button
-            className="w-7 h-7 flex items-center justify-center text-gray-500
-                       hover:bg-gray-200 transition-colors"
-            onClick={() => onQty(item.cartId, item.quantity - 1)}
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <input
-            className="w-8 h-7 text-center text-[13px] font-bold text-gray-900
-                       bg-transparent focus:outline-none"
-            type="number" min="1"
-            value={item.quantity}
-            onChange={(e) => onQty(item.cartId, parseInt(e.target.value, 10) || 1)}
-          />
-          <button
-            className="w-7 h-7 flex items-center justify-center text-gray-500
-                       hover:bg-gray-200 transition-colors"
-            onClick={() => onQty(item.cartId, item.quantity + 1)}
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
+        {/* Pill stepper — for kg items show weight; for unit items show integer */}
+        {item.unit_type === 'kg' ? (
+          <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden shrink-0">
+            <button
+              className="w-7 h-7 flex items-center justify-center text-gray-500
+                         hover:bg-gray-200 transition-colors"
+              onClick={() => onQty(item.cartId, Math.max(0.001, item.quantity - 0.1))}
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              className="w-12 h-7 text-center text-[12px] font-bold text-gray-900
+                         bg-transparent focus:outline-none"
+              type="number" min="0.001" step="0.001"
+              value={item.quantity}
+              onChange={(e) => onQty(item.cartId, parseFloat(e.target.value) || 0.001)}
+            />
+            <button
+              className="w-7 h-7 flex items-center justify-center text-gray-500
+                         hover:bg-gray-200 transition-colors"
+              onClick={() => onQty(item.cartId, item.quantity + 0.1)}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden shrink-0">
+            <button
+              className="w-7 h-7 flex items-center justify-center text-gray-500
+                         hover:bg-gray-200 transition-colors"
+              onClick={() => onQty(item.cartId, item.quantity - 1)}
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <input
+              className="w-8 h-7 text-center text-[13px] font-bold text-gray-900
+                         bg-transparent focus:outline-none"
+              type="number" min="1"
+              value={item.quantity}
+              onChange={(e) => onQty(item.cartId, parseInt(e.target.value, 10) || 1)}
+            />
+            <button
+              className="w-7 h-7 flex items-center justify-center text-gray-500
+                         hover:bg-gray-200 transition-colors"
+              onClick={() => onQty(item.cartId, item.quantity + 1)}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        )}
 
-        <span className="text-xs text-gray-400 flex-1 truncate">× {fmt(item.unit_price)}</span>
+        <span className="text-xs text-gray-400 flex-1 truncate">
+          {item.unit_type === 'kg'
+            ? `${fmtWeight(item.quantity)} × ${fmt(item.unit_price)}/kg`
+            : `× ${fmt(item.unit_price)}`}
+        </span>
 
         {/* Discount pill */}
         <button
@@ -358,6 +486,9 @@ export default function POSPage() {
   const [showMobileCart, setShowMobileCart]  = useState(false);
   const [showCamera,     setShowCamera]      = useState(false);
 
+  // Weight modal (for kg products)
+  const [weightPending,  setWeightPending]  = useState(null); // product
+
   // Pre-order token lookup
   const [showPreOrder,   setShowPreOrder]   = useState(false);
   const [preOrderToken,  setPreOrderToken]  = useState('');
@@ -412,6 +543,7 @@ export default function POSPage() {
 
     try {
       const { data } = await productsApi.byBarcode(code);
+      if (data.unit_type === 'kg') { setWeightPending(data); return; }
       addItem(data);
       toast.success(`Added: ${data.name}`);
     } catch {
@@ -438,6 +570,12 @@ export default function POSPage() {
     setScanning(true);
     try {
       const { data } = await productsApi.byBarcode(code);
+      if (data.unit_type === 'kg') {
+        setBarcodeInput('');
+        setWeightPending(data);
+        setScanning(false);
+        return;
+      }
       addItem(data);
       setBarcodeInput('');
     } catch {
@@ -450,6 +588,7 @@ export default function POSPage() {
 
   function handleProductSelect(product) {
     if (readOnly) return;
+    if (product.unit_type === 'kg') { setWeightPending(product); return; }
     addItem(product);
   }
 
@@ -791,6 +930,19 @@ export default function POSPage() {
             barcodeRef.current?.focus();
           }}
           onClose={() => setShowCamera(false)}
+        />
+      )}
+
+      {/* Weight input modal for kg products */}
+      {weightPending && (
+        <WeightInputModal
+          product={weightPending}
+          onConfirm={(kg) => {
+            addItem(weightPending, kg);
+            toast.success(`Added: ${weightPending.name} (${fmtWeight(kg)})`);
+            setWeightPending(null);
+          }}
+          onClose={() => setWeightPending(null)}
         />
       )}
 

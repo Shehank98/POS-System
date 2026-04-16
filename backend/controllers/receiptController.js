@@ -34,14 +34,30 @@ async function getReceipt(req, res) {
       }
     } catch { /* migration 005 not yet applied — continue without logo/contact email */ }
 
-    // Fetch line items
-    const { rows: items } = await db.query(
-      `SELECT ti.*, COALESCE(p.name, 'Deleted product') AS product_name
-         FROM transaction_items ti
-         LEFT JOIN products p ON p.id = ti.product_id
-        WHERE ti.transaction_id = $1`,
-      [req.params.id]
-    );
+    // Fetch line items (include unit_type for weight display; graceful fallback)
+    let items;
+    try {
+      const { rows } = await db.query(
+        `SELECT ti.*,
+                COALESCE(p.name,      'Deleted product') AS product_name,
+                COALESCE(p.unit_type, 'unit')            AS unit_type
+           FROM transaction_items ti
+           LEFT JOIN products p ON p.id = ti.product_id
+          WHERE ti.transaction_id = $1`,
+        [req.params.id]
+      );
+      items = rows;
+    } catch {
+      // unit_type column not yet added (pre-migration 010)
+      const { rows } = await db.query(
+        `SELECT ti.*, COALESCE(p.name, 'Deleted product') AS product_name, 'unit' AS unit_type
+           FROM transaction_items ti
+           LEFT JOIN products p ON p.id = ti.product_id
+          WHERE ti.transaction_id = $1`,
+        [req.params.id]
+      );
+      items = rows;
+    }
 
     const t = txnRows[0];
     const fmt = (n) => Number(n || 0).toFixed(2);
@@ -67,14 +83,18 @@ async function getReceipt(req, res) {
     });
     const fallbackTimeStr = serverDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-    const itemRows = items.map((i) => `
+    const itemRows = items.map((i) => {
+      const qtyDisplay = i.unit_type === 'kg' ? fmtWeight(parseFloat(i.quantity)) : Number(i.quantity);
+      const priceLabel = i.unit_type === 'kg' ? `${fmt(i.unit_price)}/kg` : fmt(i.unit_price);
+      return `
       <tr>
         <td class="name">${escHtml(i.product_name)}</td>
-        <td class="qty">${Number(i.quantity)}</td>
-        <td class="price">${fmt(i.unit_price)}</td>
+        <td class="qty">${qtyDisplay}</td>
+        <td class="price">${priceLabel}</td>
         ${Number(i.discount) > 0 ? `<td class="disc">-${fmt(i.discount)}</td>` : '<td class="disc"></td>'}
         <td class="total">${fmt(i.subtotal)}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     const discountRow = Number(t.discount_amount) > 0
       ? `<tr class="summary-row"><td colspan="4">Discount</td><td>-${fmt(t.discount_amount)}</td></tr>` : '';
@@ -237,6 +257,12 @@ ${qrBlock}
     console.error('getReceipt error:', err);
     res.status(500).json({ error: 'Server error generating receipt' });
   }
+}
+
+function fmtWeight(kg) {
+  const grams = kg * 1000;
+  if (grams < 1000) return `${Math.round(grams)}g`;
+  return `${parseFloat(kg.toFixed(3))}kg`;
 }
 
 function escHtml(str) {

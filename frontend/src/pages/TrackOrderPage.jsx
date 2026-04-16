@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Clock, ChefHat, PackageCheck, XCircle, RefreshCw, ArrowLeft, CreditCard, CheckCheck } from 'lucide-react';
+import { CheckCircle, Clock, ChefHat, PackageCheck, XCircle, RefreshCw, ArrowLeft, CreditCard, CheckCheck, AlertTriangle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
 
 // ── Status config ─────────────────────────────────────────────
@@ -98,10 +99,13 @@ export default function TrackOrderPage() {
   const shopId = searchParams.get('shop_id');
   const token  = searchParams.get('token');
 
-  const [order,     setOrder]     = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
-  const [refreshing, setRefreshing] = useState(false);
+  const [order,        setOrder]        = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [showCancel,   setShowCancel]   = useState(false);
+  const [cancelPhone,  setCancelPhone]  = useState('');
+  const [cancelling,   setCancelling]   = useState(false);
   const pollRef = useRef(null);
 
   async function fetchOrder(silent = false) {
@@ -153,6 +157,21 @@ export default function TrackOrderPage() {
     if (mins < 1)  return 'just now';
     if (mins < 60) return `${mins} min ago`;
     return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+  }
+
+  async function handleCancelOrder() {
+    if (!cancelPhone.trim()) { toast.error('Enter your phone number to confirm'); return; }
+    setCancelling(true);
+    try {
+      await preOrdersApi.cancelOrder({ shop_id: shopId, order_id: order.id, phone: cancelPhone.trim() });
+      toast.success('Order cancelled successfully.');
+      setShowCancel(false);
+      fetchOrder(true);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not cancel order. Try again.');
+    } finally {
+      setCancelling(false);
+    }
   }
 
   return (
@@ -249,6 +268,17 @@ export default function TrackOrderPage() {
               </div>
             )}
 
+            {/* Cancel button — only while PENDING */}
+            {order.status === 'PENDING' && (
+              <button
+                onClick={() => { setShowCancel(true); setCancelPhone(''); }}
+                className="w-full text-center py-2.5 rounded-xl border border-red-200 bg-red-50
+                           text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
+              >
+                Cancel This Order
+              </button>
+            )}
+
             {/* Payment status */}
             {order.payment_status === 'paid' ? (
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2.5">
@@ -299,6 +329,57 @@ export default function TrackOrderPage() {
           </>
         )}
       </div>
+
+      {/* Cancel confirmation modal */}
+      {showCancel && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+            <div className="px-5 pt-5 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} className="text-red-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Cancel Order?</p>
+                  <p className="text-xs text-gray-500">Token: {order?.token_number}</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-4 text-xs text-amber-700">
+                <strong>Cancellation Policy:</strong> Repeated cancellations may result in a temporary pre-order block for your account.
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm your phone number
+              </label>
+              <input
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400"
+                placeholder="e.g. 0712345678"
+                value={cancelPhone}
+                onChange={(e) => setCancelPhone(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCancelOrder()}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setShowCancel(false)}
+              >
+                Keep Order
+              </button>
+              <button
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+                onClick={handleCancelOrder}
+                disabled={cancelling}
+              >
+                {cancelling ? 'Cancelling…' : 'Yes, Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

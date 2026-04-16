@@ -10,6 +10,7 @@ router.get('/public/history',              ctrl.getOrderHistory);
 router.get('/public/track',                ctrl.getPublicTrack);
 router.get('/public/cancellation-status',  ctrl.getCancellationStatus);
 router.post('/public',                     ctrl.createPreOrder);
+router.post('/public/cancel',              ctrl.publicCancelOrder);
 
 // ── Authenticated routes (shop owner / POS staff) ─────────────
 router.use(authMiddleware, shopIsolation);

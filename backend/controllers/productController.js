@@ -85,26 +85,43 @@ async function createProduct(req, res) {
   const {
     name, barcode, price, cost_price = 0,
     stock_quantity = 0, has_inventory = true,
-    category, tax_rate = 0,
+    category, tax_rate = 0, unit_type = 'unit',
   } = req.body;
 
   if (!name || price === undefined) {
     return res.status(400).json({ error: 'name and price are required' });
   }
 
+  const validUnitTypes = ['unit', 'kg'];
+  const safeUnitType = validUnitTypes.includes(unit_type) ? unit_type : 'unit';
+
   try {
     const { rows } = await db.query(
       `INSERT INTO products
-         (shop_id, name, barcode, price, cost_price, stock_quantity, has_inventory, category, tax_rate)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (shop_id, name, barcode, price, cost_price, stock_quantity, has_inventory, category, tax_rate, unit_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
       [req.shopId, name, barcode || null, price, cost_price,
-       stock_quantity, has_inventory, category || null, tax_rate]
+       stock_quantity, has_inventory, category || null, tax_rate, safeUnitType]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'A product with this barcode already exists' });
+    }
+    // Fallback: column may not exist yet (pre-migration 010)
+    if (err.code === '42703') {
+      try {
+        const { rows } = await db.query(
+          `INSERT INTO products
+             (shop_id, name, barcode, price, cost_price, stock_quantity, has_inventory, category, tax_rate)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           RETURNING *`,
+          [req.shopId, name, barcode || null, price, cost_price,
+           stock_quantity, has_inventory, category || null, tax_rate]
+        );
+        return res.status(201).json({ ...rows[0], unit_type: 'unit' });
+      } catch (e2) { console.error('createProduct fallback error:', e2); }
     }
     console.error('createProduct error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -115,30 +132,52 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   const {
     name, barcode, price, cost_price,
-    stock_quantity, has_inventory, category, tax_rate,
+    stock_quantity, has_inventory, category, tax_rate, unit_type,
   } = req.body;
+
+  const validUnitTypes = ['unit', 'kg'];
+  const safeUnitType = unit_type && validUnitTypes.includes(unit_type) ? unit_type : undefined;
 
   try {
     const { rows } = await db.query(
       `UPDATE products
-          SET name = COALESCE($1, name),
-              barcode = $2,
-              price = COALESCE($3, price),
-              cost_price = COALESCE($4, cost_price),
+          SET name           = COALESCE($1, name),
+              barcode        = $2,
+              price          = COALESCE($3, price),
+              cost_price     = COALESCE($4, cost_price),
               stock_quantity = COALESCE($5, stock_quantity),
-              has_inventory = COALESCE($6, has_inventory),
-              category = $7,
-              tax_rate = COALESCE($8, tax_rate)
-        WHERE id = $9 AND shop_id = $10
+              has_inventory  = COALESCE($6, has_inventory),
+              category       = $7,
+              tax_rate       = COALESCE($8, tax_rate),
+              unit_type      = COALESCE($9, unit_type)
+        WHERE id = $10 AND shop_id = $11
         RETURNING *`,
       [name, barcode ?? null, price, cost_price, stock_quantity, has_inventory,
-       category ?? null, tax_rate, req.params.id, req.shopId]
+       category ?? null, tax_rate, safeUnitType ?? null, req.params.id, req.shopId]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Product not found' });
     res.json(rows[0]);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'A product with this barcode already exists' });
+    }
+    // Fallback without unit_type column (pre-migration 010)
+    if (err.code === '42703') {
+      try {
+        const { rows } = await db.query(
+          `UPDATE products
+              SET name = COALESCE($1, name), barcode = $2,
+                  price = COALESCE($3, price), cost_price = COALESCE($4, cost_price),
+                  stock_quantity = COALESCE($5, stock_quantity),
+                  has_inventory = COALESCE($6, has_inventory),
+                  category = $7, tax_rate = COALESCE($8, tax_rate)
+            WHERE id = $9 AND shop_id = $10 RETURNING *`,
+          [name, barcode ?? null, price, cost_price, stock_quantity,
+           has_inventory, category ?? null, tax_rate, req.params.id, req.shopId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+        return res.json({ ...rows[0], unit_type: 'unit' });
+      } catch (e2) { console.error('updateProduct fallback error:', e2); }
     }
     console.error('updateProduct error:', err);
     res.status(500).json({ error: 'Server error' });
