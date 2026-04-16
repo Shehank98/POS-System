@@ -281,18 +281,23 @@ function CreateShopModal({ onClose, onCreated }) {
 
 // ── Extend Subscription Modal ─────────────────────────────────
 function ExtendSubModal({ shop, onClose, onDone }) {
-  const [months,       setMonths]       = useState('0');
-  const [status,       setStatus]       = useState(shop.subscription_status);
-  const [extraSlots,   setExtraSlots]   = useState(String(shop.extra_staff_slots || 0));
-  // Shop info fields
-  const [shopName,     setShopName]     = useState(shop.name || '');
-  const [phone,        setPhone]        = useState(shop.phone || '');
-  const [address,      setAddress]      = useState(shop.address || '');
-  const [logoUrl,      setLogoUrl]      = useState(shop.logo_url || '');
-  const [contactEmail, setContactEmail] = useState(shop.contact_email || '');
-  const [busy,         setBusy]         = useState(false);
+  const [months,          setMonths]          = useState('0');
+  const [status,          setStatus]          = useState(shop.subscription_status);
+  const [extraSlots,      setExtraSlots]      = useState(String(shop.extra_staff_slots || 0));
+  const [shopName,        setShopName]        = useState(shop.name || '');
+  const [ownerName,       setOwnerName]       = useState(shop.owner_name || '');
+  const [loginEmail,      setLoginEmail]      = useState(shop.email || '');
+  const [phone,           setPhone]           = useState(shop.phone || '');
+  const [address,         setAddress]         = useState(shop.address || '');
+  const [logoUrl,         setLogoUrl]         = useState(shop.logo_url || '');
+  const [contactEmail,    setContactEmail]    = useState(shop.contact_email || '');
+  const [shopType,        setShopType]        = useState(shop.shop_type || 'retail');
+  const [barcodeEnabled,  setBarcodeEnabled]  = useState(!!shop.barcode_enabled);
+  const [busy,            setBusy]            = useState(false);
 
   async function handleSave() {
+    if (!shopName.trim()) return toast.error('Shop name is required');
+    if (!loginEmail.trim()) return toast.error('Login email is required');
     setBusy(true);
     try {
       await adminApi.updateSub(shop.id, {
@@ -300,11 +305,15 @@ function ExtendSubModal({ shop, onClose, onDone }) {
         extend_months: parseInt(months, 10) || 0,
       });
       await adminApi.updateShop(shop.id, {
-        name:          shopName || undefined,
-        phone:         phone,
-        address:       address,
-        logo_url:      logoUrl,
-        contact_email: contactEmail,
+        name:              shopName,
+        owner_name:        ownerName,
+        email:             loginEmail,
+        phone:             phone,
+        address:           address,
+        logo_url:          logoUrl,
+        contact_email:     contactEmail,
+        shop_type:         shopType,
+        barcode_enabled:   barcodeEnabled,
         extra_staff_slots: parseInt(extraSlots, 10) || 0,
       });
       toast.success('Shop updated');
@@ -327,15 +336,24 @@ function ExtendSubModal({ shop, onClose, onDone }) {
           <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle className="w-5 h-5" /></button>
         </div>
 
-        {/* Two-column layout matching Create Shop modal */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
 
           {/* ── Left column: Shop Info ── */}
           <div className="space-y-3">
             <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Information</p>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Shop Name</label>
+              <label className="block text-xs text-gray-400 mb-1">Shop Name *</label>
               <input className={`w-full ${inputCls}`} value={shopName} onChange={(e) => setShopName(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Owner Full Name</label>
+              <input className={`w-full ${inputCls}`} placeholder="John Doe" value={ownerName}
+                     onChange={(e) => setOwnerName(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Login Email *</label>
+              <input className={`w-full ${inputCls}`} type="email" placeholder="owner@shop.com" value={loginEmail}
+                     onChange={(e) => setLoginEmail(e.target.value)} />
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Phone</label>
@@ -366,9 +384,28 @@ function ExtendSubModal({ shop, onClose, onDone }) {
             </div>
           </div>
 
-          {/* ── Right column: Subscription ── */}
+          {/* ── Right column: Settings + Subscription ── */}
           <div className="space-y-3">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Subscription</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Shop Settings</p>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
+              <select className={`w-full ${inputCls}`} value={shopType} onChange={(e) => setShopType(e.target.value)}>
+                <option value="retail">Retail / General</option>
+                <option value="carwash">Car Wash</option>
+                <option value="grocery">Grocery / Supermarket</option>
+                <option value="restaurant">Restaurant / Cafe</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3 bg-gray-700 rounded-lg px-3 py-2.5">
+              <input type="checkbox" id="barcode_edit" checked={barcodeEnabled}
+                     onChange={(e) => setBarcodeEnabled(e.target.checked)}
+                     className="w-4 h-4 accent-primary-500 cursor-pointer" />
+              <label htmlFor="barcode_edit" className="text-sm text-gray-200 cursor-pointer">
+                Enable barcode scanner
+              </label>
+            </div>
+
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold pt-2">Subscription</p>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Status</label>
               <select className={`w-full ${inputCls}`} value={status} onChange={(e) => setStatus(e.target.value)}>

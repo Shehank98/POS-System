@@ -367,9 +367,12 @@ async function changeUserPassword(req, res) {
 
 // ── PUT /api/admin/shops/:id ──────────────────────────────────
 async function updateShop(req, res) {
-  const { name, owner_name, email, phone, address, logo_url, contact_email, barcode_enabled, extra_staff_slots } = req.body;
+  const {
+    name, owner_name, email, phone, address,
+    logo_url, contact_email, barcode_enabled,
+    extra_staff_slots, shop_type,
+  } = req.body;
   try {
-    // Full update including optional migration columns (logo_url, contact_email, extra_staff_slots)
     const { rows } = await db.query(
       `UPDATE shops
           SET name               = COALESCE($1, name),
@@ -380,21 +383,21 @@ async function updateShop(req, res) {
               logo_url           = COALESCE($6, logo_url),
               contact_email      = COALESCE($7, contact_email),
               barcode_enabled    = COALESCE($8, barcode_enabled),
-              extra_staff_slots  = COALESCE($9, extra_staff_slots)
-        WHERE id = $10
+              extra_staff_slots  = COALESCE($9, extra_staff_slots),
+              shop_type          = COALESCE($10, shop_type)
+        WHERE id = $11
         RETURNING *`,
       [name, owner_name, email, phone, address,
        logo_url !== undefined ? logo_url || null : undefined,
        contact_email !== undefined ? contact_email || null : undefined,
        barcode_enabled,
        extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
+       shop_type || null,
        req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json(rows[0]);
   } catch (err) {
-    // Postgres error 42703 = undefined_column: migration(s) not yet applied.
-    // Fall back to updating only the core columns so the operation still succeeds.
     if (err.code === '42703') {
       try {
         const { rows } = await db.query(
