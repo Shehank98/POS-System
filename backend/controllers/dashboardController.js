@@ -227,7 +227,8 @@ async function getLowStock(req, res) {
   const threshold = parseInt(req.query.threshold, 10) || 10;
   try {
     const { rows } = await db.query(
-      `SELECT id, name, stock_quantity, category
+      `SELECT id, name, stock_quantity, category,
+              COALESCE(unit_type, 'unit') AS unit_type
          FROM products
         WHERE shop_id      = $1
           AND has_inventory = true

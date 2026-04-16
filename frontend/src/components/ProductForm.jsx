@@ -87,7 +87,11 @@ export default function ProductForm({ product, onSaved, onClose }) {
       barcode:        form.barcode.trim() || null,
       price:          parseFloat(form.price),
       cost_price:     parseFloat(form.cost_price) || 0,
-      stock_quantity: form.has_inventory ? (parseInt(form.stock_quantity, 10) || 0) : 0,
+      stock_quantity: form.has_inventory
+        ? (form.unit_type === 'kg'
+            ? (parseFloat(form.stock_quantity) || 0)
+            : (parseInt(form.stock_quantity, 10) || 0))
+        : 0,
       has_inventory:  form.has_inventory,
       category:       form.category.trim() || null,
       tax_rate:       parseFloat(form.tax_rate) || 0,
@@ -334,14 +338,30 @@ export default function ProductForm({ product, onSaved, onClose }) {
           {/* Stock quantity */}
           {form.has_inventory && (
             <div>
-              <label className="label">Stock Quantity</label>
-              <input
-                className="input"
-                type="number" min="0" step="1"
-                placeholder="0"
-                value={form.stock_quantity}
-                onChange={set('stock_quantity')}
-              />
+              <label className="label">
+                {form.unit_type === 'kg' ? 'Stock (KG)' : 'Stock Quantity'}
+              </label>
+              <div className="relative">
+                <input
+                  className="input"
+                  type="number" min="0"
+                  step={form.unit_type === 'kg' ? '0.001' : '1'}
+                  placeholder={form.unit_type === 'kg' ? '0.000' : '0'}
+                  value={form.stock_quantity}
+                  onChange={set('stock_quantity')}
+                />
+                {form.unit_type === 'kg' && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2
+                                   text-sm font-medium text-gray-400 pointer-events-none">
+                    KG
+                  </span>
+                )}
+              </div>
+              {form.unit_type === 'kg' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Enter total weight in KG (e.g. 50 = 50 KG in stock)
+                </p>
+              )}
             </div>
           )}
 

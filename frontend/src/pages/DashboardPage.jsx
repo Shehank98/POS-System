@@ -79,8 +79,10 @@ function LowStockPanel({ products, loading }) {
                 {p.category && <p className="text-xs text-gray-400">{p.category}</p>}
               </div>
               <span className={`text-sm font-bold tabular-nums
-                ${p.stock_quantity <= 0 ? 'text-red-600' : 'text-orange-500'}`}>
-                {p.stock_quantity}
+                ${parseFloat(p.stock_quantity) <= 0 ? 'text-red-600' : 'text-orange-500'}`}>
+                {p.unit_type === 'kg'
+                  ? `${parseFloat(p.stock_quantity).toFixed(2)} KG`
+                  : p.stock_quantity}
               </span>
             </li>
           ))}

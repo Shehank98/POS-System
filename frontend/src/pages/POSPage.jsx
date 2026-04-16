@@ -24,7 +24,7 @@ function fmtWeight(kg) {
 // ── Weight input modal for kg products ───────────────────────
 function WeightInputModal({ product, onConfirm, onClose }) {
   const [input, setInput] = useState('');
-  const [unit,  setUnit]  = useState('g');
+  const [unit,  setUnit]  = useState('kg');
   const inputRef = useRef();
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -68,16 +68,27 @@ function WeightInputModal({ product, onConfirm, onClose }) {
             <span className="font-semibold">{product.name}</span>
             <span className="text-gray-400 ml-1">— Rs. {fmt(product.price)}/kg</span>
           </p>
+          {product.has_inventory && parseFloat(product.stock_quantity) > 0 &&
+           parseFloat(product.stock_quantity) <= 10 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-700 font-medium">
+              Low stock — Only {parseFloat(product.stock_quantity).toFixed(2)} KG remaining
+            </div>
+          )}
+          {product.has_inventory && parseFloat(product.stock_quantity) <= 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 font-medium">
+              Out of stock
+            </div>
+          )}
 
           <div className="flex gap-2">
             <input
               ref={inputRef}
               className="input flex-1 text-lg font-mono"
-              placeholder={unit === 'g' ? '500' : '0.5'}
+              placeholder={unit === 'kg' ? '0.5' : '500'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
-              type="number" min="0" step={unit === 'g' ? '1' : '0.001'}
+              type="number" min="0" step={unit === 'kg' ? '0.001' : '1'}
             />
             <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
               {['g', 'kg'].map((u) => (
@@ -123,9 +134,9 @@ const accent = (name) => ACCENTS[(name.charCodeAt(0) || 0) % ACCENTS.length];
 
 // ── Compact product card (no image — slim left accent strip) ───
 function ProductCard({ product, onSelect, disabled }) {
-  const outOfStock = product.has_inventory && product.stock_quantity <= 0;
-  const lowStock   = product.has_inventory && product.stock_quantity > 0
-                     && product.stock_quantity <= 5;
+  const qty        = parseFloat(product.stock_quantity) || 0;
+  const outOfStock = product.has_inventory && qty <= 0;
+  const lowStock   = product.has_inventory && qty > 0 && qty <= 10;
 
   return (
     <button
@@ -165,7 +176,9 @@ function ProductCard({ product, onSelect, disabled }) {
       {lowStock && (
         <span className="absolute top-1.5 right-1.5 text-[9px] bg-orange-100 text-orange-600
                          px-1.5 py-0.5 rounded font-semibold leading-tight">
-          {product.stock_quantity}
+          {product.unit_type === 'kg'
+            ? `${parseFloat(product.stock_quantity).toFixed(1)}kg`
+            : product.stock_quantity}
         </span>
       )}
     </button>

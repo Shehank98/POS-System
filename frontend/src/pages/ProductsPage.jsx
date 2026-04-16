@@ -211,8 +211,9 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               ) : products.map((p) => {
-                const outOfStock = p.has_inventory && p.stock_quantity <= 0;
-                const lowStockRow = p.has_inventory && p.stock_quantity > 0 && p.stock_quantity <= 10;
+                const qty = parseFloat(p.stock_quantity) || 0;
+                const outOfStock  = p.has_inventory && qty <= 0;
+                const lowStockRow = p.has_inventory && qty > 0 && qty <= 10;
                 return (
                 <tr key={p.id}
                     className={`transition-colors
@@ -232,7 +233,10 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
                     {p.category || <span className="text-gray-300">-</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCurrency(p.price)}</td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    {formatCurrency(p.price)}
+                    {p.unit_type === 'kg' && <span className="text-xs text-gray-400 ml-0.5">/kg</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {p.has_inventory
                       ? <span className={
@@ -240,7 +244,9 @@ export default function ProductsPage() {
                         : lowStockRow ? 'font-bold text-orange-600'
                         : 'text-gray-700'
                         }>
-                          {p.stock_quantity}
+                          {p.unit_type === 'kg'
+                            ? `${parseFloat(p.stock_quantity).toFixed(2)} KG`
+                            : p.stock_quantity}
                         </span>
                       : <span className="text-gray-400 text-xs">—</span>
                     }

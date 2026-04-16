@@ -29,7 +29,8 @@ async function createTransaction(req, res) {
 
     for (const item of items) {
       const { rows } = await client.query(
-        `SELECT id, name, price, tax_rate, has_inventory, stock_quantity
+        `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                COALESCE(unit_type, 'unit') AS unit_type
            FROM products WHERE id = $1 AND shop_id = $2`,
         [item.product_id, req.shopId]
       );
@@ -51,10 +52,12 @@ async function createTransaction(req, res) {
 
       // Deduct stock if inventory is tracked
       if (product.has_inventory) {
-        if (product.stock_quantity < qty) {
+        const available = parseFloat(product.stock_quantity);
+        if (available < qty) {
           await client.query('ROLLBACK');
+          const unit = product.unit_type === 'kg' ? 'KG' : 'units';
           return res.status(400).json({
-            error: `Insufficient stock for "${product.name}". Available: ${product.stock_quantity}`
+            error: `Insufficient stock for "${product.name}". Available: ${available} ${unit}`
           });
         }
         await client.query(
@@ -494,7 +497,8 @@ async function syncTransactions(req, res) {
 
       for (const item of items) {
         const { rows } = await pgClient.query(
-          `SELECT id, name, price, tax_rate, has_inventory, stock_quantity
+          `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                  COALESCE(unit_type, 'unit') AS unit_type
              FROM products WHERE id = $1 AND shop_id = $2`,
           [item.product_id, req.shopId]
         );
@@ -511,8 +515,10 @@ async function syncTransactions(req, res) {
         taxSum      += taxAmt;
 
         if (product.has_inventory) {
-          if (product.stock_quantity < qty) {
-            itemError = `Insufficient stock for "${product.name}"`;
+          const available = parseFloat(product.stock_quantity);
+          if (available < qty) {
+            const unit = product.unit_type === 'kg' ? 'KG' : 'units';
+            itemError = `Insufficient stock for "${product.name}". Available: ${available} ${unit}`;
             break;
           }
           await pgClient.query(
