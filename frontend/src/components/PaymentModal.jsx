@@ -62,13 +62,13 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
           items:           itemsPayload,
         });
         setDone({ server_id: data.id, transaction_number: data.transaction_number });
-        toast.success('Sale complete!');
+        toast.success('Payment successful!');
       } catch (err) {
         // If the API returned an offline/network error, fall through to offline path
         if (err.response?.data?.offline || !err.response) {
           await saveOffline(itemsPayload);
         } else {
-          toast.error(err.response?.data?.error || 'Transaction failed');
+          toast.error(err.response?.data?.error || 'Payment failed. Please try again.');
           setSaving(false);
         }
       }

@@ -1,10 +1,11 @@
 require('dotenv').config();
-const http    = require('http');
-const express = require('express');
-const cors    = require('cors');
-const cron    = require('node-cron');
-const path    = require('path');
+const http           = require('http');
+const express        = require('express');
+const cors           = require('cors');
+const cron           = require('node-cron');
+const path           = require('path');
 const { setupWebSocket } = require('./websocket');
+const runMigrations  = require('./utils/runMigrations');
 
 const authRoutes         = require('./routes/auth');
 const productRoutes      = require('./routes/products');
@@ -79,8 +80,13 @@ console.log('[Cron] Daily check scheduled at 09:00');
 cron.schedule('*/30 * * * *', cancelStalePreOrders);
 console.log('[Cron] Stale pre-order cleanup scheduled every 30 minutes');
 
-// ── Start ─────────────────────────────────────────────────────
-const PORT   = process.env.PORT || 3001;
+// ── Start: apply pending DB migrations, then listen ──────────
+const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 setupWebSocket(server);
-server.listen(PORT, () => console.log(`POS API running on port ${PORT}`));
+
+runMigrations()
+  .catch((err) => console.error('[Migration] Runner error (non-fatal):', err.message))
+  .finally(() => {
+    server.listen(PORT, () => console.log(`POS API running on port ${PORT}`));
+  });

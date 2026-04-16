@@ -28,12 +28,26 @@ async function createTransaction(req, res) {
     const enrichedItems = [];
 
     for (const item of items) {
-      const { rows } = await client.query(
-        `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
-                COALESCE(unit_type, 'unit') AS unit_type
-           FROM products WHERE id = $1 AND shop_id = $2`,
-        [item.product_id, req.shopId]
-      );
+      let productRows;
+      try {
+        ({ rows: productRows } = await client.query(
+          `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                  COALESCE(unit_type, 'unit') AS unit_type
+             FROM products WHERE id = $1 AND shop_id = $2`,
+          [item.product_id, req.shopId]
+        ));
+      } catch (colErr) {
+        // unit_type column may not exist yet (pre-migration 010)
+        if (colErr.code === '42703') {
+          ({ rows: productRows } = await client.query(
+            `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                    'unit' AS unit_type
+               FROM products WHERE id = $1 AND shop_id = $2`,
+            [item.product_id, req.shopId]
+          ));
+        } else { throw colErr; }
+      }
+      const rows = productRows;
 
       if (rows.length === 0) {
         await client.query('ROLLBACK');
@@ -496,12 +510,25 @@ async function syncTransactions(req, res) {
       let itemError = null;
 
       for (const item of items) {
-        const { rows } = await pgClient.query(
-          `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
-                  COALESCE(unit_type, 'unit') AS unit_type
-             FROM products WHERE id = $1 AND shop_id = $2`,
-          [item.product_id, req.shopId]
-        );
+        let syncProductRows;
+        try {
+          ({ rows: syncProductRows } = await pgClient.query(
+            `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                    COALESCE(unit_type, 'unit') AS unit_type
+               FROM products WHERE id = $1 AND shop_id = $2`,
+            [item.product_id, req.shopId]
+          ));
+        } catch (colErr) {
+          if (colErr.code === '42703') {
+            ({ rows: syncProductRows } = await pgClient.query(
+              `SELECT id, name, price, tax_rate, has_inventory, stock_quantity,
+                      'unit' AS unit_type
+                 FROM products WHERE id = $1 AND shop_id = $2`,
+              [item.product_id, req.shopId]
+            ));
+          } else { throw colErr; }
+        }
+        const rows = syncProductRows;
         if (rows.length === 0) { itemError = `Product ${item.product_id} not found`; break; }
 
         const product  = rows[0];
