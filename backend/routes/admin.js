@@ -19,8 +19,11 @@ router.get('/shops/:id',                          ctrl.getShop);
 router.put('/shops/:id',                          ctrl.updateShop);
 router.put('/shops/:id/subscription',             ctrl.updateSubscription);
 router.get('/shops/:id/sales',                    ctrl.getShopSales);
-router.get('/shops/:id/users',                    ctrl.getShopUsers);
-router.put('/shops/:id/users/:userId/password',   ctrl.changeUserPassword);
+router.delete('/shops/:id',                           ctrl.deleteShop);
+router.get('/shops/:id/users',                        ctrl.getShopUsers);
+router.post('/shops/:id/users',                       ctrl.addShopUser);
+router.delete('/shops/:id/users/:userId',             ctrl.deleteShopUser);
+router.put('/shops/:id/users/:userId/password',       ctrl.changeUserPassword);
 
 // Payment management
 router.get('/payments',                     ctrl.listPayments);

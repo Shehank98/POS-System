@@ -263,6 +263,9 @@ export const adminApi = {
   getAuditLog:      (params)            => adminClient.get('/admin/audit-log', { params }),
   getShopUsers:     (shopId)            => adminClient.get(`/admin/shops/${shopId}/users`),
   changeUserPw:     (shopId, userId, pw) => adminClient.put(`/admin/shops/${shopId}/users/${userId}/password`, { new_password: pw }),
+  deleteShop:       (id)               => adminClient.delete(`/admin/shops/${id}`, { data: { confirm: 'DELETE' } }),
+  addShopUser:      (id, data)         => adminClient.post(`/admin/shops/${id}/users`, data),
+  deleteShopUser:   (id, userId)       => adminClient.delete(`/admin/shops/${id}/users/${userId}`),
 };
 
 export default client;

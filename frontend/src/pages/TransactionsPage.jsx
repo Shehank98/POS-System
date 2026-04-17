@@ -40,8 +40,8 @@ function PayBadge({ method }) {
 
 export default function TransactionsPage() {
   const user       = useAuthStore((s) => s.user);
-  const canVoid    = !user?.read_only && ['owner', 'manager'].includes(user?.role);
-  const canRefund  = !user?.read_only && ['owner', 'manager'].includes(user?.role);
+  const canVoid    = !user?.read_only && ['owner', 'manager'].includes(user?.role) && user?.void_enabled    !== false;
+  const canRefund  = !user?.read_only && ['owner', 'manager'].includes(user?.role) && user?.refunds_enabled !== false;
 
   const today = new Date().toISOString().split('T')[0];
 

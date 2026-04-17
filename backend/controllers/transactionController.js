@@ -358,6 +358,17 @@ async function getTransaction(req, res) {
 
 // ── POST /api/transactions/:id/void ──────────────────────────
 async function voidTransaction(req, res) {
+  // Feature flag check
+  try {
+    const { rows: shopRows } = await db.query(
+      `SELECT COALESCE(void_enabled, TRUE) AS void_enabled FROM shops WHERE id = $1`,
+      [req.shopId]
+    );
+    if (shopRows[0] && shopRows[0].void_enabled === false) {
+      return res.status(403).json({ error: 'Void transactions are disabled for this shop.' });
+    }
+  } catch { /* column may not exist yet — allow */ }
+
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -436,6 +447,17 @@ async function voidTransaction(req, res) {
 
 // ── POST /api/transactions/:id/refund ─────────────────────────
 async function refundTransaction(req, res) {
+  // Feature flag check
+  try {
+    const { rows: shopRows } = await db.query(
+      `SELECT COALESCE(refunds_enabled, TRUE) AS refunds_enabled FROM shops WHERE id = $1`,
+      [req.shopId]
+    );
+    if (shopRows[0] && shopRows[0].refunds_enabled === false) {
+      return res.status(403).json({ error: 'Refunds are disabled for this shop.' });
+    }
+  } catch { /* column may not exist yet — allow */ }
+
   const { items: refundItems, reason = '' } = req.body;
 
   if (!Array.isArray(refundItems) || refundItems.length === 0) {
@@ -628,6 +650,17 @@ async function getSummary(req, res) {
 // (duplicate sync) we return the existing server record instead of
 // inserting a duplicate.
 async function syncTransactions(req, res) {
+  // Feature flag check
+  try {
+    const { rows: shopRows } = await db.query(
+      `SELECT COALESCE(offline_enabled, TRUE) AS offline_enabled FROM shops WHERE id = $1`,
+      [req.shopId]
+    );
+    if (shopRows[0] && shopRows[0].offline_enabled === false) {
+      return res.status(403).json({ error: 'Offline mode is disabled for this shop.' });
+    }
+  } catch { /* column may not exist yet — allow */ }
+
   const { transactions } = req.body;
 
   if (!Array.isArray(transactions) || transactions.length === 0) {

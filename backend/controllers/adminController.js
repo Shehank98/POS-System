@@ -370,36 +370,62 @@ async function updateShop(req, res) {
   const {
     name, owner_name, email, phone, address,
     logo_url, contact_email, barcode_enabled,
-    extra_staff_slots, shop_type,
+    extra_staff_slots, shop_type, default_tax_rate, grace_period_days,
+    // Feature flags
+    pre_orders_enabled, customers_enabled, reports_enabled, analytics_enabled,
+    loyalty_enabled, refunds_enabled, void_enabled, offline_enabled,
+    exchanges_enabled, branches_enabled,
   } = req.body;
 
-  // Treat empty string as null so COALESCE keeps the existing DB value
-  const emailVal        = email        && email.trim()        ? email.trim()        : null;
-  const logoUrlVal      = logo_url     !== undefined          ? (logo_url     || null) : undefined;
-  const contactEmailVal = contact_email !== undefined         ? (contact_email || null) : undefined;
+  const emailVal        = email         && email.trim()        ? email.trim()        : null;
+  const logoUrlVal      = logo_url      !== undefined          ? (logo_url      || null) : undefined;
+  const contactEmailVal = contact_email !== undefined          ? (contact_email  || null) : undefined;
+  const taxRateVal      = default_tax_rate !== undefined       ? parseFloat(default_tax_rate) : null;
+  const graceVal        = grace_period_days !== undefined      ? parseInt(grace_period_days, 10) : null;
+
+  const boolOrNull = (v) => v !== undefined ? Boolean(v) : null;
 
   try {
     const { rows } = await db.query(
       `UPDATE shops
-          SET name               = COALESCE($1, name),
-              owner_name         = COALESCE($2, owner_name),
-              email              = COALESCE($3, email),
-              phone              = COALESCE($4, phone),
-              address            = COALESCE($5, address),
-              logo_url           = COALESCE($6, logo_url),
-              contact_email      = COALESCE($7, contact_email),
-              barcode_enabled    = COALESCE($8, barcode_enabled),
-              extra_staff_slots  = COALESCE($9, extra_staff_slots),
-              shop_type          = COALESCE($10, shop_type)
-        WHERE id = $11
+          SET name                = COALESCE($1,  name),
+              owner_name          = COALESCE($2,  owner_name),
+              email               = COALESCE($3,  email),
+              phone               = COALESCE($4,  phone),
+              address             = COALESCE($5,  address),
+              logo_url            = COALESCE($6,  logo_url),
+              contact_email       = COALESCE($7,  contact_email),
+              barcode_enabled     = COALESCE($8,  barcode_enabled),
+              extra_staff_slots   = COALESCE($9,  extra_staff_slots),
+              shop_type           = COALESCE($10, shop_type),
+              default_tax_rate    = COALESCE($11, default_tax_rate),
+              grace_period_days   = COALESCE($12, grace_period_days),
+              pre_orders_enabled  = COALESCE($13, pre_orders_enabled),
+              customers_enabled   = COALESCE($14, customers_enabled),
+              reports_enabled     = COALESCE($15, reports_enabled),
+              analytics_enabled   = COALESCE($16, analytics_enabled),
+              loyalty_enabled     = COALESCE($17, loyalty_enabled),
+              refunds_enabled     = COALESCE($18, refunds_enabled),
+              void_enabled        = COALESCE($19, void_enabled),
+              offline_enabled     = COALESCE($20, offline_enabled),
+              exchanges_enabled   = COALESCE($21, exchanges_enabled),
+              branches_enabled    = COALESCE($22, branches_enabled)
+        WHERE id = $23
         RETURNING *`,
-      [name, owner_name, emailVal, phone, address,
-       logoUrlVal,
-       contactEmailVal,
-       barcode_enabled,
-       extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
-       shop_type || null,
-       req.params.id]
+      [
+        name, owner_name, emailVal, phone, address,
+        logoUrlVal, contactEmailVal,
+        barcode_enabled !== undefined ? Boolean(barcode_enabled) : null,
+        extra_staff_slots !== undefined ? parseInt(extra_staff_slots, 10) : null,
+        shop_type || null,
+        taxRateVal, graceVal,
+        boolOrNull(pre_orders_enabled), boolOrNull(customers_enabled),
+        boolOrNull(reports_enabled),    boolOrNull(analytics_enabled),
+        boolOrNull(loyalty_enabled),    boolOrNull(refunds_enabled),
+        boolOrNull(void_enabled),       boolOrNull(offline_enabled),
+        boolOrNull(exchanges_enabled),  boolOrNull(branches_enabled),
+        req.params.id,
+      ]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json(rows[0]);
@@ -407,28 +433,90 @@ async function updateShop(req, res) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'A shop with this email already exists' });
     }
-    if (err.code === '42703') {
-      try {
-        const { rows } = await db.query(
-          `UPDATE shops
-              SET name            = COALESCE($1, name),
-                  owner_name      = COALESCE($2, owner_name),
-                  email           = COALESCE($3, email),
-                  phone           = COALESCE($4, phone),
-                  address         = COALESCE($5, address),
-                  barcode_enabled = COALESCE($6, barcode_enabled)
-            WHERE id = $7
-            RETURNING *`,
-          [name, owner_name, emailVal, phone, address, barcode_enabled, req.params.id]
-        );
-        if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
-        return res.json(rows[0]);
-      } catch (fallbackErr) {
-        console.error('updateShop fallback error:', fallbackErr.code, fallbackErr.message);
-        return res.status(500).json({ error: 'Server error' });
-      }
-    }
     console.error('updateShop error:', err.code, err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── DELETE /api/admin/shops/:id ───────────────────────────────
+async function deleteShop(req, res) {
+  const { confirm } = req.body;
+  if (confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'Send { confirm: "DELETE" } to confirm shop deletion' });
+  }
+
+  try {
+    const { rowCount } = await db.query(
+      `DELETE FROM shops WHERE id = $1`, [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Shop not found' });
+    res.status(204).end();
+  } catch (err) {
+    console.error('deleteShop error:', err);
+    res.status(500).json({ error: 'Server error deleting shop' });
+  }
+}
+
+// ── POST /api/admin/shops/:id/users ───────────────────────────
+async function addShopUser(req, res) {
+  const { username, password, role = 'cashier' } = req.body;
+  const shopId = parseInt(req.params.id, 10);
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required' });
+  }
+  const allowedRoles = ['owner', 'manager', 'cashier'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ error: 'role must be owner, manager, or cashier' });
+  }
+
+  try {
+    const shopCheck = await db.query(`SELECT id FROM shops WHERE id = $1`, [shopId]);
+    if (shopCheck.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const { rows } = await db.query(
+      `INSERT INTO users (shop_id, username, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, username, role, created_at`,
+      [shopId, username, hash, role]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Username already exists in this shop' });
+    }
+    console.error('addShopUser error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── DELETE /api/admin/shops/:id/users/:userId ─────────────────
+async function deleteShopUser(req, res) {
+  const shopId = parseInt(req.params.id, 10);
+  const userId = parseInt(req.params.userId, 10);
+
+  try {
+    // Prevent deleting the last owner
+    const ownerCheck = await db.query(
+      `SELECT COUNT(*) AS cnt FROM users WHERE shop_id = $1 AND role = 'owner'`,
+      [shopId]
+    );
+    const targetRole = await db.query(
+      `SELECT role FROM users WHERE id = $1 AND shop_id = $2`,
+      [userId, shopId]
+    );
+    if (targetRole.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found in this shop' });
+    }
+    if (targetRole.rows[0].role === 'owner' && parseInt(ownerCheck.rows[0].cnt, 10) <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last owner of a shop' });
+    }
+
+    await db.query(`DELETE FROM users WHERE id = $1 AND shop_id = $2`, [userId, shopId]);
+    res.status(204).end();
+  } catch (err) {
+    console.error('deleteShopUser error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 }
@@ -554,8 +642,8 @@ async function getPaymentProof(req, res) {
 
 module.exports = {
   adminLogin, getDashboard,
-  listShops, createShop, getShop, updateShop,
-  getShopUsers, changeUserPassword,
+  listShops, createShop, getShop, updateShop, deleteShop,
+  getShopUsers, changeUserPassword, addShopUser, deleteShopUser,
   updateSubscription, getShopSales,
   listPayments, verifyPayment, rejectPayment, getPaymentProof,
   getAnalysis,

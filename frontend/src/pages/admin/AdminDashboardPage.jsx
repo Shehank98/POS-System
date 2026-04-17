@@ -4,7 +4,7 @@ import {
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
   AlertTriangle, Users, ClipboardList, Plus, CalendarPlus,
   KeyRound, Loader2, BarChart2, TrendingUp, DollarSign,
-  ShoppingCart, Package,
+  ShoppingCart, Package, Trash2, UserPlus, Search,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -280,25 +280,81 @@ function CreateShopModal({ onClose, onCreated }) {
   );
 }
 
-// ── Extend Subscription Modal ─────────────────────────────────
-function ExtendSubModal({ shop, onClose, onDone }) {
+// ── Shop Control Center (5-tab modal) ─────────────────────────
+function ToggleSwitch({ enabled, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors focus:outline-none
+        ${enabled ? 'bg-green-500' : 'bg-gray-600'}`}
+    >
+      <span className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform
+        ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+    </button>
+  );
+}
+
+function ShopControlCenter({ shop, onClose, onDone }) {
+  const [activeTab, setActiveTab] = useState('info');
+  const [busy,      setBusy]      = useState(false);
+
+  // Info
+  const [shopName,      setShopName]      = useState(shop.name         || '');
+  const [ownerName,     setOwnerName]     = useState(shop.owner_name   || '');
+  const [loginEmail,    setLoginEmail]    = useState(shop.email        || '');
+  const [phone,         setPhone]         = useState(shop.phone        || '');
+  const [address,       setAddress]       = useState(shop.address      || '');
+  const [logoUrl,       setLogoUrl]       = useState(shop.logo_url     || '');
+  const [contactEmail,  setContactEmail]  = useState(shop.contact_email || '');
+
+  // Subscription
   const [months,          setMonths]          = useState('0');
-  const [status,          setStatus]          = useState(shop.subscription_status);
+  const [status,          setStatus]          = useState(shop.subscription_status || 'active');
   const [extraSlots,      setExtraSlots]      = useState(String(shop.extra_staff_slots || 0));
-  const [shopName,        setShopName]        = useState(shop.name || '');
-  const [ownerName,       setOwnerName]       = useState(shop.owner_name || '');
-  const [loginEmail,      setLoginEmail]      = useState(shop.email || '');
-  const [phone,           setPhone]           = useState(shop.phone || '');
-  const [address,         setAddress]         = useState(shop.address || '');
-  const [logoUrl,         setLogoUrl]         = useState(shop.logo_url || '');
-  const [contactEmail,    setContactEmail]    = useState(shop.contact_email || '');
-  const [shopType,        setShopType]        = useState(shop.shop_type || 'retail');
-  const [barcodeEnabled,  setBarcodeEnabled]  = useState(!!shop.barcode_enabled);
-  const [busy,            setBusy]            = useState(false);
+  const [gracePeriodDays, setGracePeriodDays] = useState(String(shop.grace_period_days || 5));
+  const [defaultTaxRate,  setDefaultTaxRate]  = useState(String(shop.default_tax_rate  || 0));
+
+  // Features
+  const [shopType, setShopType] = useState(shop.shop_type || 'retail');
+  const [flags, setFlags] = useState({
+    barcode_enabled:    !!shop.barcode_enabled,
+    pre_orders_enabled: shop.pre_orders_enabled !== false,
+    customers_enabled:  shop.customers_enabled  !== false,
+    reports_enabled:    shop.reports_enabled    !== false,
+    analytics_enabled:  shop.analytics_enabled  !== false,
+    loyalty_enabled:    shop.loyalty_enabled    !== false,
+    refunds_enabled:    shop.refunds_enabled    !== false,
+    void_enabled:       shop.void_enabled       !== false,
+    offline_enabled:    shop.offline_enabled    !== false,
+    exchanges_enabled:  shop.exchanges_enabled  !== false,
+    branches_enabled:   shop.branches_enabled   !== false,
+  });
+  const toggleFlag = (key) => setFlags((p) => ({ ...p, [key]: !p[key] }));
+
+  // Users
+  const [users,       setUsers]       = useState([]);
+  const [loadingUsers,setLoadingUsers]= useState(false);
+  const [changingPw,  setChangingPw]  = useState({});
+  const [addUserForm, setAddUserForm] = useState(null);
+
+  // Danger Zone
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting,          setDeleting]          = useState(false);
+
+  const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    setLoadingUsers(true);
+    adminApi.getShopUsers(shop.id)
+      .then(({ data }) => setUsers(data))
+      .catch(() => toast.error('Failed to load users'))
+      .finally(() => setLoadingUsers(false));
+  }, [activeTab, shop.id]);
 
   async function handleSave() {
     if (!shopName.trim()) return toast.error('Shop name is required');
-    if (!loginEmail.trim()) return toast.error('Login email is required');
     setBusy(true);
     try {
       await adminApi.updateSub(shop.id, {
@@ -306,16 +362,24 @@ function ExtendSubModal({ shop, onClose, onDone }) {
         extend_months: parseInt(months, 10) || 0,
       });
       await adminApi.updateShop(shop.id, {
-        name:              shopName,
-        owner_name:        ownerName,
-        email:             loginEmail,
-        phone:             phone,
-        address:           address,
-        logo_url:          logoUrl,
-        contact_email:     contactEmail,
-        shop_type:         shopType,
-        barcode_enabled:   barcodeEnabled,
-        extra_staff_slots: parseInt(extraSlots, 10) || 0,
+        name: shopName, owner_name: ownerName,
+        email: loginEmail, phone, address,
+        logo_url: logoUrl, contact_email: contactEmail,
+        shop_type: shopType,
+        barcode_enabled:    flags.barcode_enabled,
+        pre_orders_enabled: flags.pre_orders_enabled,
+        customers_enabled:  flags.customers_enabled,
+        reports_enabled:    flags.reports_enabled,
+        analytics_enabled:  flags.analytics_enabled,
+        loyalty_enabled:    flags.loyalty_enabled,
+        refunds_enabled:    flags.refunds_enabled,
+        void_enabled:       flags.void_enabled,
+        offline_enabled:    flags.offline_enabled,
+        exchanges_enabled:  flags.exchanges_enabled,
+        branches_enabled:   flags.branches_enabled,
+        extra_staff_slots:  parseInt(extraSlots, 10)      || 0,
+        default_tax_rate:   parseFloat(defaultTaxRate)    || 0,
+        grace_period_days:  parseInt(gracePeriodDays, 10) || 5,
       });
       toast.success('Shop updated');
       onDone();
@@ -326,7 +390,429 @@ function ExtendSubModal({ shop, onClose, onDone }) {
     }
   }
 
-  const inputCls = 'bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+  async function handleAddUser(e) {
+    e.preventDefault();
+    const { username, password, role } = addUserForm;
+    if (!username || !password) return toast.error('Username and password are required');
+    setBusy(true);
+    try {
+      const { data } = await adminApi.addShopUser(shop.id, { username, password, role });
+      setUsers((prev) => [...prev, data]);
+      setAddUserForm(null);
+      toast.success('User added');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add user');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteUser(userId, username) {
+    if (!window.confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+    try {
+      await adminApi.deleteShopUser(shop.id, userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      toast.success('User deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete user');
+    }
+  }
+
+  function openPw(userId) {
+    setChangingPw((prev) => ({ ...prev, [userId]: { open: true, pw: '', busy: false } }));
+  }
+  function setPwVal(userId, val) {
+    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], pw: val } }));
+  }
+  async function savePw(userId) {
+    const entry = changingPw[userId];
+    if (!entry?.pw || entry.pw.length < 4) return toast.error('Min 4 characters');
+    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: true } }));
+    try {
+      await adminApi.changeUserPw(shop.id, userId, entry.pw);
+      toast.success('Password changed');
+      setChangingPw((prev) => ({ ...prev, [userId]: { open: false, pw: '', busy: false } }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+      setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: false } }));
+    }
+  }
+
+  async function handleDeleteShop() {
+    if (deleteConfirmName !== shop.name) return toast.error('Shop name does not match');
+    setDeleting(true);
+    try {
+      await adminApi.deleteShop(shop.id);
+      toast.success('Shop deleted');
+      onDone();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete shop');
+      setDeleting(false);
+    }
+  }
+
+  const ROLE_CLS = {
+    owner:   'bg-yellow-900/40 text-yellow-300',
+    manager: 'bg-blue-900/40 text-blue-300',
+    cashier: 'bg-gray-700 text-gray-300',
+  };
+
+  function FeatureRow({ label, flagKey, note }) {
+    return (
+      <div className="flex items-center justify-between py-2.5 border-b border-gray-700/40 last:border-0">
+        <div>
+          <p className="text-sm text-white">{label}</p>
+          {note && <p className="text-xs text-gray-500">{note}</p>}
+        </div>
+        <ToggleSwitch enabled={flags[flagKey]} onToggle={() => toggleFlag(flagKey)} />
+      </div>
+    );
+  }
+
+  const TABS = [
+    { id: 'info',         label: 'Info'         },
+    { id: 'subscription', label: 'Subscription' },
+    { id: 'features',     label: 'Features'     },
+    { id: 'users',        label: 'Users'        },
+    { id: 'danger',       label: 'Danger'       },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+           onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700 shrink-0">
+          <div>
+            <p className="font-semibold text-white">Shop Control Center</p>
+            <p className="text-xs text-gray-400 mt-0.5">{shop.name} · ID {shop.id}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex gap-0.5 px-4 pt-3 border-b border-gray-700 shrink-0 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors
+                ${activeTab === t.id
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'}
+                ${t.id === 'danger' ? 'text-red-400 hover:text-red-300' : ''}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
+
+          {/* ── Info ── */}
+          {activeTab === 'info' && (
+            <div className="space-y-3">
+              {[
+                ['Shop Name *',   shopName,     setShopName,     'text' ],
+                ['Owner Name',    ownerName,    setOwnerName,    'text' ],
+                ['Login Email *', loginEmail,   setLoginEmail,   'email'],
+                ['Phone',         phone,        setPhone,        'text' ],
+                ['Contact Email', contactEmail, setContactEmail, 'email'],
+                ['Address',       address,      setAddress,      'text' ],
+                ['Logo URL',      logoUrl,      setLogoUrl,      'text' ],
+              ].map(([label, val, set, type]) => (
+                <div key={label}>
+                  <label className="block text-xs text-gray-400 mb-1">{label}</label>
+                  <input className={inputCls} type={type} value={val}
+                         onChange={(e) => set(e.target.value)} />
+                </div>
+              ))}
+              {logoUrl && (
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center mt-1">
+                  <img src={logoUrl} alt="logo" className="max-h-12 max-w-full object-contain" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Subscription ── */}
+          {activeTab === 'subscription' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Status</label>
+                <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="active">Active</option>
+                  <option value="trial">Trial</option>
+                  <option value="expired">Expired</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Add Months (0 = status change only)</label>
+                <input className={inputCls} type="number" min="0" max="36" value={months}
+                       onChange={(e) => setMonths(e.target.value)} />
+                <p className="text-xs text-gray-500 mt-1">
+                  Current expiry: {shop.subscription_end_date
+                    ? new Date(shop.subscription_end_date).toLocaleDateString() : 'none'}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Extra Staff Slots</label>
+                  <input className={inputCls} type="number" min="0" max="20" value={extraSlots}
+                         onChange={(e) => setExtraSlots(e.target.value)} />
+                  <p className="text-xs text-gray-500 mt-1">+1 manager & +1 cashier per slot</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Default Tax Rate (%)</label>
+                  <input className={inputCls} type="number" min="0" max="100" step="0.01" value={defaultTaxRate}
+                         onChange={(e) => setDefaultTaxRate(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Grace Period (days after expiry)</label>
+                <input className={inputCls} type="number" min="1" max="30" value={gracePeriodDays}
+                       onChange={(e) => setGracePeriodDays(e.target.value)} />
+                <p className="text-xs text-gray-500 mt-1">System default: 5. POS works during grace period.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Features ── */}
+          {activeTab === 'features' && (
+            <div className="space-y-4">
+              <div className="bg-gray-900/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">System</p>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
+                  <select className={inputCls} value={shopType} onChange={(e) => setShopType(e.target.value)}>
+                    <option value="retail">Retail / General</option>
+                    <option value="car_wash">Car Wash</option>
+                    <option value="clothing">Clothing Shop</option>
+                    <option value="grocery">Grocery / Supermarket</option>
+                    <option value="restaurant">Restaurant / Cafe</option>
+                  </select>
+                </div>
+                <div className="mt-2">
+                  <FeatureRow label="Barcode Scanner" flagKey="barcode_enabled" note="Hardware/camera barcode at POS" />
+                </div>
+              </div>
+
+              <div className="bg-gray-900/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">POS Core</p>
+                <FeatureRow label="Allow Refunds"  flagKey="refunds_enabled"  note="Partial/full refund in Transactions" />
+                <FeatureRow label="Allow Void"     flagKey="void_enabled"     note="Void completed transactions" />
+                <FeatureRow label="Offline Mode"   flagKey="offline_enabled"  note="Accept sales offline and sync later" />
+              </div>
+
+              <div className="bg-gray-900/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Modules</p>
+                <FeatureRow label="Pre-Orders"     flagKey="pre_orders_enabled" note="Customer online ordering portal" />
+                <FeatureRow label="Customers Tab"  flagKey="customers_enabled"  note="Customer insights dashboard" />
+                <FeatureRow label="Loyalty Points" flagKey="loyalty_enabled"    note="Earn & redeem points at checkout" />
+                <FeatureRow label="Reports"        flagKey="reports_enabled"    note="Sales & inventory report exports" />
+                <FeatureRow label="Analytics"      flagKey="analytics_enabled"  note="Analytics charts and trends" />
+              </div>
+
+              <div className="bg-gray-900/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Clothing Shops Only</p>
+                <p className="text-xs text-gray-600 mb-2">Only apply when shop type is "Clothing"</p>
+                <FeatureRow label="Exchanges / Returns" flagKey="exchanges_enabled" note="Single-transaction exchange module" />
+                <FeatureRow label="Multi-Branch"        flagKey="branches_enabled"  note="Branch inventory management" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Users ── */}
+          {activeTab === 'users' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-400">
+                  {shop.extra_staff_slots > 0 ? `Extra slots: +${shop.extra_staff_slots}` : 'Default: 1 manager + 1 cashier'}
+                </p>
+                {!addUserForm && (
+                  <button
+                    onClick={() => setAddUserForm({ username: '', password: '', role: 'cashier' })}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Add User
+                  </button>
+                )}
+              </div>
+
+              {addUserForm && (
+                <form onSubmit={handleAddUser} className="bg-gray-900 rounded-xl p-3 space-y-2">
+                  <p className="text-xs text-gray-400 font-medium mb-2">New User</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input placeholder="Username" required
+                           className="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                           value={addUserForm.username}
+                           onChange={(e) => setAddUserForm((p) => ({ ...p, username: e.target.value }))} />
+                    <input placeholder="Password" type="password" required
+                           className="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                           value={addUserForm.password}
+                           onChange={(e) => setAddUserForm((p) => ({ ...p, password: e.target.value }))} />
+                    <select className="bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-2 py-2 focus:outline-none"
+                            value={addUserForm.role}
+                            onChange={(e) => setAddUserForm((p) => ({ ...p, role: e.target.value }))}>
+                      <option value="cashier">Cashier</option>
+                      <option value="manager">Manager</option>
+                      <option value="owner">Owner</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={busy}
+                            className="px-3 py-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium disabled:opacity-50">
+                      {busy ? 'Adding…' : 'Add'}
+                    </button>
+                    <button type="button" onClick={() => setAddUserForm(null)}
+                            className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {loadingUsers && (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                </div>
+              )}
+              {!loadingUsers && users.length === 0 && (
+                <p className="text-center py-6 text-gray-500 text-sm">No users found</p>
+              )}
+              {!loadingUsers && users.map((u) => {
+                const cp = changingPw[u.id] || {};
+                return (
+                  <div key={u.id} className="bg-gray-900 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{u.username}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${ROLE_CLS[u.role] || ROLE_CLS.cashier}`}>
+                          {u.role}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {!cp.open && (
+                          <button onClick={() => openPw(u.id)}
+                                  className="flex items-center gap-1 px-2 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg">
+                            <KeyRound className="w-3 h-3" /> PW
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteUser(u.id, u.username)}
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs bg-red-900/40 hover:bg-red-900/70 text-red-400 rounded-lg">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    {cp.open && (
+                      <div className="flex items-center gap-2">
+                        <input type="password" placeholder="New password (min 4)"
+                               className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                               value={cp.pw}
+                               onChange={(e) => setPwVal(u.id, e.target.value)}
+                               onKeyDown={(e) => e.key === 'Enter' && savePw(u.id)}
+                               autoFocus />
+                        <button onClick={() => savePw(u.id)} disabled={cp.busy}
+                                className="px-3 py-2 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium disabled:opacity-50">
+                          {cp.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+                        </button>
+                        <button onClick={() => setChangingPw((p) => ({ ...p, [u.id]: { open: false } }))}
+                                className="px-2 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg">
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Danger Zone ── */}
+          {activeTab === 'danger' && (
+            <div className="space-y-4">
+              <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-4">
+                <p className="text-sm font-semibold text-yellow-300 mb-1">Suspend Shop</p>
+                <p className="text-xs text-gray-400 mb-3">Sets status to "suspended" — staff cannot log in.</p>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('Suspend this shop?')) return;
+                    try {
+                      await adminApi.updateSub(shop.id, { subscription_status: 'suspended' });
+                      toast.success('Shop suspended');
+                      onDone();
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed');
+                    }
+                  }}
+                  className="px-4 py-2 bg-yellow-700 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg"
+                >
+                  Suspend Shop
+                </button>
+              </div>
+
+              <div className="bg-red-900/20 border border-red-700/40 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                  <p className="text-sm font-semibold text-red-400">Delete Shop Permanently</p>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Removes all users, products, transactions, and orders.
+                  <span className="font-bold text-red-400"> This cannot be undone.</span>
+                </p>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    Type <span className="font-mono text-gray-200">{shop.name}</span> to confirm
+                  </label>
+                  <input
+                    className="w-full bg-gray-900 border border-red-700/50 text-white text-sm rounded-lg px-3 py-2
+                               focus:outline-none focus:ring-2 focus:ring-red-500 placeholder-gray-600"
+                    placeholder="Shop name…"
+                    value={deleteConfirmName}
+                    onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={handleDeleteShop}
+                  disabled={deleting || deleteConfirmName !== shop.name}
+                  className="w-full py-2 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-lg
+                             disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {deleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deleting ? 'Deleting…' : 'Delete Shop Permanently'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer save — hidden on Users and Danger tabs */}
+        {!['users', 'danger'].includes(activeTab) && (
+          <div className="flex gap-2 px-5 py-3 border-t border-gray-700 shrink-0">
+            <button onClick={onClose}
+                    className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={busy}
+                    className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg
+                               hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50">
+              {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Save Changes
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── (legacy ExtendSubModal kept as alias for reference — replaced by ShopControlCenter above)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
@@ -455,135 +941,6 @@ function ExtendSubModal({ shop, onClose, onDone }) {
   );
 }
 
-// ── Users Modal (per shop) ────────────────────────────────────
-function UsersModal({ shop, onClose }) {
-  const [users,     setUsers]     = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [changingPw, setChangingPw] = useState({}); // userId -> { open, pw, busy }
-
-  useEffect(() => {
-    adminApi.getShopUsers(shop.id)
-      .then(({ data }) => setUsers(data))
-      .catch(() => toast.error('Failed to load users'))
-      .finally(() => setLoading(false));
-  }, [shop.id]);
-
-  function openPw(userId) {
-    setChangingPw((prev) => ({ ...prev, [userId]: { open: true, pw: '', busy: false } }));
-  }
-
-  function setPw(userId, val) {
-    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], pw: val } }));
-  }
-
-  async function savePw(userId) {
-    const entry = changingPw[userId];
-    if (!entry?.pw || entry.pw.length < 4) {
-      toast.error('Password must be at least 4 characters');
-      return;
-    }
-    setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: true } }));
-    try {
-      await adminApi.changeUserPw(shop.id, userId, entry.pw);
-      toast.success('Password changed');
-      setChangingPw((prev) => ({ ...prev, [userId]: { open: false, pw: '', busy: false } }));
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to change password');
-      setChangingPw((prev) => ({ ...prev, [userId]: { ...prev[userId], busy: false } }));
-    }
-  }
-
-  const ROLE_CLS = {
-    owner:   'bg-yellow-900/40 text-yellow-300',
-    manager: 'bg-blue-900/40 text-blue-300',
-    cashier: 'bg-gray-700 text-gray-300',
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full space-y-4 max-h-[85vh] overflow-y-auto"
-           onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-white">Users - {shop.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {shop.extra_staff_slots > 0
-                ? `Extra staff slots: +${shop.extra_staff_slots}`
-                : 'Limit: 1 manager + 1 cashier (default)'}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <XCircle className="w-5 h-5" />
-          </button>
-        </div>
-
-        {loading && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-          </div>
-        )}
-
-        {!loading && users.length === 0 && (
-          <p className="text-center py-6 text-gray-500 text-sm">No users found</p>
-        )}
-
-        {!loading && users.map((u) => {
-          const cp = changingPw[u.id] || {};
-          return (
-            <div key={u.id} className="bg-gray-900 rounded-xl p-3 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-white">{u.username}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize
-                    ${ROLE_CLS[u.role] || ROLE_CLS.cashier}`}>
-                    {u.role}
-                  </span>
-                </div>
-                {!cp.open && (
-                  <button
-                    onClick={() => openPw(u.id)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gray-700
-                               hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" /> Change PW
-                  </button>
-                )}
-              </div>
-              {cp.open && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="password"
-                    placeholder="New password (min 4)"
-                    className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs
-                               rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    value={cp.pw}
-                    onChange={(e) => setPw(u.id, e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && savePw(u.id)}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => savePw(u.id)}
-                    disabled={cp.busy}
-                    className="px-3 py-2 text-xs bg-primary-600 hover:bg-primary-700 text-white
-                               rounded-lg font-medium flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {cp.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => setChangingPw((prev) => ({ ...prev, [u.id]: { open: false, pw: '', busy: false } }))}
-                    className="px-2 py-2 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ── Analysis Tab ──────────────────────────────────────────────
 function AnalysisTab({ shops }) {
@@ -924,11 +1281,12 @@ export default function AdminDashboardPage() {
   const [loading,    setLoading]    = useState(true);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
-  const [proofPayId,   setProofPayId]   = useState(null);
-  const [rejectPayId,  setRejectPayId]  = useState(null);
+  const [proofPayId,    setProofPayId]    = useState(null);
+  const [rejectPayId,   setRejectPayId]   = useState(null);
   const [showCreateShop, setShowCreateShop] = useState(false);
-  const [extendShop,     setExtendShop]     = useState(null);
-  const [usersShop,      setUsersShop]      = useState(null);
+  const [manageShop,    setManageShop]    = useState(null);
+  const [shopSearch,    setShopSearch]    = useState('');
+  const [shopStatusFilter, setShopStatusFilter] = useState('');
 
   const AUDIT_PAGE_SIZE = 25;
 
@@ -1132,12 +1490,34 @@ export default function AdminDashboardPage() {
         {tab === 'shops' && (
           <div className="space-y-3">
             {/* Header row */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-400">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[160px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search shops…"
+                  value={shopSearch}
+                  onChange={(e) => setShopSearch(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg pl-8 pr-3 py-2
+                             focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder-gray-500"
+                />
+              </div>
+              <select
+                value={shopStatusFilter}
+                onChange={(e) => setShopStatusFilter(e.target.value)}
+                className="bg-gray-800 border border-gray-700 text-sm text-gray-300 rounded-lg px-3 py-2
+                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="trial">Trial</option>
+                <option value="expired">Expired</option>
+                <option value="suspended">Suspended</option>
+              </select>
               <button
                 onClick={() => setShowCreateShop(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700
-                           text-white text-sm font-medium rounded-lg transition-colors"
+                           text-white text-sm font-medium rounded-lg transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" /> Add Shop
               </button>
@@ -1152,58 +1532,60 @@ export default function AdminDashboardPage() {
                 <p>No shops yet. Add your first shop above.</p>
               </div>
             )}
-            {!loading && shops.map((s) => {
-              const badge = SUB_STATUS[s.subscription_status] || SUB_STATUS.expired;
-              return (
-                <div key={s.id} className="bg-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-white">{s.name}</p>
-                      <span className="text-xs font-mono bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
-                        ID: {s.id}
-                      </span>
-                      {s.shop_type && s.shop_type !== 'retail' && (
-                        <span className="text-xs bg-blue-900 text-blue-300 px-1.5 py-0.5 rounded font-medium capitalize">
-                          {s.shop_type.replace('_', ' ')}
+            {!loading && (() => {
+              const q = shopSearch.toLowerCase();
+              const filtered = shops.filter((s) => {
+                const matchSearch = !q || s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q) || s.owner_name?.toLowerCase().includes(q);
+                const matchStatus = !shopStatusFilter || s.subscription_status === shopStatusFilter;
+                return matchSearch && matchStatus;
+              });
+              if (filtered.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    No shops match the current filter
+                  </div>
+                );
+              }
+              return filtered.map((s) => {
+                const badge = SUB_STATUS[s.subscription_status] || SUB_STATUS.expired;
+                return (
+                  <div key={s.id} className="bg-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-white">{s.name}</p>
+                        <span className="text-xs font-mono bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
+                          ID: {s.id}
                         </span>
-                      )}
+                        {s.shop_type && s.shop_type !== 'retail' && (
+                          <span className="text-xs bg-blue-900 text-blue-300 px-1.5 py-0.5 rounded font-medium capitalize">
+                            {s.shop_type.replace('_', ' ')}
+                          </span>
+                        )}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
+                          {badge.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        {s.owner_name} · {s.email}
+                        {s.subscription_end_date && <> · Exp {fmtDate(s.subscription_end_date)}</>}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {s.user_count || 0} users · {s.product_count || 0} products · {s.transaction_count || 0} txns
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {s.owner_name} · {s.email}
-                      {s.subscription_end_date && (
-                        <> · Expires {fmtDate(s.subscription_end_date)}</>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {s.user_count || 0} user{s.user_count !== 1 ? 's' : ''} ·{' '}
-                      {s.product_count || 0} products ·{' '}
-                      {s.transaction_count || 0} transactions
-                    </p>
+                    <div className="shrink-0">
+                      <button
+                        onClick={() => setManageShop(s)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-600
+                                   hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" /> Manage
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${badge.cls}`}>
-                      {badge.label}
-                    </span>
-                    <button
-                      onClick={() => setUsersShop(s)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-700
-                                 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
-                      title="View users / change passwords"
-                    >
-                      <Users className="w-3.5 h-3.5" /> Users
-                    </button>
-                    <button
-                      onClick={() => setExtendShop(s)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-gray-700
-                                 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
-                      title="Manage subscription"
-                    >
-                      <CalendarPlus className="w-3.5 h-3.5" /> Manage
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
 
@@ -1302,11 +1684,10 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Modals */}
-      {proofPayId  && <ProofModal  paymentId={proofPayId}  onClose={() => setProofPayId(null)} />}
-      {rejectPayId && <RejectModal paymentId={rejectPayId} onClose={() => setRejectPayId(null)} onDone={() => { setRejectPayId(null); load(); }} />}
-      {showCreateShop && <CreateShopModal onClose={() => setShowCreateShop(false)} onCreated={() => { load(); }} />}
-      {extendShop  && <ExtendSubModal shop={extendShop}  onClose={() => setExtendShop(null)}  onDone={() => { setExtendShop(null);  load(); }} />}
-      {usersShop   && <UsersModal     shop={usersShop}   onClose={() => setUsersShop(null)} />}
+      {proofPayId    && <ProofModal   paymentId={proofPayId}  onClose={() => setProofPayId(null)} />}
+      {rejectPayId   && <RejectModal  paymentId={rejectPayId} onClose={() => setRejectPayId(null)} onDone={() => { setRejectPayId(null); load(); }} />}
+      {showCreateShop && <CreateShopModal onClose={() => setShowCreateShop(false)} onCreated={() => load()} />}
+      {manageShop    && <ShopControlCenter shop={manageShop} onClose={() => setManageShop(null)} onDone={() => { setManageShop(null); load(); }} />}
     </div>
   );
 }

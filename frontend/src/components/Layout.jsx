@@ -16,24 +16,24 @@ import { preOrdersApi } from '../api/client';
 
 // Full sidebar nav (base — clothing extras injected at render time)
 const NAV_BASE = [
-  { to: '/pos',          label: 'POS / Sale',   icon: ShoppingCart    },
-  { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
-  { to: '/products',     label: 'Products',     icon: Package         },
-  { to: '/transactions', label: 'Transactions', icon: Receipt         },
-  { to: '/reports',      label: 'Reports',      icon: BarChart2       },
-  { to: '/analytics',    label: 'Analytics',    icon: TrendingUp      },
-  { to: '/billing',      label: 'Billing',      icon: CreditCard      },
-  { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList,  roles: ['owner', 'manager'] },
-  { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode },
-  { to: '/customers',    label: 'Customers',    icon: Users,          roles: ['owner', 'manager'] },
-  { to: '/settings',     label: 'Settings',     icon: Settings        },
+  { to: '/pos',          label: 'POS / Sale',   icon: ShoppingCart                                                       },
+  { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard                                                    },
+  { to: '/products',     label: 'Products',     icon: Package                                                            },
+  { to: '/transactions', label: 'Transactions', icon: Receipt                                                            },
+  { to: '/reports',      label: 'Reports',      icon: BarChart2,     feature: 'reports_enabled'                         },
+  { to: '/analytics',    label: 'Analytics',    icon: TrendingUp,    feature: 'analytics_enabled'                       },
+  { to: '/billing',      label: 'Billing',      icon: CreditCard                                                         },
+  { to: '/audit-log',    label: 'Audit Log',    icon: ClipboardList, roles: ['owner', 'manager']                         },
+  { to: '/pre-orders',   label: 'Pre Orders',   icon: QrCode,        feature: 'pre_orders_enabled'                      },
+  { to: '/customers',    label: 'Customers',    icon: Users,         roles: ['owner', 'manager'], feature: 'customers_enabled' },
+  { to: '/settings',     label: 'Settings',     icon: Settings                                                           },
 ];
 
 // Extra nav items shown only for clothing shop type
 const NAV_CLOTHING = [
-  { to: '/exchanges',          label: 'Exchanges',      icon: RotateCcw  },
-  { to: '/clothing-analytics', label: 'Clothing Stats', icon: TrendingUp },
-  { to: '/branches',           label: 'Branches',       icon: GitBranch, roles: ['owner'] },
+  { to: '/exchanges',          label: 'Exchanges',      icon: RotateCcw,  feature: 'exchanges_enabled'                  },
+  { to: '/clothing-analytics', label: 'Clothing Stats', icon: TrendingUp                                                 },
+  { to: '/branches',           label: 'Branches',       icon: GitBranch,  roles: ['owner'], feature: 'branches_enabled' },
 ];
 
 // Bottom tab bar - 4 main items + "More" sheet
@@ -46,13 +46,13 @@ const BOTTOM_TABS = [
 
 // "More" sheet items (everything not in BOTTOM_TABS)
 const MORE_NAV_BASE = [
-  { to: '/reports',      label: 'Reports',    icon: BarChart2      },
-  { to: '/analytics',    label: 'Analytics',  icon: TrendingUp     },
-  { to: '/billing',      label: 'Billing',    icon: CreditCard     },
-  { to: '/audit-log',    label: 'Audit Log',  icon: ClipboardList, roles: ['owner', 'manager'] },
-  { to: '/pre-orders',   label: 'Pre Orders', icon: QrCode },
-  { to: '/customers',    label: 'Customers',  icon: Users,         roles: ['owner', 'manager'] },
-  { to: '/settings',     label: 'Settings',   icon: Settings       },
+  { to: '/reports',      label: 'Reports',    icon: BarChart2,     feature: 'reports_enabled'                         },
+  { to: '/analytics',    label: 'Analytics',  icon: TrendingUp,    feature: 'analytics_enabled'                       },
+  { to: '/billing',      label: 'Billing',    icon: CreditCard                                                         },
+  { to: '/audit-log',    label: 'Audit Log',  icon: ClipboardList, roles: ['owner', 'manager']                         },
+  { to: '/pre-orders',   label: 'Pre Orders', icon: QrCode,        feature: 'pre_orders_enabled'                      },
+  { to: '/customers',    label: 'Customers',  icon: Users,         roles: ['owner', 'manager'], feature: 'customers_enabled' },
+  { to: '/settings',     label: 'Settings',   icon: Settings                                                           },
 ];
 
 export default function Layout() {
@@ -63,7 +63,11 @@ export default function Layout() {
   const location    = useLocation();
 
   const isClothing = user?.shop_type === 'clothing';
-  const baseFiltered     = isClothing ? NAV_BASE.filter((n) => n.to !== '/analytics')     : NAV_BASE;
+  const featureFilter = ({ roles, feature }) =>
+    (!roles || roles.includes(user?.role)) &&
+    (!feature || user?.[feature] !== false);
+
+  const baseFiltered     = isClothing ? NAV_BASE.filter((n) => n.to !== '/analytics')      : NAV_BASE;
   const moreBaseFiltered = isClothing ? MORE_NAV_BASE.filter((n) => n.to !== '/analytics') : MORE_NAV_BASE;
   const NAV      = isClothing ? [...baseFiltered,     ...NAV_CLOTHING] : baseFiltered;
   const MORE_NAV = isClothing ? [...moreBaseFiltered, ...NAV_CLOTHING] : moreBaseFiltered;
@@ -170,7 +174,7 @@ export default function Layout() {
         <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto
                          ${collapsed ? 'px-1' : 'px-2'}`}>
           {NAV
-            .filter(({ roles }) => !roles || roles.includes(user?.role))
+            .filter(featureFilter)
             .map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -324,7 +328,7 @@ export default function Layout() {
             {/* Scrollable nav list — max 65vh so it never overflows small screens */}
             <nav className="px-2 space-y-0.5 overflow-y-auto max-h-[65vh]">
               {MORE_NAV
-                .filter(({ roles }) => !roles || roles.includes(user?.role))
+                .filter(featureFilter)
                 .map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}

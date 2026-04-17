@@ -244,11 +244,15 @@ async function createPreOrder(req, res) {
   const phone = customer_phone.trim();
 
   try {
-    // Verify shop exists
+    // Verify shop exists and check pre_orders_enabled flag
     const { rows: shopRows } = await db.query(
-      `SELECT id FROM shops WHERE id = $1`, [shop_id]
+      `SELECT id, COALESCE(pre_orders_enabled, TRUE) AS pre_orders_enabled FROM shops WHERE id = $1`,
+      [shop_id]
     );
     if (shopRows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    if (shopRows[0].pre_orders_enabled === false) {
+      return res.status(403).json({ error: 'Pre-orders are not available for this shop.' });
+    }
 
     // Check cooldown restriction
     try {

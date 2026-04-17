@@ -2,10 +2,9 @@ const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const db       = require('../config/database');
 
-const GRACE_DAYS = 5;
-
 // Returns { readOnly, inGracePeriod, graceDaysRemaining, daysUntilExpiry }
-function calcSubscriptionFlags(subscriptionStatus, subscriptionEndDate) {
+function calcSubscriptionFlags(subscriptionStatus, subscriptionEndDate, gracePeriodDays = 5) {
+  const GRACE = parseInt(gracePeriodDays, 10) || 5;
   let readOnly = false;
   let inGracePeriod = false;
   let graceDaysRemaining = 0;
@@ -16,11 +15,11 @@ function calcSubscriptionFlags(subscriptionStatus, subscriptionEndDate) {
     const daysOverdue = (Date.now() - new Date(subscriptionEndDate).getTime()) / msPerDay;
     daysUntilExpiry   = -daysOverdue; // positive = days left, negative = overdue
 
-    if (daysOverdue > GRACE_DAYS) {
+    if (daysOverdue > GRACE) {
       readOnly = true;
     } else if (daysOverdue > 0) {
       inGracePeriod      = true;
-      graceDaysRemaining = Math.ceil(GRACE_DAYS - daysOverdue);
+      graceDaysRemaining = Math.ceil(GRACE - daysOverdue);
     }
   } else if (subscriptionStatus === 'expired') {
     readOnly = true; // no end_date + expired status → fully locked
@@ -42,7 +41,18 @@ async function login(req, res) {
       `SELECT u.id, u.username, u.password_hash, u.role, u.shop_id,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
               s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
-              COALESCE(s.shop_type, 'retail') AS shop_type
+              COALESCE(s.shop_type, 'retail') AS shop_type,
+              COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,
+              COALESCE(s.customers_enabled,  TRUE)  AS customers_enabled,
+              COALESCE(s.reports_enabled,    TRUE)  AS reports_enabled,
+              COALESCE(s.analytics_enabled,  TRUE)  AS analytics_enabled,
+              COALESCE(s.loyalty_enabled,    TRUE)  AS loyalty_enabled,
+              COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
+              COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
+              COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
+              COALESCE(s.exchanges_enabled,  TRUE)  AS exchanges_enabled,
+              COALESCE(s.branches_enabled,   TRUE)  AS branches_enabled,
+              COALESCE(s.grace_period_days,  5)     AS grace_period_days
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.username = $1 AND u.shop_id = $2`,
@@ -64,7 +74,7 @@ async function login(req, res) {
       return res.status(403).json({ error: 'Account suspended. Please contact support.' });
     }
 
-    const sub = calcSubscriptionFlags(user.subscription_status, user.subscription_end_date);
+    const sub = calcSubscriptionFlags(user.subscription_status, user.subscription_end_date, user.grace_period_days);
 
     const token = jwt.sign(
       {
@@ -98,6 +108,17 @@ async function login(req, res) {
         in_grace_period:       sub.inGracePeriod,
         grace_days_remaining:  sub.graceDaysRemaining,
         days_until_expiry:     sub.daysUntilExpiry,
+        // Feature flags
+        pre_orders_enabled:    user.pre_orders_enabled,
+        customers_enabled:     user.customers_enabled,
+        reports_enabled:       user.reports_enabled,
+        analytics_enabled:     user.analytics_enabled,
+        loyalty_enabled:       user.loyalty_enabled,
+        refunds_enabled:       user.refunds_enabled,
+        void_enabled:          user.void_enabled,
+        offline_enabled:       user.offline_enabled,
+        exchanges_enabled:     user.exchanges_enabled,
+        branches_enabled:      user.branches_enabled,
       },
     });
   } catch (err) {
@@ -173,7 +194,18 @@ async function getMe(req, res) {
       `SELECT u.id, u.username, u.role, u.shop_id, u.created_at,
               s.name AS shop_name, s.subscription_status, s.subscription_end_date,
               s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
-              COALESCE(s.shop_type, 'retail') AS shop_type
+              COALESCE(s.shop_type, 'retail') AS shop_type,
+              COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,
+              COALESCE(s.customers_enabled,  TRUE)  AS customers_enabled,
+              COALESCE(s.reports_enabled,    TRUE)  AS reports_enabled,
+              COALESCE(s.analytics_enabled,  TRUE)  AS analytics_enabled,
+              COALESCE(s.loyalty_enabled,    TRUE)  AS loyalty_enabled,
+              COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
+              COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
+              COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
+              COALESCE(s.exchanges_enabled,  TRUE)  AS exchanges_enabled,
+              COALESCE(s.branches_enabled,   TRUE)  AS branches_enabled,
+              COALESCE(s.grace_period_days,  5)     AS grace_period_days
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,
@@ -182,7 +214,7 @@ async function getMe(req, res) {
 
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     const row = rows[0];
-    const sub = calcSubscriptionFlags(row.subscription_status, row.subscription_end_date);
+    const sub = calcSubscriptionFlags(row.subscription_status, row.subscription_end_date, row.grace_period_days);
     res.json({
       ...row,
       read_only:            sub.readOnly,
