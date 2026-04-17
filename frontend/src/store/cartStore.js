@@ -26,29 +26,39 @@ const useCartStore = create((set, get) => ({
   totals:        EMPTY_TOTALS,
 
   // ── Add product (or increment qty if already in cart) ──────
-  // Always floats the affected item to the TOP of the list so users
-  // can see and edit it without scrolling.
+  // Clothing variants use `cv-{variant_id}` as the dedup key so two
+  // variants of the same parent product are treated as separate rows.
+  // Retail items continue to use `p-{product_id}` — fully backward-compatible.
   addItem(product, qty = 1) {
     set((state) => {
+      const key = product.clothing_variant_id
+        ? `cv-${product.clothing_variant_id}`
+        : `p-${product.id}`;
+
       let items;
-      const existing = state.items.find((i) => i.product_id === product.id);
+      const existing = state.items.find((i) => i._key === key);
       if (existing) {
-        // Update qty and move to top
         const updated = { ...existing, quantity: existing.quantity + qty };
         const updatedItem = { ...updated, ...calcItemTotal(updated) };
-        items = [updatedItem, ...state.items.filter((i) => i.product_id !== product.id)];
+        items = [updatedItem, ...state.items.filter((i) => i._key !== key)];
       } else {
+        const price = parseFloat(
+          product.effective_price ?? product.price ?? product.unit_price ?? 0
+        );
         const newItem = {
-          cartId:       `${product.id}-${Date.now()}`,
-          product_id:   product.id,
-          name:         product.name,
-          unit_price:   parseFloat(product.price),
-          quantity:     qty,
-          discount_pct: 0,
-          tax_rate:     parseFloat(product.tax_rate) || 0,
-          unit_type:    product.unit_type || 'unit',
-          discAmt:      0,
-          subtotal:     parseFloat(product.price) * qty,
+          _key:                key,
+          cartId:              `${key}-${Date.now()}`,
+          product_id:          product.clothing_variant_id ? null : product.id,
+          clothing_variant_id: product.clothing_variant_id ?? null,
+          name:                product.name,
+          unit_price:          price,
+          quantity:            qty,
+          discount_pct:        0,
+          tax_rate:            parseFloat(product.tax_rate) || 0,
+          unit_type:           product.unit_type || 'unit',
+          is_clearance:        product.is_clearance || false,
+          discAmt:             0,
+          subtotal:            price * qty,
         };
         items = [newItem, ...state.items];
       }

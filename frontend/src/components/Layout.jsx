@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Receipt, Menu, X, CreditCard,
   ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
   PanelLeftClose, PanelLeftOpen, QrCode, Users,
+  RotateCcw, GitBranch,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/authStore';
@@ -12,8 +13,8 @@ import NotificationBell from './NotificationBell';
 import { syncPending, cacheUserSubscription } from '../utils/syncService';
 import { preOrdersApi } from '../api/client';
 
-// Full sidebar nav
-const NAV = [
+// Full sidebar nav (base — clothing extras injected at render time)
+const NAV_BASE = [
   { to: '/pos',          label: 'POS / Sale',   icon: ShoppingCart    },
   { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/products',     label: 'Products',     icon: Package         },
@@ -27,6 +28,13 @@ const NAV = [
   { to: '/settings',     label: 'Settings',     icon: Settings        },
 ];
 
+// Extra nav items shown only for clothing shop type
+const NAV_CLOTHING = [
+  { to: '/exchanges',          label: 'Exchanges',      icon: RotateCcw  },
+  { to: '/clothing-analytics', label: 'Clothing Stats', icon: TrendingUp },
+  { to: '/branches',           label: 'Branches',       icon: GitBranch, roles: ['owner'] },
+];
+
 // Bottom tab bar - 4 main items + "More" sheet
 const BOTTOM_TABS = [
   { to: '/pos',          label: 'POS',        icon: ShoppingCart    },
@@ -36,14 +44,14 @@ const BOTTOM_TABS = [
 ];
 
 // "More" sheet items (everything not in BOTTOM_TABS)
-const MORE_NAV = [
+const MORE_NAV_BASE = [
   { to: '/reports',      label: 'Reports',    icon: BarChart2      },
-  { to: '/analytics',    label: 'Analytics', icon: TrendingUp     },
-  { to: '/billing',      label: 'Billing',   icon: CreditCard     },
-  { to: '/audit-log',    label: 'Audit Log', icon: ClipboardList, roles: ['owner', 'manager'] },
-  { to: '/pre-orders',   label: 'Pre Orders',icon: QrCode },
-  { to: '/customers',    label: 'Customers', icon: Users,         roles: ['owner', 'manager'] },
-  { to: '/settings',     label: 'Settings',  icon: Settings       },
+  { to: '/analytics',    label: 'Analytics',  icon: TrendingUp     },
+  { to: '/billing',      label: 'Billing',    icon: CreditCard     },
+  { to: '/audit-log',    label: 'Audit Log',  icon: ClipboardList, roles: ['owner', 'manager'] },
+  { to: '/pre-orders',   label: 'Pre Orders', icon: QrCode },
+  { to: '/customers',    label: 'Customers',  icon: Users,         roles: ['owner', 'manager'] },
+  { to: '/settings',     label: 'Settings',   icon: Settings       },
 ];
 
 export default function Layout() {
@@ -51,6 +59,10 @@ export default function Layout() {
   const logout   = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isClothing = user?.shop_type === 'clothing';
+  const NAV      = isClothing ? [...NAV_BASE, ...NAV_CLOTHING]      : NAV_BASE;
+  const MORE_NAV = isClothing ? [...MORE_NAV_BASE, ...NAV_CLOTHING] : MORE_NAV_BASE;
 
   // Desktop hamburger (kept for very narrow viewports or overflow)
   const [drawerOpen, setDrawerOpen] = useState(false);

@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, Barcode, Pencil, Trash2,
   ChevronLeft, ChevronRight, Upload, RefreshCw, X, AlertTriangle,
+  ChevronDown, ChevronUp, Tag, Package, Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsApi } from '../api/client';
+import { productsApi, clothingApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 import ProductForm from '../components/ProductForm';
 import BulkImport from '../components/BulkImport';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ClothingProductsPanel from '../components/clothing/ClothingProductsPanel';
 
 const LIMIT = 50;
 
@@ -19,6 +21,11 @@ function formatCurrency(val) {
 export default function ProductsPage() {
   const user = useAuthStore((s) => s.user);
   const canEdit = !user?.read_only && ['owner', 'manager'].includes(user?.role);
+
+  // Clothing shops get their own dedicated panel
+  if (user?.shop_type === 'clothing') {
+    return <ClothingProductsPanel canEdit={canEdit} />;
+  }
 
   const [products,   setProducts]   = useState([]);
   const [total,      setTotal]      = useState(0);

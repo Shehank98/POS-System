@@ -164,6 +164,47 @@ export const carwashApi = {
   convertBooking:      (id)          => client.post(`/carwash/bookings/${id}/convert`),
 };
 
+// ── Clothing Module ───────────────────────────────────────────
+export const clothingApi = {
+  // Products
+  listProducts:       (params)       => client.get('/clothing/products', { params }),
+  getProduct:         (id)           => client.get(`/clothing/products/${id}`),
+  createProduct:      (data)         => client.post('/clothing/products', data),
+  updateProduct:      (id, data)     => client.put(`/clothing/products/${id}`, data),
+  deleteProduct:      (id)           => client.delete(`/clothing/products/${id}`),
+  // Variants
+  listVariants:       (pid)          => client.get(`/clothing/products/${pid}/variants`),
+  createVariant:      (pid, data)    => client.post(`/clothing/products/${pid}/variants`, data),
+  updateVariant:      (id, data)     => client.put(`/clothing/variants/${id}`, data),
+  deleteVariant:      (id)           => client.delete(`/clothing/variants/${id}`),
+  getVariantByBarcode:(barcode)      => client.get(`/clothing/variants/by-barcode/${encodeURIComponent(barcode)}`),
+  // Stock
+  adjustStock:        (id, data)     => client.post(`/clothing/variants/${id}/adjust`, data),
+  getStockHistory:    (id)           => client.get(`/clothing/variants/${id}/stock-history`),
+  getLowStock:        ()             => client.get('/clothing/variants/low-stock'),
+  // Barcode labels PDF
+  getBarcodeLabels:   (ids)          => client.get('/clothing/variants/labels', { params: { ids }, responseType: 'blob' }),
+  // Exchanges / Returns
+  lookupTransaction:  (params)       => client.get('/clothing/transactions/lookup', { params }),
+  processExchange:    (data)         => client.post('/clothing/exchanges', data),
+  listExchanges:      (params)       => client.get('/clothing/exchanges', { params }),
+  getExchange:        (id)           => client.get(`/clothing/exchanges/${id}`),
+  // Reports
+  dashboard:          ()             => client.get('/clothing/dashboard'),
+  bestSizes:          (params)       => client.get('/clothing/reports/best-sizes', { params }),
+  bestColors:         (params)       => client.get('/clothing/reports/best-colors', { params }),
+  dailySales:         (params)       => client.get('/clothing/reports/daily-sales', { params }),
+  // Branches
+  listBranches:       ()             => client.get('/clothing/branches'),
+  createBranch:       (data)         => client.post('/clothing/branches', data),
+  updateBranch:       (id, data)     => client.put(`/clothing/branches/${id}`, data),
+  getBranchInventory: (id)           => client.get(`/clothing/branches/${id}/inventory`),
+  transferStock:      (data)         => client.post('/clothing/branches/transfer', data),
+  // Loyalty / Customers
+  getCustomer:        (phone)        => client.get('/clothing/customers/lookup', { params: { phone } }),
+  upsertCustomer:     (data)         => client.post('/clothing/customers', data),
+};
+
 // ── Car Wash Public (no auth — customer portal) ───────────────
 export const carwashPublicApi = {
   lookup:        (shopId, phone, vehicle) =>

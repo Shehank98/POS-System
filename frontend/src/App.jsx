@@ -23,6 +23,11 @@ import CustomersPage from './pages/CustomersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
+// Clothing module
+import ClothingExchangesPage from './pages/ClothingExchangesPage';
+import ClothingAnalyticsPage from './pages/ClothingAnalyticsPage';
+import BranchManagementPage from './pages/BranchManagementPage';
+
 // Car Wash module
 import CarWashLayout from './components/CarWashLayout';
 import CarWashDashboard from './pages/carwash/CarWashDashboard';
@@ -102,6 +107,10 @@ export default function App() {
           <Route path="settings"    element={<SettingsPage />} />
           <Route path="pre-orders"  element={<PreOrdersPage />} />
           <Route path="customers"   element={<CustomersPage />} />
+          {/* Clothing module routes */}
+          <Route path="exchanges"          element={<ClothingExchangesPage />} />
+          <Route path="clothing-analytics" element={<ClothingAnalyticsPage />} />
+          <Route path="branches"           element={<BranchManagementPage />} />
         </Route>
 
         {/* ── Car Wash module ───────────────────────────────── */}

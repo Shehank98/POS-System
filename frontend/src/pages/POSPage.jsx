@@ -2,16 +2,17 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Barcode, Search, X, Plus, Minus,
   ShoppingCart, Percent, CreditCard, Smartphone,
-  Wifi, RefreshCw, Camera, QrCode,
+  Wifi, RefreshCw, Camera, QrCode, User,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useCartStore   from '../store/cartStore';
 import useAuthStore   from '../store/authStore';
-import { productsApi, preOrdersApi } from '../api/client';
+import { productsApi, preOrdersApi, clothingApi } from '../api/client';
 import PaymentModal      from '../components/PaymentModal';
 import usePosScanner     from '../hooks/usePosScanner';
 import PhoneScannerModal from '../components/PhoneScannerModal';
 import PosCameraScanner  from '../components/PosCameraScanner';
+import VariantPickerModal from '../components/VariantPickerModal';
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
@@ -326,7 +327,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
 }
 
 // ── Cart panel (desktop sidebar + mobile drawer) ───────────────
-function CartPanel({ onPayClick, onClose }) {
+function CartPanel({ onPayClick, onClose, clothingProps }) {
   const {
     items, orderDiscount,
     setQty, setItemDiscount, removeItem, setOrderDiscount, clearCart,
@@ -405,6 +406,11 @@ function CartPanel({ onPayClick, onClose }) {
         )}
       </ul>
 
+      {/* Clothing: customer loyalty bar */}
+      {clothingProps && (
+        <CustomerLoyaltyBar {...clothingProps} />
+      )}
+
       {/* ── Totals + Charge ── */}
       <div className="border-t border-gray-100 bg-gray-50/50 shrink-0">
         <div className="px-4 pt-3 pb-2 space-y-2">
@@ -472,11 +478,56 @@ function CartPanel({ onPayClick, onClose }) {
   );
 }
 
+// ── Clothing customer loyalty bar ─────────────────────────────
+function CustomerLoyaltyBar({ phone, setPhone, customerData, onLookup, pointsToRedeem, setPointsToRedeem }) {
+  const maxRedeem = customerData ? Math.min(customerData.loyalty_points, 500) : 0;
+  const discount  = Math.floor(pointsToRedeem / 100);
+
+  return (
+    <div className="px-4 py-3 border-t border-primary-100 bg-primary-50/50 shrink-0">
+      <div className="flex items-center gap-2">
+        <User className="w-4 h-4 text-primary-500 shrink-0" />
+        <input
+          className="input py-1 h-8 text-sm flex-1 min-w-0"
+          placeholder="Customer phone (optional)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          onBlur={onLookup}
+          onKeyDown={(e) => e.key === 'Enter' && onLookup()}
+        />
+      </div>
+      {customerData && (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-primary-700 font-medium">
+              {customerData.name || phone} · {customerData.loyalty_points} pts
+            </span>
+            {customerData.loyalty_points >= 100 && (
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pointsToRedeem > 0}
+                  onChange={(e) => setPointsToRedeem(e.target.checked ? maxRedeem : 0)}
+                  className="w-3.5 h-3.5 accent-primary-600"
+                />
+                <span className="text-primary-600 font-semibold">
+                  Redeem {maxRedeem} pts (−Rs. {discount}.00)
+                </span>
+              </label>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main POS Page ─────────────────────────────────────────────
 export default function POSPage() {
   const user           = useAuthStore((s) => s.user);
   const barcodeEnabled = user?.barcode_enabled ?? false;
   const readOnly       = user?.read_only ?? false;
+  const isClothing     = user?.shop_type === 'clothing';
 
   const [scannerMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
   const showUsb   = barcodeEnabled && (scannerMode === 'usb'   || scannerMode === 'both');
@@ -490,6 +541,14 @@ export default function POSPage() {
   const [searchQuery,    setSearchQuery]    = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [loadingProds,   setLoadingProds]   = useState(false);
+
+  // Clothing variant picker
+  const [variantProduct,  setVariantProduct]  = useState(null); // { product, variants }
+  // Clothing customer / loyalty
+  const [customerPhone,   setCustomerPhone]   = useState('');
+  const [customerData,    setCustomerData]    = useState(null); // { loyalty_points, name }
+  const [pointsToRedeem,  setPointsToRedeem]  = useState(0);
+  const [showCustomer,    setShowCustomer]    = useState(false);
 
   // UI state
   const [barcodeInput,   setBarcodeInput]   = useState('');
@@ -529,19 +588,86 @@ export default function POSPage() {
     return prods;
   }, [allProducts, searchQuery, activeCategory]);
 
-  // ── Load products ────────────────────────────────────────────
+  // ── Load products (retail) or clothing parent products ───────
   function loadProducts() {
     setLoadingProds(true);
-    productsApi.list({ limit: 500 })
+    const req = isClothing
+      ? clothingApi.listProducts({ limit: 500 })
+      : productsApi.list({ limit: 500 });
+    req
       .then(({ data }) => setAllProducts(data.products))
       .catch(() => toast.error('Failed to load products'))
       .finally(() => setLoadingProds(false));
+  }
+
+  // ── Clothing: lookup customer loyalty ────────────────────────
+  async function lookupCustomer() {
+    const phone = customerPhone.trim();
+    if (!phone) return;
+    try {
+      const { data } = await clothingApi.getCustomer(phone);
+      setCustomerData(data);
+      toast.success(`${data.name || phone} — ${data.loyalty_points} pts`);
+    } catch {
+      setCustomerData({ loyalty_points: 0 });
+    }
+  }
+
+  // ── Clothing: open variant picker ────────────────────────────
+  async function openVariantPicker(product) {
+    if (readOnly) return;
+    try {
+      const { data } = await clothingApi.listVariants(product.id);
+      setVariantProduct({ product, variants: data.variants });
+    } catch {
+      toast.error('Could not load variants');
+    }
+  }
+
+  // ── Clothing: add variant to cart ────────────────────────────
+  function addVariantToCart(variant) {
+    if (!variantProduct) return;
+    const { product } = variantProduct;
+    const cartItem = {
+      id:                   variant.id,
+      clothing_variant_id:  variant.id,
+      name:                 `${product.name} / ${variant.color} / ${variant.size}`,
+      effective_price:      parseFloat(variant.effective_price ?? variant.price_override ?? product.base_price),
+      tax_rate:             parseFloat(product.tax_rate) || 0,
+      is_clearance:         product.is_clearance || false,
+      unit_type:            'unit',
+    };
+    addItem(cartItem);
+    toast.success(`Added: ${cartItem.name}`);
   }
 
   useEffect(() => {
     loadProducts();
     barcodeRef.current?.focus();
   }, []); // eslint-disable-line
+
+  // ── Barcode resolver (clothing-aware) ────────────────────────
+  const resolveBarcode = useCallback(async (code) => {
+    if (isClothing) {
+      const { data } = await clothingApi.getVariantByBarcode(code);
+      const cartItem = {
+        id:                  data.variant.id,
+        clothing_variant_id: data.variant.id,
+        name:                `${data.product.name} / ${data.variant.color} / ${data.variant.size}`,
+        effective_price:     data.effective_price,
+        tax_rate:            parseFloat(data.product.tax_rate) || 0,
+        is_clearance:        data.product.is_clearance || false,
+        unit_type:           'unit',
+      };
+      addItem(cartItem);
+      toast.success(`Added: ${cartItem.name}`);
+    } else {
+      const { data } = await productsApi.byBarcode(code);
+      if (data.unit_type === 'kg') { setWeightPending(data); return; }
+      addItem(data);
+      toast.success(`Added: ${data.name}`);
+    }
+  }, [addItem, isClothing]);
 
   // ── Phone scanner WebSocket ──────────────────────────────────
   const handlePhoneBarcode = useCallback(async (code) => {
@@ -555,14 +681,11 @@ export default function POSPage() {
     }
 
     try {
-      const { data } = await productsApi.byBarcode(code);
-      if (data.unit_type === 'kg') { setWeightPending(data); return; }
-      addItem(data);
-      toast.success(`Added: ${data.name}`);
+      await resolveBarcode(code);
     } catch {
       toast.error(`Barcode "${code}" not found`);
     }
-  }, [addItem, readOnly]);
+  }, [resolveBarcode, readOnly]);
 
   const phoneScanner = usePosScanner({ onBarcode: handlePhoneBarcode });
 
@@ -572,8 +695,7 @@ export default function POSPage() {
     const code = barcodeInput.trim();
     if (!code) return;
 
-    // Auto-detect pre-order token format (e.g. A001, B123)
-    if (/^[A-Za-z]\d{3}$/.test(code)) {
+    if (!isClothing && /^[A-Za-z]\d{3}$/.test(code)) {
       setBarcodeInput('');
       setPreOrderToken(code.toUpperCase());
       setShowPreOrder(true);
@@ -582,14 +704,7 @@ export default function POSPage() {
 
     setScanning(true);
     try {
-      const { data } = await productsApi.byBarcode(code);
-      if (data.unit_type === 'kg') {
-        setBarcodeInput('');
-        setWeightPending(data);
-        setScanning(false);
-        return;
-      }
-      addItem(data);
+      await resolveBarcode(code);
       setBarcodeInput('');
     } catch {
       toast.error(`Barcode "${code}" not found`);
@@ -601,6 +716,7 @@ export default function POSPage() {
 
   function handleProductSelect(product) {
     if (readOnly) return;
+    if (isClothing) { openVariantPicker(product); return; }
     if (product.unit_type === 'kg') { setWeightPending(product); return; }
     addItem(product);
   }
@@ -862,7 +978,14 @@ export default function POSPage() {
       {/* ── RIGHT: cart (desktop) ────────────────────────────── */}
       <div className="hidden md:flex w-80 xl:w-96 flex-col bg-white border-l border-gray-200
                       overflow-hidden shrink-0">
-        <CartPanel onPayClick={() => setShowPayment(true)} />
+        <CartPanel
+          onPayClick={() => setShowPayment(true)}
+          clothingProps={isClothing ? {
+            phone: customerPhone, setPhone: setCustomerPhone,
+            customerData, onLookup: lookupCustomer,
+            pointsToRedeem, setPointsToRedeem,
+          } : null}
+        />
       </div>
 
       {/* ── MOBILE: floating cart button ── */}
@@ -914,6 +1037,11 @@ export default function POSPage() {
               <CartPanel
                 onPayClick={() => { setShowMobileCart(false); setShowPayment(true); }}
                 onClose={() => setShowMobileCart(false)}
+                clothingProps={isClothing ? {
+                  phone: customerPhone, setPhone: setCustomerPhone,
+                  customerData, onLookup: lookupCustomer,
+                  pointsToRedeem, setPointsToRedeem,
+                } : null}
               />
             </div>
           </div>
@@ -956,6 +1084,16 @@ export default function POSPage() {
             setWeightPending(null);
           }}
           onClose={() => setWeightPending(null)}
+        />
+      )}
+
+      {/* Clothing: variant picker modal */}
+      {variantProduct && (
+        <VariantPickerModal
+          product={variantProduct.product}
+          variants={variantProduct.variants}
+          onSelect={addVariantToCart}
+          onClose={() => setVariantProduct(null)}
         />
       )}
 
