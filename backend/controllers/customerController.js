@@ -8,7 +8,7 @@ function formatWeight(kg) {
 }
 
 // ── GET /api/customers/insights?phone=X ───────────────────────
-// Full customer profile: orders, spend, top items, cancellations
+// Full customer profile: covers both pre-orders and POS transactions
 async function getCustomerInsights(req, res) {
   const { phone } = req.query;
   if (!phone) return res.status(400).json({ error: 'phone is required' });
@@ -16,8 +16,8 @@ async function getCustomerInsights(req, res) {
   const trimPhone = phone.trim();
 
   try {
-    // Base stats
-    const { rows: statsRows } = await db.query(
+    // Pre-order stats
+    const { rows: poStats } = await db.query(
       `SELECT
          COUNT(*)                                                  AS total_orders,
          COUNT(*) FILTER (WHERE status = 'CANCELLED')             AS total_cancelled,
@@ -30,11 +30,45 @@ async function getCustomerInsights(req, res) {
       [req.shopId, trimPhone]
     );
 
-    if (statsRows.length === 0 || parseInt(statsRows[0].total_orders, 10) === 0) {
+    // POS transaction stats (clothing / retail purchases at counter)
+    let txnStats = { total_orders: 0, total_spent: 0, last_order_date: null };
+    try {
+      const { rows: txRows } = await db.query(
+        `SELECT
+           COUNT(*)                          AS total_orders,
+           COALESCE(SUM(total_amount), 0)    AS total_spent,
+           MAX(transaction_date)             AS last_order_date
+         FROM transactions
+         WHERE shop_id = $1 AND customer_phone = $2 AND status = 'completed'`,
+        [req.shopId, trimPhone]
+      );
+      if (txRows.length) txnStats = txRows[0];
+    } catch { /* customer_phone column may not exist pre-migration */ }
+
+    // Loyalty points from customers table
+    let loyaltyPoints = 0;
+    let customerName  = '';
+    try {
+      const { rows: cRows } = await db.query(
+        `SELECT name, loyalty_points FROM customers WHERE shop_id = $1 AND phone = $2`,
+        [req.shopId, trimPhone]
+      );
+      if (cRows.length) { loyaltyPoints = cRows[0].loyalty_points; customerName = cRows[0].name || ''; }
+    } catch { /* customers table may not exist pre-migration */ }
+
+    const totalOrders = parseInt(poStats[0].total_orders, 10) + parseInt(txnStats.total_orders, 10);
+    const totalSpent  = parseFloat(poStats[0].total_spent) + parseFloat(txnStats.total_spent);
+
+    if (totalOrders === 0 && !loyaltyPoints) {
       return res.status(404).json({ error: 'No orders found for this phone number' });
     }
 
-    // Frequently ordered items — unnest JSONB array
+    const lastDate = [poStats[0].last_order_date, txnStats.last_order_date]
+      .filter(Boolean)
+      .sort()
+      .pop() || null;
+
+    // Frequently ordered items from pre-orders
     const { rows: itemRows } = await db.query(
       `SELECT
          item->>'name'                               AS item_name,
@@ -51,7 +85,30 @@ async function getCustomerInsights(req, res) {
       [req.shopId, trimPhone]
     );
 
-    // Cancellation tracking record
+    // Recent POS transactions
+    let recentTxns = [];
+    try {
+      const { rows } = await db.query(
+        `SELECT id, transaction_number AS token_number,
+                'COMPLETED' AS status, total_amount, transaction_date AS created_at
+           FROM transactions
+          WHERE shop_id = $1 AND customer_phone = $2 AND status = 'completed'
+          ORDER BY transaction_date DESC LIMIT 5`,
+        [req.shopId, trimPhone]
+      );
+      recentTxns = rows;
+    } catch { /* ignore */ }
+
+    // Recent pre-orders
+    const { rows: recentOrders } = await db.query(
+      `SELECT id, token_number, status, payment_status, total_amount, created_at
+         FROM pre_orders
+        WHERE shop_id = $1 AND customer_phone = $2
+        ORDER BY created_at DESC LIMIT 5`,
+      [req.shopId, trimPhone]
+    );
+
+    // Cancellation tracking
     let cancellationRecord = null;
     try {
       const { rows: cRows } = await db.query(
@@ -62,27 +119,21 @@ async function getCustomerInsights(req, res) {
       cancellationRecord = cRows[0] || null;
     } catch { /* table may not exist yet */ }
 
-    // Recent orders (last 10)
-    const { rows: recentOrders } = await db.query(
-      `SELECT id, token_number, status, payment_status, total_amount, created_at
-         FROM pre_orders
-        WHERE shop_id = $1 AND customer_phone = $2
-        ORDER BY created_at DESC
-        LIMIT 10`,
-      [req.shopId, trimPhone]
-    );
-
-    const stats = statsRows[0];
     res.json({
-      phone:          trimPhone,
-      total_orders:   parseInt(stats.total_orders, 10),
-      total_completed: parseInt(stats.total_completed, 10),
-      total_cancelled: parseInt(stats.total_cancelled, 10),
-      total_spent:    parseFloat(stats.total_spent),
-      last_order_date: stats.last_order_date,
-      first_order_date: stats.first_order_date,
-      top_items:      itemRows,
-      recent_orders:  recentOrders.map((r) => ({ ...r, payment_status: r.payment_status || 'pending' })),
+      customer_phone:  trimPhone,
+      customer_name:   customerName,
+      total_orders:    totalOrders,
+      total_completed: parseInt(poStats[0].total_completed, 10),
+      total_cancelled: parseInt(poStats[0].total_cancelled, 10),
+      total_spent:     totalSpent,
+      loyalty_points:  loyaltyPoints,
+      last_order_date: lastDate,
+      first_order_date: poStats[0].first_order_date,
+      top_items:       itemRows,
+      recent_orders:   [
+        ...recentTxns,
+        ...recentOrders.map((r) => ({ ...r, payment_status: r.payment_status || 'pending' })),
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10),
       cancellation_tracking: cancellationRecord,
     });
   } catch (err) {
@@ -92,22 +143,39 @@ async function getCustomerInsights(req, res) {
 }
 
 // ── GET /api/customers/top ────────────────────────────────────
-// Top customers by total spend (from completed pre-orders)
+// Top customers by total spend (pre-orders + POS transactions combined)
 async function getTopCustomers(req, res) {
   const { limit = 20 } = req.query;
 
   try {
     const { rows } = await db.query(
       `SELECT
-         customer_phone                                              AS phone,
-         MAX(customer_name)                                          AS name,
-         COUNT(*)                                                    AS total_orders,
-         COUNT(*) FILTER (WHERE status = 'COMPLETED')               AS completed_orders,
-         COUNT(*) FILTER (WHERE status = 'CANCELLED')               AS cancelled_orders,
-         COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('CANCELLED')), 0) AS total_spent,
-         MAX(created_at)                                             AS last_order_date
-       FROM pre_orders
-       WHERE shop_id = $1
+         customer_phone,
+         MAX(customer_name)   AS name,
+         SUM(total_orders)    AS total_orders,
+         SUM(total_spent)     AS total_spent,
+         MAX(last_order_date) AS last_order_date
+       FROM (
+         -- Pre-orders
+         SELECT customer_phone,
+                MAX(customer_name)                                                    AS customer_name,
+                COUNT(*)                                                              AS total_orders,
+                COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('CANCELLED')), 0) AS total_spent,
+                MAX(created_at)                                                       AS last_order_date
+           FROM pre_orders
+          WHERE shop_id = $1 AND customer_phone IS NOT NULL
+          GROUP BY customer_phone
+         UNION ALL
+         -- POS transactions
+         SELECT customer_phone,
+                NULL                                AS customer_name,
+                COUNT(*)                            AS total_orders,
+                COALESCE(SUM(total_amount), 0)      AS total_spent,
+                MAX(transaction_date)               AS last_order_date
+           FROM transactions
+          WHERE shop_id = $1 AND customer_phone IS NOT NULL AND status = 'completed'
+          GROUP BY customer_phone
+       ) combined
        GROUP BY customer_phone
        ORDER BY total_spent DESC
        LIMIT $2`,

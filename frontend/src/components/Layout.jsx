@@ -30,9 +30,8 @@ const NAV_BASE = [
 
 // Extra nav items shown only for clothing shop type
 const NAV_CLOTHING = [
-  { to: '/exchanges',          label: 'Exchanges',      icon: RotateCcw  },
-  { to: '/clothing-analytics', label: 'Clothing Stats', icon: TrendingUp },
-  { to: '/branches',           label: 'Branches',       icon: GitBranch, roles: ['owner'] },
+  { to: '/exchanges', label: 'Exchanges', icon: RotateCcw  },
+  { to: '/branches',  label: 'Branches',  icon: GitBranch, roles: ['owner'] },
 ];
 
 // Bottom tab bar - 4 main items + "More" sheet

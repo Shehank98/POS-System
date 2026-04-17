@@ -303,12 +303,28 @@ export default function TransactionsPage() {
                                   <td className="text-right">{i.quantity}</td>
                                   <td className="text-right">{fmt(i.unit_price)}</td>
                                   <td className="text-right text-orange-500">
-                                    {Number(i.discount) > 0 ? `-${fmt(i.discount)}` : '-'}
+                                    {Number(i.discount) > 0 ? `-${fmt(i.discount)}` : ''}
                                   </td>
                                   <td className="text-right font-medium">{fmt(i.subtotal)}</td>
                                 </tr>
                               ))}
                             </tbody>
+                            {Number(t.discount_amount) > 0 && (
+                              <tfoot>
+                                <tr className="border-t border-gray-200">
+                                  <td colSpan={3} className="pt-1 text-gray-500">Discount applied</td>
+                                  <td className="pt-1 text-right text-orange-600 font-semibold" colSpan={2}>
+                                    −Rs. {fmt(t.discount_amount)}
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td colSpan={3} className="text-gray-700 font-semibold">Net Total</td>
+                                  <td className="text-right font-bold text-gray-900" colSpan={2}>
+                                    Rs. {fmt(t.total_amount)}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            )}
                           </table>
                         ) : (
                           <span className="text-gray-400">Loading items…</span>

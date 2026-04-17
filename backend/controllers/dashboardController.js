@@ -241,7 +241,7 @@ async function getLowStock(req, res) {
        UNION ALL
        -- Clothing variants
        SELECT cv.id,
-              cp.name || ' — ' || cv.size || ' / ' || cv.color AS name,
+              cp.name || ' / ' || cv.size || ' / ' || cv.color AS name,
               cv.stock_quantity,
               cp.category,
               'unit' AS unit_type

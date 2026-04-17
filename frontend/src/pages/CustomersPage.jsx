@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Search, Users, ShoppingBag, TrendingUp, Clock, AlertTriangle, Star } from 'lucide-react';
+import { Search, Users, ShoppingBag, TrendingUp, Clock, AlertTriangle, Star, Award } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { customersApi } from '../api/client';
 
@@ -29,14 +29,17 @@ function CustomerInsightsCard({ data }) {
         <StatCard icon={ShoppingBag} label="Total Orders" value={data.total_orders} />
         <StatCard icon={TrendingUp}  label="Total Spent"  value={`Rs. ${fmt(data.total_spent)}`} bg="bg-green-50" color="text-green-600" />
         <StatCard icon={Clock}       label="Last Order"   value={data.last_order_date ? new Date(data.last_order_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Never'} bg="bg-blue-50" color="text-blue-600" />
-        <StatCard
-          icon={AlertTriangle}
-          label="Cancellations"
-          value={data.cancellation_tracking?.total_cancellations ?? 0}
-          sub={data.cancellation_tracking?.cooldown_active ? 'Cooldown active' : undefined}
-          bg={data.cancellation_tracking?.total_cancellations > 0 ? 'bg-orange-50' : 'bg-gray-50'}
-          color={data.cancellation_tracking?.total_cancellations > 0 ? 'text-orange-600' : 'text-gray-400'}
-        />
+        {data.loyalty_points > 0
+          ? <StatCard icon={Award} label="Loyalty Points" value={`${data.loyalty_points} pts`} sub={`= Rs. ${fmt(data.loyalty_points / 100)} value`} bg="bg-purple-50" color="text-purple-600" />
+          : <StatCard
+              icon={AlertTriangle}
+              label="Cancellations"
+              value={data.cancellation_tracking?.total_cancellations ?? 0}
+              sub={data.cancellation_tracking?.cooldown_active ? 'Cooldown active' : undefined}
+              bg={data.cancellation_tracking?.total_cancellations > 0 ? 'bg-orange-50' : 'bg-gray-50'}
+              color={data.cancellation_tracking?.total_cancellations > 0 ? 'text-orange-600' : 'text-gray-400'}
+            />
+        }
       </div>
 
       {/* Top items */}
@@ -161,7 +164,7 @@ export default function CustomersPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 text-gray-500" />
-            <p className="text-sm font-semibold text-gray-700">{insights.customer_phone}</p>
+            <p className="text-sm font-semibold text-gray-700">{insights.customer_phone || phone}</p>
             {insights.customer_name && (
               <span className="text-sm text-gray-400">{insights.customer_name}</span>
             )}
