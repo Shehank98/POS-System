@@ -21,6 +21,7 @@ const customerRoutes      = require('./routes/customers');
 const emailSummaryRoutes  = require('./routes/emailSummary');
 const carwashRoutes       = require('./routes/carwash');
 const carwashPublicRoutes = require('./routes/carwashPublic');
+const clothingRoutes      = require('./routes/clothing');
 
 const { runDailyChecks }        = require('./controllers/notificationController');
 const { cancelStalePreOrders }  = require('./controllers/preOrderController');
@@ -54,6 +55,8 @@ app.use('/api/email-summary', emailSummaryRoutes);
 // Car Wash module — public routes BEFORE authenticated to avoid JWT guard
 app.use('/api/carwash/public', carwashPublicRoutes);
 app.use('/api/carwash',        carwashRoutes);
+// Clothing module
+app.use('/api/clothing',       clothingRoutes);
 
 // ── Serve React frontend in production ────────────────────────
 if (process.env.NODE_ENV === 'production') {
