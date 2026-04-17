@@ -26,19 +26,20 @@ async function getToday(req, res) {
         [req.shopId]
       ),
 
-      // Top 5 products sold today
+      // Top 5 products sold today (includes clothing variants)
       db.query(
-        `SELECT p.name,
-                p.id   AS product_id,
-                SUM(ti.quantity)  AS qty_sold,
-                SUM(ti.subtotal)  AS revenue
+        `SELECT COALESCE(cp.name, p.name)   AS name,
+                SUM(ti.quantity)             AS qty_sold,
+                SUM(ti.subtotal)             AS revenue
            FROM transaction_items ti
            JOIN transactions t ON t.id = ti.transaction_id
-           JOIN products      p ON p.id = ti.product_id
+           LEFT JOIN products         p  ON p.id  = ti.product_id
+           LEFT JOIN clothing_variants cv ON cv.id = ti.clothing_variant_id
+           LEFT JOIN clothing_products cp ON cp.id = cv.product_id
           WHERE t.shop_id = $1
             AND t.status  = 'completed'
             AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE
-          GROUP BY p.id, p.name
+          GROUP BY COALESCE(cp.name, p.name)
           ORDER BY qty_sold DESC
           LIMIT 5`,
         [req.shopId]
@@ -104,13 +105,16 @@ async function getYesterday(req, res) {
         [req.shopId]
       ),
       db.query(
-        `SELECT p.name, p.id AS product_id, SUM(ti.quantity) AS qty_sold, SUM(ti.subtotal) AS revenue
+        `SELECT COALESCE(cp.name, p.name) AS name,
+                SUM(ti.quantity) AS qty_sold, SUM(ti.subtotal) AS revenue
            FROM transaction_items ti
            JOIN transactions t ON t.id = ti.transaction_id
-           JOIN products      p ON p.id = ti.product_id
+           LEFT JOIN products p ON p.id = ti.product_id
+           LEFT JOIN clothing_variants cv ON cv.id = ti.clothing_variant_id
+           LEFT JOIN clothing_products cp ON cp.id = cv.product_id
           WHERE t.shop_id = $1 AND t.status = 'completed'
             AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE - 1
-          GROUP BY p.id, p.name ORDER BY qty_sold DESC LIMIT 5`,
+          GROUP BY COALESCE(cp.name, p.name) ORDER BY qty_sold DESC LIMIT 5`,
         [req.shopId]
       ),
     ]);
@@ -153,18 +157,20 @@ async function getWeek(req, res) {
         [req.shopId]
       ),
 
-      // Top 5 products this week
+      // Top 5 products this week (includes clothing variants)
       db.query(
-        `SELECT p.name,
-                SUM(ti.quantity) AS qty_sold,
-                SUM(ti.subtotal) AS revenue
+        `SELECT COALESCE(cp.name, p.name) AS name,
+                SUM(ti.quantity)           AS qty_sold,
+                SUM(ti.subtotal)           AS revenue
            FROM transaction_items ti
            JOIN transactions t ON t.id = ti.transaction_id
-           JOIN products      p ON p.id = ti.product_id
+           LEFT JOIN products         p  ON p.id  = ti.product_id
+           LEFT JOIN clothing_variants cv ON cv.id = ti.clothing_variant_id
+           LEFT JOIN clothing_products cp ON cp.id = cv.product_id
           WHERE t.shop_id = $1
             AND t.status  = 'completed'
             AND t.transaction_date >= NOW() - INTERVAL '6 days'
-          GROUP BY p.id, p.name
+          GROUP BY COALESCE(cp.name, p.name)
           ORDER BY qty_sold DESC
           LIMIT 5`,
         [req.shopId]
@@ -227,12 +233,22 @@ async function getLowStock(req, res) {
   const threshold = parseInt(req.query.threshold, 10) || 10;
   try {
     const { rows } = await db.query(
-      `SELECT id, name, stock_quantity, category,
+      `-- Retail products
+       SELECT id, name, stock_quantity, category,
               COALESCE(unit_type, 'unit') AS unit_type
          FROM products
-        WHERE shop_id      = $1
-          AND has_inventory = true
-          AND stock_quantity < $2
+        WHERE shop_id = $1 AND has_inventory = TRUE AND stock_quantity < $2
+       UNION ALL
+       -- Clothing variants
+       SELECT cv.id,
+              cp.name || ' — ' || cv.size || ' / ' || cv.color AS name,
+              cv.stock_quantity,
+              cp.category,
+              'unit' AS unit_type
+         FROM clothing_variants cv
+         JOIN clothing_products cp ON cp.id = cv.product_id
+        WHERE cv.shop_id = $1 AND cv.is_active = TRUE
+          AND cv.stock_quantity <= cv.low_stock_threshold
         ORDER BY stock_quantity ASC
         LIMIT 50`,
       [req.shopId, threshold]
@@ -306,20 +322,22 @@ async function getAnalytics(req, res) {
         WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
       `, jtParams),
 
-      // Top 20 products by revenue with profit breakdown
+      // Top 20 products by revenue with profit breakdown (includes clothing)
       db.query(`
         SELECT
-          COALESCE(p.name, '[Deleted Product]')                          AS name,
-          SUM(ti.quantity)::numeric                                       AS qty_sold,
-          COALESCE(SUM(ti.subtotal), 0)                                  AS revenue,
-          COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)     AS cost,
+          COALESCE(cp.name, p.name, '[Deleted Product]')                           AS name,
+          SUM(ti.quantity)::numeric                                                  AS qty_sold,
+          COALESCE(SUM(ti.subtotal), 0)                                             AS revenue,
+          COALESCE(SUM(ti.quantity * COALESCE(cp.cost_price, p.cost_price, 0)), 0) AS cost,
           COALESCE(SUM(ti.subtotal), 0)
-            - COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS profit
+            - COALESCE(SUM(ti.quantity * COALESCE(cp.cost_price, p.cost_price, 0)), 0) AS profit
         FROM transaction_items ti
         JOIN  transactions t ON t.id = ti.transaction_id
-        LEFT JOIN products  p ON p.id = ti.product_id
+        LEFT JOIN products          p  ON p.id  = ti.product_id
+        LEFT JOIN clothing_variants cv ON cv.id  = ti.clothing_variant_id
+        LEFT JOIN clothing_products cp ON cp.id  = cv.product_id
         WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
-        GROUP BY p.id, p.name
+        GROUP BY COALESCE(cp.name, p.name)
         ORDER BY revenue DESC
         LIMIT 20
       `, jtParams),

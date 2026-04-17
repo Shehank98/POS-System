@@ -235,4 +235,193 @@ async function getExchange(req, res) {
   }
 }
 
-module.exports = { lookupTransaction, processExchange, listExchanges, getExchange };
+// ── GET /api/clothing/exchanges/:id/receipt ──────────────────
+async function getExchangeReceipt(req, res) {
+  try {
+    const { rows: excRows } = await db.query(
+      `SELECT ce.*,
+              u.username AS cashier,
+              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone
+         FROM clothing_exchanges ce
+         LEFT JOIN users u ON u.id = ce.user_id
+         LEFT JOIN shops s ON s.id = ce.shop_id
+        WHERE ce.id = $1 AND ce.shop_id = $2`,
+      [req.params.id, req.shopId]
+    );
+    if (!excRows.length) return res.status(404).json({ error: 'Exchange not found' });
+
+    const { rows: items } = await db.query(
+      `SELECT cei.*, cv.size, cv.color, cp.name AS product_name
+         FROM clothing_exchange_items cei
+         JOIN clothing_variants cv ON cv.id = cei.variant_id
+         JOIN clothing_products cp ON cp.id = cv.product_id
+        WHERE cei.exchange_id = $1
+        ORDER BY cei.direction DESC, cei.id`,
+      [req.params.id]
+    );
+
+    const ex = excRows[0];
+    const returned = items.filter(i => i.direction === 'returned');
+    const issued   = items.filter(i => i.direction === 'issued');
+    const net      = parseFloat(ex.net_refund_amount);
+    const fmt      = n => Number(n || 0).toFixed(2);
+    const esc      = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    const QRCode = require('qrcode');
+    let qrBlock = '';
+    // QR code for net payment amount (customer pays extra)
+    if (net < 0) {
+      const payAmt = Math.abs(net).toFixed(2);
+      try {
+        const qrData  = `EXCHANGE-PAYMENT:${ex.exchange_number}:${payAmt}`;
+        const qrUrl   = await QRCode.toDataURL(qrData, { width: 120, margin: 1 });
+        qrBlock = `
+<div class="divider"></div>
+<div style="text-align:center; margin:3mm 0 2mm;">
+  <img src="${qrUrl}" width="90" height="90" alt="Payment QR" style="display:block; margin:0 auto 1.5mm;" />
+  <p style="font-size:0.85em; font-weight:bold; color:#c00;">Amount Due: Rs. ${payAmt}</p>
+  <p style="font-size:0.75em; color:#555;">Scan to pay the difference</p>
+</div>`;
+      } catch { /* skip if QR fails */ }
+    }
+
+    const makeRows = (list) => list.map(i => `
+      <tr>
+        <td class="name">${esc(i.product_name)} (${esc(i.size)} / ${esc(i.color)})</td>
+        <td class="qty">${i.quantity}</td>
+        <td class="price">${fmt(i.unit_price)}</td>
+        <td class="total">${fmt(i.subtotal)}</td>
+      </tr>`).join('');
+
+    const returnTotal = returned.reduce((s, i) => s + parseFloat(i.subtotal), 0);
+    const issueTotal  = issued.reduce((s, i)   => s + parseFloat(i.subtotal), 0);
+
+    const fallbackDate = new Date(ex.created_at);
+    const dateStr = fallbackDate.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const timeStr = fallbackDate.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Exchange ${esc(ex.exchange_number)}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Courier New',Courier,monospace; font-size:12px; color:#000;
+         width:80mm; margin:0 auto; padding:4mm 3mm; }
+  .center { text-align:center; }
+  .bold   { font-weight:bold; }
+  .divider{ border-top:1px dashed #000; margin:3mm 0; }
+  .shop-name { font-size:1.3em; font-weight:bold; text-align:center; }
+  .shop-meta { text-align:center; font-size:0.9em; margin-bottom:1mm; }
+  table { width:100%; border-collapse:collapse; }
+  th { border-bottom:1px solid #000; text-align:left; padding-bottom:1mm; }
+  td { padding:0.5mm 0; vertical-align:top; }
+  td.qty, th.qty, td.price, th.price, td.total, th.total { text-align:right; white-space:nowrap; }
+  td.name { max-width:32mm; word-break:break-word; }
+  td.price { width:16mm; } td.qty { width:8mm; } td.total { width:16mm; }
+  .section-head { font-weight:bold; font-size:0.9em; padding:1.5mm 0 0.5mm;
+                  border-bottom:1px solid #000; margin-top:2mm; }
+  .section-return { color:#c00; }
+  .section-issue  { color:#060; }
+  .summary-row td { padding-top:1mm; }
+  .net-row td { font-weight:bold; font-size:1.1em; border-top:1px solid #000; padding-top:1.5mm; }
+  .stamp { text-align:center; border:2px solid #555; color:#555; font-weight:bold;
+           font-size:1.3em; padding:2mm; margin:3mm 0; letter-spacing:2px; }
+  .thank-you { text-align:center; margin-top:4mm; font-size:0.9em; }
+  @media print { body { margin:0; } .no-print { display:none; } }
+</style>
+</head>
+<body id="receipt-body">
+
+<div class="no-print" style="margin-bottom:4mm; display:flex; justify-content:center;">
+  <button onclick="window.print()" style="padding:6px 18px; cursor:pointer; font-size:13px;">🖨 Print</button>
+</div>
+
+<p class="shop-name">${esc(ex.shop_name || 'Shop')}</p>
+${ex.shop_address ? `<p class="shop-meta">${esc(ex.shop_address)}</p>` : ''}
+${ex.shop_phone   ? `<p class="shop-meta">Tel: ${esc(ex.shop_phone)}</p>` : ''}
+
+<div class="divider"></div>
+<div class="stamp">★ EXCHANGE ★</div>
+<div class="divider"></div>
+
+<p>Date: <strong><span id="exc-date">${dateStr}&nbsp;&nbsp;${timeStr}</span></strong></p>
+<p>Ref: <strong>${esc(ex.exchange_number)}</strong></p>
+<p>Orig Txn: <strong>${esc(ex.original_transaction_id)}</strong></p>
+<p>Cashier: ${esc(ex.cashier || '—')}</p>
+${ex.customer_phone ? `<p>Customer: ${esc(ex.customer_phone)}</p>` : ''}
+
+${returned.length ? `
+<div class="divider"></div>
+<p class="section-head section-return">RETURNED ITEMS</p>
+<table>
+  <thead><tr>
+    <th class="name">Item</th>
+    <th class="qty">Qty</th>
+    <th class="price">Price</th>
+    <th class="total">Total</th>
+  </tr></thead>
+  <tbody>${makeRows(returned)}</tbody>
+  <tfoot>
+    <tr class="summary-row"><td colspan="3" style="color:#c00;">Return Credit</td>
+      <td style="color:#c00;">+${fmt(returnTotal)}</td></tr>
+  </tfoot>
+</table>` : ''}
+
+${issued.length ? `
+<div class="divider"></div>
+<p class="section-head section-issue">NEW ITEMS ISSUED</p>
+<table>
+  <thead><tr>
+    <th class="name">Item</th>
+    <th class="qty">Qty</th>
+    <th class="price">Price</th>
+    <th class="total">Total</th>
+  </tr></thead>
+  <tbody>${makeRows(issued)}</tbody>
+  <tfoot>
+    <tr class="summary-row"><td colspan="3" style="color:#060;">Items Total</td>
+      <td style="color:#060;">-${fmt(issueTotal)}</td></tr>
+  </tfoot>
+</table>` : ''}
+
+<div class="divider"></div>
+<table>
+  <tfoot>
+    <tr class="net-row">
+      <td colspan="3">${net >= 0 ? 'REFUND TO CUSTOMER' : 'AMOUNT DUE'}</td>
+      <td>${net >= 0 ? `Rs. ${fmt(net)}` : `Rs. ${fmt(Math.abs(net))}`}</td>
+    </tr>
+  </tfoot>
+</table>
+
+${qrBlock}
+<div class="divider"></div>
+${net >= 0
+  ? `<p class="thank-you bold">Refund: Rs. ${fmt(net)} — Please pay the customer</p>`
+  : `<p class="thank-you bold" style="color:#c00;">Customer pays Rs. ${fmt(Math.abs(net))}</p>`}
+<p class="thank-you">Thank you!</p>
+<p class="thank-you" style="font-size:0.75em; margin-top:1mm; color:#777;">Powered by BillFlow</p>
+
+<script>
+  try {
+    var d = new Date('${ex.created_at}');
+    document.getElementById('exc-date').textContent =
+      d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+      + '   ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {}
+  if (localStorage.getItem('pos_auto_print') === 'true') window.print();
+</script>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (err) {
+    console.error('getExchangeReceipt error:', err);
+    res.status(500).json({ error: 'Server error generating receipt' });
+  }
+}
+
+module.exports = { lookupTransaction, processExchange, listExchanges, getExchange, getExchangeReceipt };

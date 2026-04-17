@@ -40,9 +40,11 @@ router.post  ('/variants/:id/adjust',    readOnly, requireRole('owner','manager'
 router.get('/transactions/lookup', exchanges.lookupTransaction);
 
 // ── Exchanges ─────────────────────────────────────────────────
-router.get ('/exchanges',     exchanges.listExchanges);
-router.post('/exchanges',     readOnly, exchanges.processExchange);
-router.get ('/exchanges/:id', exchanges.getExchange);
+router.get ('/exchanges',              exchanges.listExchanges);
+router.post('/exchanges',              readOnly, exchanges.processExchange);
+// Receipt BEFORE /:id so it isn't captured as an id param
+router.get ('/exchanges/:id/receipt',  exchanges.getExchangeReceipt);
+router.get ('/exchanges/:id',          exchanges.getExchange);
 
 // ── Reports ───────────────────────────────────────────────────
 router.get('/reports/best-sizes',   requireRole('owner','manager'), reports.bestSizes);

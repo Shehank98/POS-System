@@ -321,16 +321,27 @@ export default function ClothingExchangesPage() {
             Exchange <strong>{result.exchange_number}</strong> processed successfully.
           </p>
           {result.net_refund_amount > 0 && (
-            <p className="text-sm text-green-700 font-medium">
-              Refund: Rs. {fmt(result.net_refund_amount)}
+            <p className="text-sm text-green-700 font-medium bg-green-50 rounded-lg px-4 py-2">
+              Refund to Customer: <strong>Rs. {fmt(result.net_refund_amount)}</strong>
             </p>
           )}
           {result.net_refund_amount < 0 && (
-            <p className="text-sm text-red-600 font-medium">
-              Charged: Rs. {fmt(Math.abs(result.net_refund_amount))}
+            <p className="text-sm text-red-600 font-medium bg-red-50 rounded-lg px-4 py-2">
+              Customer Pays Extra: <strong>Rs. {fmt(Math.abs(result.net_refund_amount))}</strong>
             </p>
           )}
-          <button onClick={reset} className="btn-primary mx-auto">New Exchange</button>
+          {result.net_refund_amount === 0 && (
+            <p className="text-sm text-gray-600">Even exchange — no payment required.</p>
+          )}
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => clothingApi.openExchangeReceipt(result.id)}
+              className="btn-secondary flex items-center gap-2"
+            >
+              🖨 Print Exchange Receipt
+            </button>
+            <button onClick={reset} className="btn-primary">New Exchange</button>
+          </div>
         </div>
       )}
 

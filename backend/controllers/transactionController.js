@@ -302,9 +302,18 @@ async function getTransaction(req, res) {
     if (txnRows.length === 0) return res.status(404).json({ error: 'Transaction not found' });
 
     const { rows: items } = await db.query(
-      `SELECT ti.*, p.name AS product_name
+      `SELECT ti.*,
+              COALESCE(
+                cp.name || ' / ' || cv.color || ' / ' || cv.size,
+                p.name
+              ) AS product_name,
+              cv.size  AS variant_size,
+              cv.color AS variant_color,
+              cp.name  AS clothing_product_name
          FROM transaction_items ti
-         LEFT JOIN products p ON p.id = ti.product_id
+         LEFT JOIN products          p  ON p.id  = ti.product_id
+         LEFT JOIN clothing_variants cv ON cv.id  = ti.clothing_variant_id
+         LEFT JOIN clothing_products cp ON cp.id  = cv.product_id
         WHERE ti.transaction_id = $1`,
       [req.params.id]
     );
@@ -516,9 +525,13 @@ async function refundTransaction(req, res) {
     await client.query('COMMIT');
 
     const { rows: fullItems } = await db.query(
-      `SELECT ti.*, p.name AS product_name
+      `SELECT ti.*,
+              COALESCE(cp.name || ' / ' || cv.color || ' / ' || cv.size, p.name) AS product_name,
+              cv.size AS variant_size, cv.color AS variant_color
          FROM transaction_items ti
-         LEFT JOIN products p ON p.id = ti.product_id
+         LEFT JOIN products          p  ON p.id  = ti.product_id
+         LEFT JOIN clothing_variants cv ON cv.id  = ti.clothing_variant_id
+         LEFT JOIN clothing_products cp ON cp.id  = cv.product_id
         WHERE ti.transaction_id = $1`,
       [refundTxn.id]
     );
