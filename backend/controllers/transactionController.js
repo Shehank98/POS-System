@@ -124,19 +124,6 @@ async function createTransaction(req, res) {
       enrichedItems.push({ product_id: product.id, clothing_variant_id: null, quantity: qty, unit_price: price, discount: disc, subtotal });
     }
 
-    const totalAmount = subtotalSum + taxSum - parseFloat(discount_amount);
-    const txnNumber   = generateTxnNumber(req.shopId);
-
-    const { rows: txnRows } = await client.query(
-      `INSERT INTO transactions
-         (shop_id, user_id, transaction_number, total_amount, tax_amount, discount_amount, payment_method, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'completed')
-       RETURNING *`,
-      [req.shopId, req.user.id, txnNumber, totalAmount, taxSum, discount_amount, payment_method]
-    );
-
-    const txn = txnRows[0];
-
     // Accept customer_phone + loyalty for clothing shops (graceful fallback)
     const customer_phone    = req.body.customer_phone || null;
     const loyalty_pts_used  = parseInt(req.body.loyalty_points_used, 10) || 0;
