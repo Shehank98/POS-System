@@ -47,10 +47,11 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
     setSaving(true);
 
     const itemsPayload = items.map((i) => ({
-      product_id: i.product_id,
-      quantity:   i.quantity,
-      unit_price: i.unit_price,
-      discount:   i.discAmt,
+      product_id:          i.product_id          ?? null,
+      clothing_variant_id: i.clothing_variant_id ?? null,
+      quantity:            i.quantity,
+      unit_price:          i.unit_price,
+      discount:            i.discAmt,
     }));
 
     // ── Online path ──────────────────────────────────────────

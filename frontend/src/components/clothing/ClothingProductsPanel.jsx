@@ -31,8 +31,23 @@ const CATEGORIES = [
   'Jackets', 'Shoes', 'Accessories',
 ];
 
+// ── Download / print a PDF label for one or more variant IDs ──
+async function downloadLabels(ids, filename) {
+  try {
+    const { data } = await clothingApi.getBarcodeLabels(
+      Array.isArray(ids) ? ids.join(',') : String(ids)
+    );
+    const url = URL.createObjectURL(data);
+    const a   = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Failed to generate label');
+  }
+}
+
 // ── Variant row inside expanded product ──────────────────────
-function VariantRow({ variant, onDelete, canEdit }) {
+function VariantRow({ variant, productName, onDelete, canEdit }) {
   const stock = variant.stock_quantity;
   const low   = stock > 0 && stock <= variant.low_stock_threshold;
   const out   = stock <= 0;
@@ -52,7 +67,7 @@ function VariantRow({ variant, onDelete, canEdit }) {
       </td>
       <td className="py-2 px-3 font-mono text-xs text-gray-400">{variant.sku || '—'}</td>
       <td className="py-2 px-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={variant.barcode}>
-        {variant.barcode || '—'}
+        {variant.barcode || <span className="text-gray-200">no barcode</span>}
       </td>
       <td className="py-2 px-3 text-right text-gray-700">
         {variant.price_override ? `Rs. ${fmt(variant.price_override)}` : <span className="text-gray-300">—</span>}
@@ -66,12 +81,21 @@ function VariantRow({ variant, onDelete, canEdit }) {
         </span>
       </td>
       <td className="py-2 px-3 text-right">
-        {canEdit && (
-          <button onClick={() => onDelete(variant.id)}
-            className="p-1 text-gray-300 hover:text-red-500 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
+        <div className="flex items-center justify-end gap-1">
+          {/* Print label for this one variant */}
+          <button
+            onClick={() => downloadLabels(variant.id, `label-${productName}-${variant.size}-${variant.color}.pdf`)}
+            title="Download barcode label (CODE128)"
+            className="p-1 text-gray-300 hover:text-indigo-500 transition-colors">
+            <Tag className="w-3.5 h-3.5" />
           </button>
-        )}
+          {canEdit && (
+            <button onClick={() => onDelete(variant.id)}
+              className="p-1 text-gray-300 hover:text-red-500 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -495,16 +519,10 @@ function ProductCard({ product, canEdit, onRefresh, autoOpen }) {
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to delete'); }
   }
 
-  async function printLabels() {
-    const ids = variants.map((v) => v.id).join(',');
-    if (!ids) { toast.error('No variants to print'); return; }
-    try {
-      const blob = await clothingApi.getBarcodeLabels(ids).then((r) => r.data);
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href = url; a.download = `labels-${product.name}.pdf`; a.click();
-      URL.revokeObjectURL(url);
-    } catch { toast.error('Failed to generate labels'); }
+  function printLabels() {
+    const ids = variants.map((v) => v.id);
+    if (!ids.length) { toast.error('No variants to print'); return; }
+    downloadLabels(ids, `labels-${product.name}.pdf`);
   }
 
   const totalStock = parseInt(product.total_stock, 10) || 0;
@@ -572,15 +590,23 @@ function ProductCard({ product, canEdit, onRefresh, autoOpen }) {
                   <th className="pb-1.5 pr-3">Size</th>
                   <th className="pb-1.5 pr-3">Color</th>
                   <th className="pb-1.5 pr-3">SKU</th>
-                  <th className="pb-1.5 pr-3">Barcode</th>
+                  <th className="pb-1.5 pr-3">Barcode (CODE128)</th>
                   <th className="pb-1.5 pr-3 text-right">Price</th>
                   <th className="pb-1.5 pr-3 text-right">Stock</th>
-                  <th className="pb-1.5 text-right" />
+                  <th className="pb-1.5 text-right" title="Print label / Delete">
+                    <Tag className="w-3 h-3 inline" />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {variants.map((v) => (
-                  <VariantRow key={v.id} variant={v} onDelete={deleteVariant} canEdit={canEdit} />
+                  <VariantRow
+                    key={v.id}
+                    variant={v}
+                    productName={product.name}
+                    onDelete={deleteVariant}
+                    canEdit={canEdit}
+                  />
                 ))}
               </tbody>
             </table>

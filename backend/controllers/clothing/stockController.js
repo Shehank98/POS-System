@@ -1,6 +1,6 @@
 const db     = require('../../config/database');
 const PDFDoc = require('pdfkit');
-const QRCode = require('qrcode');
+const bwipjs = require('bwip-js');
 
 // ── POST /api/clothing/variants/:id/adjust ────────────────────
 async function adjustStock(req, res) {
@@ -90,10 +90,38 @@ async function getLowStockVariants(req, res) {
   }
 }
 
+// ── Generate CODE128 barcode PNG buffer ───────────────────────
+async function makeBarcodePng(text, widthPt, heightMm) {
+  // bwip-js works in mm; we convert pts to mm (1pt = 0.352778mm)
+  const widthMm = widthPt * 0.352778;
+  return bwipjs.toBuffer({
+    bcid:        'code128',
+    text,
+    scale:       2,
+    height:      heightMm,
+    width:       widthMm,
+    includetext: false,   // we print the text manually below the bar
+    backgroundcolor: 'ffffff',
+  });
+}
+
 // ── GET /api/clothing/variants/labels?ids=1,2,3 ───────────────
+// Label size: 80mm × 40mm thermal label (226pt × 113pt)
+// Each page = one label with:
+//   • Product name  (top, bold)
+//   • Size / Color  (line 2)
+//   • Price         (line 3)
+//   • CODE128 barcode spanning full width  (center)
+//   • Barcode text below barcode
+//   • SKU small text at bottom
 async function generateBarcodeLabels(req, res) {
   const ids = String(req.query.ids || '').split(',').map(Number).filter(Boolean);
   if (!ids.length) return res.status(400).json({ error: 'ids query param required' });
+
+  // Label dimensions in points  (80mm × 40mm)
+  const LW = 226.77;  // 80mm in pt
+  const LH = 113.39;  // 40mm in pt
+  const PAD = 8;      // horizontal padding
 
   try {
     const { rows: variants } = await db.query(
@@ -105,38 +133,60 @@ async function generateBarcodeLabels(req, res) {
       [ids, req.shopId]
     );
 
-    const doc = new PDFDoc({ size: [226, 142], margin: 0, autoFirstPage: false });
+    const doc = new PDFDoc({ size: [LW, LH], margin: 0, autoFirstPage: false });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="barcode-labels.pdf"');
     doc.pipe(res);
 
     for (const v of variants) {
-      doc.addPage();
-      const scanData = v.barcode || v.sku || String(v.id);
-      let qrBuf;
-      try {
-        qrBuf = await QRCode.toBuffer(scanData, { width: 80, margin: 1 });
-      } catch { qrBuf = null; }
+      doc.addPage({ size: [LW, LH], margin: 0 });
 
+      const scanText = v.barcode || v.sku || String(v.id);
+      const price    = `Rs. ${parseFloat(v.effective_price).toFixed(2)}`;
+
+      // ── Text block (top) ─────────────────────────────────
       doc.fontSize(9).font('Helvetica-Bold')
-         .text(v.product_name, 8, 10, { width: 210, ellipsis: true });
+         .text(v.product_name, PAD, 7, { width: LW - PAD * 2, ellipsis: true });
+
       doc.fontSize(8).font('Helvetica')
-         .text(`${v.size} / ${v.color}`, 8, 22)
-         .text(`Rs. ${parseFloat(v.effective_price).toFixed(2)}`, 8, 33);
-      if (v.barcode || v.sku) {
-        doc.fontSize(7).text(scanData, 8, 44, { width: 130 });
+         .text(`${v.size}  /  ${v.color}`, PAD, 19, { width: LW - PAD * 2 });
+
+      doc.fontSize(8).font('Helvetica-Bold')
+         .text(price, PAD, 30, { width: LW - PAD * 2 });
+
+      // ── CODE128 barcode ──────────────────────────────────
+      const bcWidth  = LW - PAD * 2;   // pts
+      const bcHeightMm = 14;           // mm tall bars
+
+      let bcBuf = null;
+      try {
+        bcBuf = await makeBarcodePng(scanText, bcWidth, bcHeightMm);
+      } catch (bwErr) {
+        console.warn('bwip-js encode failed for', scanText, bwErr.message);
       }
-      if (qrBuf) {
-        doc.image(qrBuf, 150, 8, { width: 68, height: 68 });
+
+      const bcY = 44;
+      if (bcBuf) {
+        // height in pts: 14mm ≈ 39.7pt
+        doc.image(bcBuf, PAD, bcY, { width: bcWidth, height: 39.7 });
       }
-      doc.fontSize(6).fillColor('#888')
-         .text(`SKU: ${v.sku || '—'}`, 8, 58);
+
+      // Barcode text (human-readable) below the bars
+      doc.fontSize(6.5).font('Courier')
+         .fillColor('#000')
+         .text(scanText, PAD, bcY + 42, { width: LW - PAD * 2, align: 'center' });
+
+      // SKU footnote
+      if (v.sku) {
+        doc.fontSize(5.5).font('Helvetica').fillColor('#888')
+           .text(`SKU: ${v.sku}`, PAD, LH - 10, { width: LW - PAD * 2 });
+      }
     }
 
     doc.end();
   } catch (err) {
     console.error('generateBarcodeLabels error:', err);
-    if (!res.headersSent) res.status(500).json({ error: 'Server error' });
+    if (!res.headersSent) res.status(500).json({ error: 'Server error generating labels' });
   }
 }
 
