@@ -47,57 +47,147 @@ async function downloadLabels(ids, filename) {
 }
 
 // ── Variant row inside expanded product ──────────────────────
-function VariantRow({ variant, productName, onDelete, canEdit }) {
-  const stock = variant.stock_quantity;
-  const low   = stock > 0 && stock <= variant.low_stock_threshold;
-  const out   = stock <= 0;
+function VariantRow({ variant, productName, onDelete, onStockChange, canEdit }) {
+  const [stock,     setStock]     = useState(variant.stock_quantity);
+  const [adjusting, setAdjusting] = useState(false); // inline stock-adjust mode
+  const [delta,     setDelta]     = useState('');
+  const [saving,    setSaving]    = useState(false);
+
+  const low = stock > 0 && stock <= variant.low_stock_threshold;
+  const out = stock <= 0;
   const colorHex = COLOR_MAP[variant.color];
 
+  async function applyDelta(d) {
+    const n = parseInt(d, 10);
+    if (!n) { toast.error('Enter a non-zero number'); return; }
+    setSaving(true);
+    try {
+      const { data } = await clothingApi.adjustStock(variant.id, {
+        delta:  n,
+        reason: n > 0 ? 'received' : 'correction',
+      });
+      setStock(data.stock_quantity);
+      onStockChange(variant.id, data.stock_quantity);
+      setDelta('');
+      setAdjusting(false);
+      toast.success(`Stock updated → ${data.stock_quantity}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update stock');
+    } finally { setSaving(false); }
+  }
+
   return (
-    <tr className="border-t border-gray-100 text-sm hover:bg-gray-50 transition-colors">
-      <td className="py-2 px-3 font-semibold text-gray-700">{variant.size}</td>
-      <td className="py-2 px-3">
-        <div className="flex items-center gap-1.5">
-          {colorHex && (
-            <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0"
-              style={{ backgroundColor: colorHex }} />
-          )}
-          <span className="text-gray-600">{variant.color}</span>
-        </div>
-      </td>
-      <td className="py-2 px-3 font-mono text-xs text-gray-400">{variant.sku || '—'}</td>
-      <td className="py-2 px-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={variant.barcode}>
-        {variant.barcode || <span className="text-gray-200">no barcode</span>}
-      </td>
-      <td className="py-2 px-3 text-right text-gray-700">
-        {variant.price_override ? `Rs. ${fmt(variant.price_override)}` : <span className="text-gray-300">—</span>}
-      </td>
-      <td className="py-2 px-3 text-right">
-        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
-          ${out ? 'bg-red-100 text-red-600'
-            : low ? 'bg-amber-100 text-amber-700'
-            : 'bg-green-100 text-green-700'}`}>
-          {stock}
-        </span>
-      </td>
-      <td className="py-2 px-3 text-right">
-        <div className="flex items-center justify-end gap-1">
-          {/* Print label for this one variant */}
+    <>
+      <tr className="border-t border-gray-100 text-sm hover:bg-gray-50 transition-colors">
+        <td className="py-2 px-3 font-semibold text-gray-700">{variant.size}</td>
+        <td className="py-2 px-3">
+          <div className="flex items-center gap-1.5">
+            {colorHex && (
+              <span className="w-3 h-3 rounded-full border border-gray-200 shrink-0"
+                style={{ backgroundColor: colorHex }} />
+            )}
+            <span className="text-gray-600">{variant.color}</span>
+          </div>
+        </td>
+        <td className="py-2 px-3 font-mono text-xs text-gray-400">{variant.sku || '—'}</td>
+        <td className="py-2 px-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={variant.barcode}>
+          {variant.barcode || <span className="text-gray-200">no barcode</span>}
+        </td>
+        <td className="py-2 px-3 text-right text-gray-700">
+          {variant.price_override ? `Rs. ${fmt(variant.price_override)}` : <span className="text-gray-300">—</span>}
+        </td>
+
+        {/* Stock cell — click badge to open inline adjust */}
+        <td className="py-2 px-3 text-right">
           <button
-            onClick={() => downloadLabels(variant.id, `label-${productName}-${variant.size}-${variant.color}.pdf`)}
-            title="Download barcode label (CODE128)"
-            className="p-1 text-gray-300 hover:text-indigo-500 transition-colors">
-            <Tag className="w-3.5 h-3.5" />
+            onClick={() => setAdjusting((v) => !v)}
+            title="Click to adjust stock"
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+                        transition-colors cursor-pointer
+                        ${out  ? 'bg-red-100   text-red-600   hover:bg-red-200'
+                        : low ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                               : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+          >
+            {stock}
+            <span className="text-[9px] opacity-60">±</span>
           </button>
-          {canEdit && (
-            <button onClick={() => onDelete(variant.id)}
-              className="p-1 text-gray-300 hover:text-red-500 transition-colors">
-              <Trash2 className="w-3.5 h-3.5" />
+        </td>
+
+        <td className="py-2 px-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => downloadLabels(variant.id, `label-${productName}-${variant.size}-${variant.color}.pdf`)}
+              title="Download CODE128 barcode label"
+              className="p-1 text-gray-300 hover:text-indigo-500 transition-colors">
+              <Tag className="w-3.5 h-3.5" />
             </button>
-          )}
-        </div>
-      </td>
-    </tr>
+            {canEdit && (
+              <button onClick={() => onDelete(variant.id)}
+                className="p-1 text-gray-300 hover:text-red-500 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+
+      {/* Inline stock adjust row */}
+      {adjusting && (
+        <tr className="bg-indigo-50/60 border-t border-indigo-100">
+          <td colSpan={7} className="px-3 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 font-medium shrink-0">
+                Adjust stock for <strong>{variant.size} / {variant.color}</strong>
+                &nbsp;(current: <strong>{stock}</strong>)
+              </span>
+              <div className="flex items-center gap-1">
+                {/* Quick preset buttons */}
+                {[5, 10, 20, 50].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => applyDelta(n)}
+                    disabled={saving}
+                    className="px-2 py-1 text-xs rounded-lg bg-green-100 text-green-700
+                               hover:bg-green-200 font-semibold transition-colors">
+                    +{n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  className="w-20 h-7 px-2 text-sm border border-indigo-200 rounded-lg
+                             focus:outline-none focus:border-indigo-400 text-center font-mono"
+                  placeholder="e.g. +10"
+                  value={delta}
+                  onChange={(e) => setDelta(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyDelta(delta); }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => applyDelta(delta)}
+                  disabled={saving || !delta}
+                  className="h-7 px-3 text-xs rounded-lg bg-indigo-600 text-white
+                             hover:bg-indigo-700 disabled:opacity-40 font-semibold transition-colors">
+                  {saving ? '…' : 'Apply'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAdjusting(false); setDelta(''); }}
+                  className="h-7 px-2 text-xs rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
+                  Cancel
+                </button>
+              </div>
+              <span className="text-[11px] text-gray-400">
+                Use negative numbers to reduce (e.g. -3)
+              </span>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -605,6 +695,11 @@ function ProductCard({ product, canEdit, onRefresh, autoOpen }) {
                     variant={v}
                     productName={product.name}
                     onDelete={deleteVariant}
+                    onStockChange={(id, newQty) =>
+                      setVariants((prev) => prev.map((x) =>
+                        x.id === id ? { ...x, stock_quantity: newQty } : x
+                      ))
+                    }
                     canEdit={canEdit}
                   />
                 ))}
