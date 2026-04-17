@@ -4,10 +4,19 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const client = axios.create({ baseURL: BASE_URL });
 
-// Attach JWT on every request
+// Attach JWT and device ID on every request
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('pos_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // Device binding: generate once, persist forever
+  let deviceId = localStorage.getItem('pos_device_id');
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem('pos_device_id', deviceId);
+  }
+  config.headers['X-Device-ID'] = deviceId;
+
   return config;
 });
 

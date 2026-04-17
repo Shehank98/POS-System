@@ -5,6 +5,7 @@ import useAdminStore from './store/adminStore';
 
 // Standard POS
 import Layout from './components/Layout';
+import SubscriptionGuard from './components/SubscriptionGuard';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
@@ -42,7 +43,8 @@ import CarWashPortal from './pages/CarWashPortal';
 
 function PrivateRoute({ children }) {
   const user = useAuthStore((s) => s.user);
-  return user ? children : <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  return <SubscriptionGuard>{children}</SubscriptionGuard>;
 }
 
 function AdminRoute({ children }) {

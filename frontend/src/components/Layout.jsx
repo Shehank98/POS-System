@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/authStore';
 import ConnectionStatus, { ConnectionDot } from './ConnectionStatus';
 import NotificationBell from './NotificationBell';
+import SubscriptionStatusBar from './SubscriptionStatusBar';
 import { syncPending, cacheUserSubscription } from '../utils/syncService';
 import { preOrdersApi } from '../api/client';
 
@@ -55,10 +56,11 @@ const MORE_NAV_BASE = [
 ];
 
 export default function Layout() {
-  const user     = useAuthStore((s) => s.user);
-  const logout   = useAuthStore((s) => s.logout);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const user        = useAuthStore((s) => s.user);
+  const logout      = useAuthStore((s) => s.logout);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const navigate    = useNavigate();
+  const location    = useLocation();
 
   const isClothing = user?.shop_type === 'clothing';
   const baseFiltered     = isClothing ? NAV_BASE.filter((n) => n.to !== '/analytics')     : NAV_BASE;
@@ -96,20 +98,25 @@ export default function Layout() {
     });
   }
 
+  // Refresh subscription state once on mount (online only)
+  useEffect(() => {
+    if (navigator.onLine) refreshUser();
+  }, []); // eslint-disable-line
+
   // Cache subscription + auto-sync
   useEffect(() => {
     if (user) cacheUserSubscription(user);
     if (navigator.onLine) syncPending();
 
     function onFocus()  { if (navigator.onLine) syncPending(); }
-    function onOnline() { syncPending(); }
+    function onOnline() { syncPending(); refreshUser(); }
     window.addEventListener('focus',  onFocus);
     window.addEventListener('online', onOnline);
     return () => {
       window.removeEventListener('focus',  onFocus);
       window.removeEventListener('online', onOnline);
     };
-  }, [user]);
+  }, [user]); // eslint-disable-line
 
   // Close "More" sheet on route change
   useEffect(() => { setMoreOpen(false); setDrawerOpen(false); }, [location.pathname]);
@@ -361,6 +368,7 @@ export default function Layout() {
       {/* ── Main content ──────────────────────────────────────── */}
       {/* pb-safe-tab = 3.5rem (tab bar) + env(safe-area-inset-bottom) */}
       <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pb-0 pb-safe-tab">
+        <SubscriptionStatusBar />
         <div className="max-w-6xl mx-auto px-4 py-6">
           <Outlet />
         </div>

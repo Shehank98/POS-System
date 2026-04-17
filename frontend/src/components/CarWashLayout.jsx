@@ -7,6 +7,7 @@ import {
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
+import SubscriptionStatusBar from './SubscriptionStatusBar';
 
 const NAV = [
   { to: '/carwash/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
@@ -201,7 +202,8 @@ export default function CarWashLayout() {
 
       {/* ── Mobile bottom tab bar ────────────────────────────── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t
-                      border-gray-200 flex h-14 safe-area-bottom">
+                      border-gray-200 safe-area-bottom">
+        <div className="flex h-14">
         {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -231,7 +233,8 @@ export default function CarWashLayout() {
           <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-blue-600' : 'text-gray-400'}`} />
           More
         </button>
-      </div>
+        </div>{/* close inner h-14 flex */}
+      </div>{/* close safe-area-bottom wrapper */}
 
       {/* ── "More" bottom sheet ───────────────────────────────── */}
       {moreOpen && (
@@ -240,8 +243,8 @@ export default function CarWashLayout() {
           onClick={() => setMoreOpen(false)}
         >
           <div
-            className="absolute bottom-14 left-0 right-0 bg-white border-t border-gray-200
-                       rounded-t-2xl pb-2"
+            className="absolute left-0 right-0 bg-white border-t border-gray-200
+                       rounded-t-2xl pb-2 bottom-safe-tab"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-center pt-2 pb-3">
@@ -281,7 +284,8 @@ export default function CarWashLayout() {
       )}
 
       {/* ── Main content ──────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 pt-14 md:pt-0 pb-14 md:pb-0">
+      <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pb-0 pb-safe-tab">
+        <SubscriptionStatusBar billingPath="/carwash/billing" />
         <div className="max-w-4xl mx-auto px-4 py-6">
           <Outlet />
         </div>

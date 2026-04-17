@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '../api/client';
+import { recordOnlineVerification, clearTampered } from '../utils/subscriptionGuard';
 
 const stored = () => {
   try {
@@ -22,6 +23,8 @@ const useAuthStore = create((set) => ({
       localStorage.setItem('pos_token', data.token);
       localStorage.setItem('pos_user', JSON.stringify(data.user));
       set({ user: data.user, token: data.token, loading: false });
+      // Record successful online verification and clear any tamper flag
+      await Promise.all([recordOnlineVerification(), clearTampered()]);
       return data;
     } catch (err) {
       const msg = err.response?.data?.error || 'Login failed';
@@ -41,6 +44,7 @@ const useAuthStore = create((set) => ({
       const { data } = await authApi.me();
       localStorage.setItem('pos_user', JSON.stringify(data));
       set({ user: data });
+      await recordOnlineVerification(); // successful server round-trip
     } catch {
       // silently ignore – interceptor handles 401
     }

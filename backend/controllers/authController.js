@@ -2,6 +2,33 @@ const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const db       = require('../config/database');
 
+const GRACE_DAYS = 5;
+
+// Returns { readOnly, inGracePeriod, graceDaysRemaining, daysUntilExpiry }
+function calcSubscriptionFlags(subscriptionStatus, subscriptionEndDate) {
+  let readOnly = false;
+  let inGracePeriod = false;
+  let graceDaysRemaining = 0;
+  let daysUntilExpiry = null;
+
+  if (subscriptionEndDate) {
+    const msPerDay    = 86_400_000;
+    const daysOverdue = (Date.now() - new Date(subscriptionEndDate).getTime()) / msPerDay;
+    daysUntilExpiry   = -daysOverdue; // positive = days left, negative = overdue
+
+    if (daysOverdue > GRACE_DAYS) {
+      readOnly = true;
+    } else if (daysOverdue > 0) {
+      inGracePeriod      = true;
+      graceDaysRemaining = Math.ceil(GRACE_DAYS - daysOverdue);
+    }
+  } else if (subscriptionStatus === 'expired') {
+    readOnly = true; // no end_date + expired status → fully locked
+  }
+
+  return { readOnly, inGracePeriod, graceDaysRemaining, daysUntilExpiry };
+}
+
 // ── POST /api/auth/login ──────────────────────────────────────
 async function login(req, res) {
   const { username, password, shop_id } = req.body;
@@ -37,17 +64,7 @@ async function login(req, res) {
       return res.status(403).json({ error: 'Account suspended. Please contact support.' });
     }
 
-    // Determine read-only mode:
-    // - expired status, OR
-    // - subscription end date is more than 3 days in the past
-    let readOnly = false;
-    if (user.subscription_status === 'expired') {
-      readOnly = true;
-    } else if (user.subscription_end_date) {
-      const msPerDay = 86_400_000;
-      const daysOverdue = (Date.now() - new Date(user.subscription_end_date).getTime()) / msPerDay;
-      if (daysOverdue > 3) readOnly = true;
-    }
+    const sub = calcSubscriptionFlags(user.subscription_status, user.subscription_end_date);
 
     const token = jwt.sign(
       {
@@ -57,7 +74,8 @@ async function login(req, res) {
         username:        user.username,
         barcode_enabled: user.barcode_enabled,
         shop_type:       user.shop_type || 'retail',
-        read_only:       readOnly,
+        read_only:       sub.readOnly,
+        in_grace_period: sub.inGracePeriod,
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
@@ -76,7 +94,10 @@ async function login(req, res) {
         barcode_enabled:       user.barcode_enabled,
         default_tax_rate:      parseFloat(user.default_tax_rate) || 0,
         shop_type:             user.shop_type || 'retail',
-        read_only:             readOnly,
+        read_only:             sub.readOnly,
+        in_grace_period:       sub.inGracePeriod,
+        grace_days_remaining:  sub.graceDaysRemaining,
+        days_until_expiry:     sub.daysUntilExpiry,
       },
     });
   } catch (err) {
@@ -160,7 +181,15 @@ async function getMe(req, res) {
     );
 
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json(rows[0]);
+    const row = rows[0];
+    const sub = calcSubscriptionFlags(row.subscription_status, row.subscription_end_date);
+    res.json({
+      ...row,
+      read_only:            sub.readOnly,
+      in_grace_period:      sub.inGracePeriod,
+      grace_days_remaining: sub.graceDaysRemaining,
+      days_until_expiry:    sub.daysUntilExpiry,
+    });
   } catch (err) {
     console.error('getMe error:', err);
     res.status(500).json({ error: 'Server error' });

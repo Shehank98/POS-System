@@ -161,10 +161,6 @@ export async function getMeta(key) {
   }));
 }
 
-/**
- * Cache the shop's subscription details so we can enforce the
- * "no new offline transactions if expired > 3 days" rule.
- */
 export async function cacheSubscription(subscriptionData) {
   return setMeta('subscription', subscriptionData);
 }
@@ -175,20 +171,28 @@ export async function getCachedSubscription() {
 
 /**
  * Returns true if the subscription allows new offline transactions.
- * Blocks if: status === 'suspended', OR
- *            status === 'expired' AND end_date > 3 days ago
+ * Blocks if: status === 'suspended', OR end_date > 5 days ago (past grace period)
  */
 export async function isOfflineAllowed() {
   const sub = await getCachedSubscription();
   if (!sub) return true; // no cached data → allow (first use)
 
   if (sub.subscription_status === 'suspended') return false;
-  if (sub.subscription_status === 'expired')   return false;
 
   if (sub.subscription_end_date) {
-    const msPerDay   = 86_400_000;
+    const msPerDay    = 86_400_000;
     const daysOverdue = (Date.now() - new Date(sub.subscription_end_date).getTime()) / msPerDay;
-    if (daysOverdue > 3) return false;
+    if (daysOverdue > 5) return false; // past 5-day grace period
+  } else if (sub.subscription_status === 'expired') {
+    return false; // no end_date + expired → fully locked
   }
   return true;
 }
+
+// ── Anti-tamper + online-verification tracking ────────────────
+export const setLastVerifiedOnline = (ts) => setMeta('last_verified_online', ts);
+export const getLastVerifiedOnline = ()   => getMeta('last_verified_online');
+export const setLastRunTimestamp   = (ts) => setMeta('last_run_timestamp', ts);
+export const getLastRunTimestamp   = ()   => getMeta('last_run_timestamp');
+export const setTampered           = (v)  => setMeta('time_tampered', v);
+export const getTampered           = ()   => getMeta('time_tampered');
