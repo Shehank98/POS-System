@@ -258,6 +258,7 @@ function CreateShopModal({ onClose, onCreated }) {
                 <select className={inputCls} value={form.shop_type} onChange={set('shop_type')}>
                   <option value="retail">Retail / General</option>
                   <option value="car_wash">Car Wash</option>
+                  <option value="clothing">Clothing Shop</option>
                   <option value="grocery">Grocery / Supermarket</option>
                   <option value="restaurant">Restaurant / Cafe</option>
                 </select>
@@ -391,7 +392,8 @@ function ExtendSubModal({ shop, onClose, onDone }) {
               <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
               <select className={`w-full ${inputCls}`} value={shopType} onChange={(e) => setShopType(e.target.value)}>
                 <option value="retail">Retail / General</option>
-                <option value="carwash">Car Wash</option>
+                <option value="car_wash">Car Wash</option>
+                <option value="clothing">Clothing Shop</option>
                 <option value="grocery">Grocery / Supermarket</option>
                 <option value="restaurant">Restaurant / Cafe</option>
               </select>
