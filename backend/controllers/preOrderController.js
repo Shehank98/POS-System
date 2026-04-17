@@ -84,19 +84,45 @@ async function getPublicProducts(req, res) {
   if (!shop_id) return res.status(400).json({ error: 'shop_id is required' });
 
   try {
-    const { rows } = await db.query(
-      `SELECT id, name, price, category, stock_quantity, has_inventory
-         FROM products
-        WHERE shop_id = $1
+    const shopRow = await db.query(`SELECT shop_type FROM shops WHERE id = $1`, [shop_id]);
+    const shopType = shopRow.rows[0]?.shop_type || 'retail';
+
+    let rows;
+    if (shopType === 'clothing') {
+      // For clothing shops, aggregate variants under each parent product
+      ({ rows } = await db.query(
+        `SELECT
+           cp.id,
+           cp.name,
+           cp.base_price                          AS price,
+           cp.category,
+           COALESCE(SUM(cv.stock_quantity), 0)    AS stock_quantity,
+           TRUE                                   AS has_inventory
+         FROM clothing_products cp
+         LEFT JOIN clothing_variants cv ON cv.product_id = cp.id AND cv.is_active = TRUE
+        WHERE cp.shop_id = $1 AND cp.is_active = TRUE
+        GROUP BY cp.id
         ORDER BY
-          CASE
-            WHEN has_inventory = true AND stock_quantity <= 0 THEN 1
-            ELSE 0
-          END ASC,
-          category ASC,
-          name ASC`,
-      [shop_id]
-    );
+          CASE WHEN COALESCE(SUM(cv.stock_quantity), 0) <= 0 THEN 1 ELSE 0 END ASC,
+          cp.category ASC,
+          cp.name ASC`,
+        [shop_id]
+      ));
+    } else {
+      ({ rows } = await db.query(
+        `SELECT id, name, price, category, stock_quantity, has_inventory
+           FROM products
+          WHERE shop_id = $1
+          ORDER BY
+            CASE
+              WHEN has_inventory = true AND stock_quantity <= 0 THEN 1
+              ELSE 0
+            END ASC,
+            category ASC,
+            name ASC`,
+        [shop_id]
+      ));
+    }
     res.json({ products: rows });
   } catch (err) {
     console.error('getPublicProducts error:', err);

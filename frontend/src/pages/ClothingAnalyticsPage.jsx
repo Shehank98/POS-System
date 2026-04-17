@@ -194,14 +194,17 @@ export default function ClothingAnalyticsPage() {
     setLoading(true);
     try {
       const params = { start, end };
-      const [s, c, l] = await Promise.all([
+      const [s, c, l] = await Promise.allSettled([
         clothingApi.bestSizes(params),
         clothingApi.bestColors(params),
         clothingApi.getLowStock(),
       ]);
-      setSizes(s.data.sizes   || []);
-      setColors(c.data.colors || []);
-      setLowStock(l.data.variants || []);
+      if (s.status === 'fulfilled') setSizes(s.value.data.sizes   || []);
+      if (c.status === 'fulfilled') setColors(c.value.data.colors || []);
+      if (l.status === 'fulfilled') setLowStock(l.value.data.variants || []);
+      const failed = [s, c, l].filter((r) => r.status === 'rejected');
+      if (failed.length === 3) toast.error('Failed to load analytics');
+      else if (failed.length > 0) toast.error('Some analytics data could not be loaded');
     } catch {
       toast.error('Failed to load analytics');
     } finally { setLoading(false); }

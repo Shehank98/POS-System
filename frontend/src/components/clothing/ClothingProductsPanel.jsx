@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, ChevronDown, ChevronUp, Trash2, Tag, RefreshCw, X, Check, Zap } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, Tag, RefreshCw, X, Check, Zap, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clothingApi } from '../../api/client';
 import useAuthStore from '../../store/authStore';
@@ -47,11 +47,15 @@ async function downloadLabels(ids, filename) {
 }
 
 // ── Variant row inside expanded product ──────────────────────
-function VariantRow({ variant, productName, onDelete, onStockChange, canEdit }) {
-  const [stock,     setStock]     = useState(variant.stock_quantity);
-  const [adjusting, setAdjusting] = useState(false); // inline stock-adjust mode
-  const [delta,     setDelta]     = useState('');
-  const [saving,    setSaving]    = useState(false);
+function VariantRow({ variant, productName, basePrice, onDelete, onStockChange, canEdit }) {
+  const [stock,         setStock]         = useState(variant.stock_quantity);
+  const [adjusting,     setAdjusting]     = useState(false);
+  const [delta,         setDelta]         = useState('');
+  const [saving,        setSaving]        = useState(false);
+  const [priceOverride, setPriceOverride] = useState(variant.price_override);
+  const [editingPrice,  setEditingPrice]  = useState(false);
+  const [priceInput,    setPriceInput]    = useState('');
+  const [savingPrice,   setSavingPrice]   = useState(false);
 
   const low = stock > 0 && stock <= variant.low_stock_threshold;
   const out = stock <= 0;
@@ -76,6 +80,28 @@ function VariantRow({ variant, productName, onDelete, onStockChange, canEdit }) 
     } finally { setSaving(false); }
   }
 
+  function openPriceEdit() {
+    setPriceInput(priceOverride != null ? String(priceOverride) : '');
+    setEditingPrice(true);
+    setAdjusting(false);
+  }
+
+  async function savePrice() {
+    setSavingPrice(true);
+    try {
+      const newPrice = priceInput.trim() === '' ? null : parseFloat(priceInput);
+      if (priceInput.trim() !== '' && isNaN(newPrice)) {
+        toast.error('Invalid price'); return;
+      }
+      await clothingApi.updateVariant(variant.id, { price_override: newPrice });
+      setPriceOverride(newPrice);
+      setEditingPrice(false);
+      toast.success(newPrice == null ? 'Price reset to base price' : `Price set to Rs. ${fmt(newPrice)}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update price');
+    } finally { setSavingPrice(false); }
+  }
+
   return (
     <>
       <tr className="border-t border-gray-100 text-sm hover:bg-gray-50 transition-colors">
@@ -93,14 +119,29 @@ function VariantRow({ variant, productName, onDelete, onStockChange, canEdit }) 
         <td className="py-2 px-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={variant.barcode}>
           {variant.barcode || <span className="text-gray-200">no barcode</span>}
         </td>
-        <td className="py-2 px-3 text-right text-gray-700">
-          {variant.price_override ? `Rs. ${fmt(variant.price_override)}` : <span className="text-gray-300">—</span>}
+
+        {/* Price cell — shows override (or base fallback) + edit button */}
+        <td className="py-2 px-3 text-right">
+          <div className="flex items-center justify-end gap-1 group">
+            {priceOverride != null
+              ? <span className="text-gray-700 font-medium">Rs. {fmt(priceOverride)}</span>
+              : <span className="text-gray-400 text-xs italic">base ({basePrice ? `Rs. ${fmt(basePrice)}` : '—'})</span>
+            }
+            {canEdit && (
+              <button
+                onClick={openPriceEdit}
+                title="Edit price override"
+                className="p-0.5 text-gray-200 hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100">
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </td>
 
         {/* Stock cell — click badge to open inline adjust */}
         <td className="py-2 px-3 text-right">
           <button
-            onClick={() => setAdjusting((v) => !v)}
+            onClick={() => { setAdjusting((v) => !v); setEditingPrice(false); }}
             title="Click to adjust stock"
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
                         transition-colors cursor-pointer
@@ -130,6 +171,52 @@ function VariantRow({ variant, productName, onDelete, onStockChange, canEdit }) 
           </div>
         </td>
       </tr>
+
+      {/* Inline price edit row */}
+      {editingPrice && (
+        <tr className="bg-amber-50/60 border-t border-amber-100">
+          <td colSpan={7} className="px-3 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 font-medium shrink-0">
+                Price for <strong>{variant.size} / {variant.color}</strong>
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400">Rs.</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  autoFocus
+                  className="w-28 h-7 px-2 text-sm border border-amber-200 rounded-lg
+                             focus:outline-none focus:border-amber-400 text-right font-mono"
+                  placeholder={basePrice ? fmt(basePrice) : '0.00'}
+                  value={priceInput}
+                  onChange={(e) => setPriceInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') savePrice(); if (e.key === 'Escape') setEditingPrice(false); }}
+                />
+              </div>
+              <span className="text-[11px] text-gray-400">Leave blank to use base price</span>
+              <div className="flex items-center gap-1 ml-auto">
+                <button
+                  type="button"
+                  onClick={savePrice}
+                  disabled={savingPrice}
+                  className="h-7 px-3 text-xs rounded-lg bg-amber-500 text-white
+                             hover:bg-amber-600 disabled:opacity-40 font-semibold transition-colors flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  {savingPrice ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingPrice(false)}
+                  className="h-7 px-2 text-xs rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
 
       {/* Inline stock adjust row */}
       {adjusting && (
@@ -694,6 +781,7 @@ function ProductCard({ product, canEdit, onRefresh, autoOpen }) {
                     key={v.id}
                     variant={v}
                     productName={product.name}
+                    basePrice={product.base_price}
                     onDelete={deleteVariant}
                     onStockChange={(id, newQty) =>
                       setVariants((prev) => prev.map((x) =>
