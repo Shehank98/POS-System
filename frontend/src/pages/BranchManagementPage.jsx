@@ -251,7 +251,7 @@ function BranchCard({ branch, canEdit, onRefresh }) {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900">{branch.name}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {branch.address || '—'}
+            {branch.address || ''}
             {branch.phone && ` · ${branch.phone}`}
           </p>
         </div>

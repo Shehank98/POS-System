@@ -115,7 +115,7 @@ function VariantRow({ variant, productName, basePrice, onDelete, onStockChange, 
             <span className="text-gray-600">{variant.color}</span>
           </div>
         </td>
-        <td className="py-2 px-3 font-mono text-xs text-gray-400">{variant.sku || '—'}</td>
+        <td className="py-2 px-3 font-mono text-xs text-gray-400">{variant.sku || ''}</td>
         <td className="py-2 px-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={variant.barcode}>
           {variant.barcode || <span className="text-gray-200">no barcode</span>}
         </td>
@@ -125,7 +125,7 @@ function VariantRow({ variant, productName, basePrice, onDelete, onStockChange, 
           <div className="flex items-center justify-end gap-1 group">
             {priceOverride != null
               ? <span className="text-gray-700 font-medium">Rs. {fmt(priceOverride)}</span>
-              : <span className="text-gray-400 text-xs italic">base ({basePrice ? `Rs. ${fmt(basePrice)}` : '—'})</span>
+              : <span className="text-gray-400 text-xs italic">base{basePrice ? ` (Rs. ${fmt(basePrice)})` : ''}</span>
             }
             {canEdit && (
               <button
@@ -563,7 +563,7 @@ function AddVariantForm({ productId, basePrice, onAdded, onClose }) {
               <th className="py-2 px-2 text-left text-gray-400 font-semibold uppercase tracking-wide w-28">Color</th>
               <th className="py-2 px-2 text-center text-gray-400 font-semibold uppercase tracking-wide w-24">Stock</th>
               <th className="py-2 px-2 text-center text-gray-400 font-semibold uppercase tracking-wide w-28">
-                Price <span className="font-normal normal-case">(base: {basePrice ? `Rs.${fmt(basePrice)}` : '—'})</span>
+                Price {basePrice ? <span className="font-normal normal-case">(base: Rs.{fmt(basePrice)})</span> : ''}
               </th>
               <th className="py-2 pl-2 pr-4 text-left text-gray-400 font-semibold uppercase tracking-wide">Barcode</th>
             </tr>

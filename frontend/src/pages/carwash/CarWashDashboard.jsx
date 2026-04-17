@@ -134,7 +134,7 @@ export default function CarWashDashboard() {
                         {job.vehicle_number || 'No plate'}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {job.customer_name || job.phone_number || '—'}
+                        {job.customer_name || job.phone_number || ''}
                         {job.staff_name && ` · ${job.staff_name}`}
                       </p>
                     </div>
