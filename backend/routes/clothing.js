@@ -39,6 +39,9 @@ router.post  ('/variants/:id/adjust',    readOnly, requireRole('owner','manager'
 // ── Transactions lookup (for exchange wizard) ─────────────────
 router.get('/transactions/lookup', exchanges.lookupTransaction);
 
+// ── Vouchers ──────────────────────────────────────────────────
+router.get('/vouchers/:code', exchanges.checkVoucher);
+
 // ── Exchanges ─────────────────────────────────────────────────
 router.get ('/exchanges',              exchanges.listExchanges);
 router.post('/exchanges',              readOnly, exchanges.processExchange);

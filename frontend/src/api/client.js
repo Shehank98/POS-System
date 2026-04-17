@@ -194,6 +194,8 @@ export const clothingApi = {
     const url   = `${BASE_URL}/clothing/exchanges/${id}/receipt?token=${encodeURIComponent(token)}`;
     window.open(url, '_blank', 'width=500,height=700,noopener');
   },
+  // Refund vouchers
+  checkVoucher:       (code)         => client.get(`/clothing/vouchers/${encodeURIComponent(code)}`),
   // Reports
   dashboard:          ()             => client.get('/clothing/dashboard'),
   bestSizes:          (params)       => client.get('/clothing/reports/best-sizes', { params }),

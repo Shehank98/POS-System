@@ -1,9 +1,24 @@
-const db = require('../../config/database');
+const db     = require('../../config/database');
+const bwipjs = require('bwip-js');
 
 function genExchangeNumber(shopId) {
   const n = new Date();
   const p = (x, l) => String(x).padStart(l, '0');
   return `EXC-${shopId}-${n.getFullYear()}${p(n.getMonth()+1,2)}${p(n.getDate(),2)}-${Date.now().toString().slice(-6)}`;
+}
+
+function genVoucherCode(shopId) {
+  return `VCH-${shopId}-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,5).toUpperCase()}`;
+}
+
+async function barcodeBase64(text) {
+  const png = await bwipjs.toBuffer({
+    bcid: 'code128', text,
+    scale: 2, height: 12,
+    includetext: false,
+    paddingwidth: 4, paddingheight: 2,
+  });
+  return `data:image/png;base64,${png.toString('base64')}`;
 }
 
 // ── GET /api/clothing/transactions/lookup ─────────────────────
@@ -51,7 +66,6 @@ async function lookupTransaction(req, res) {
         [txn.id]
       );
 
-      // Check if this transaction was already exchanged
       const { rows: excRows } = await db.query(
         `SELECT exchange_number FROM clothing_exchanges
           WHERE original_transaction_id = $1 AND shop_id = $2
@@ -75,13 +89,35 @@ async function lookupTransaction(req, res) {
   }
 }
 
+// ── GET /api/clothing/vouchers/:code ──────────────────────────
+async function checkVoucher(req, res) {
+  const { code } = req.params;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM clothing_refund_vouchers
+        WHERE shop_id = $1 AND voucher_code = $2`,
+      [req.shopId, code.trim()]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Voucher not found' });
+    const v = rows[0];
+    if (v.used_at) return res.status(400).json({ error: 'Voucher already used' });
+    if (new Date(v.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Voucher expired' });
+    }
+    res.json({ voucher_code: v.voucher_code, amount: parseFloat(v.amount), expires_at: v.expires_at });
+  } catch (err) {
+    console.error('checkVoucher error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── POST /api/clothing/exchanges ──────────────────────────────
 async function processExchange(req, res) {
   const {
     original_transaction_id,
     customer_phone = '',
-    returned_items = [],  // [{ variant_id, quantity, original_transaction_item_id }]
-    issued_items   = [],  // [{ variant_id, quantity }]
+    returned_items = [],
+    issued_items   = [],
     note = '',
   } = req.body;
 
@@ -93,7 +129,6 @@ async function processExchange(req, res) {
   try {
     await client.query('BEGIN');
 
-    // 1. Verify original transaction belongs to this shop
     const { rows: txnRows } = await client.query(
       `SELECT * FROM transactions WHERE id = $1 AND shop_id = $2`,
       [original_transaction_id, req.shopId]
@@ -103,7 +138,6 @@ async function processExchange(req, res) {
       return res.status(404).json({ error: 'Original transaction not found' });
     }
 
-    // 2. Validate returned items are in original transaction
     let returnedValue = 0;
     for (const ri of returned_items) {
       const { rows } = await client.query(
@@ -118,17 +152,15 @@ async function processExchange(req, res) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Item ${ri.original_transaction_item_id} not in original transaction` });
       }
-      const origQty = parseFloat(rows[0].quantity);
-      if (ri.quantity > origQty) {
+      if (ri.quantity > parseFloat(rows[0].quantity)) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: `Cannot return more than purchased quantity for item ${ri.original_transaction_item_id}` });
+        return res.status(400).json({ error: `Cannot return more than purchased quantity` });
       }
       ri._unit_price = parseFloat(rows[0].unit_price);
       ri._subtotal   = ri._unit_price * ri.quantity;
       returnedValue += ri._subtotal;
     }
 
-    // 3. Validate issued items have enough stock
     let issuedValue = 0;
     for (const ii of issued_items) {
       const { rows } = await client.query(
@@ -154,7 +186,6 @@ async function processExchange(req, res) {
     const net_refund = returnedValue - issuedValue;
     const exchangeNumber = genExchangeNumber(req.shopId);
 
-    // 4. Insert exchange record
     const { rows: excRows } = await client.query(
       `INSERT INTO clothing_exchanges
          (shop_id, user_id, original_transaction_id, exchange_number,
@@ -165,7 +196,6 @@ async function processExchange(req, res) {
     );
     const exc = excRows[0];
 
-    // 5. Insert exchange items + update stock
     for (const ri of returned_items) {
       await client.query(
         `INSERT INTO clothing_exchange_items
@@ -204,8 +234,26 @@ async function processExchange(req, res) {
       );
     }
 
+    // Create refund voucher when customer is owed money (net_refund > 0)
+    let voucher = null;
+    if (net_refund > 0) {
+      try {
+        const voucherCode = genVoucherCode(req.shopId);
+        const { rows: vRows } = await client.query(
+          `INSERT INTO clothing_refund_vouchers
+             (shop_id, exchange_id, voucher_code, amount, expires_at)
+           VALUES ($1, $2, $3, $4, NOW() + INTERVAL '10 days') RETURNING *`,
+          [req.shopId, exc.id, voucherCode, net_refund]
+        );
+        voucher = vRows[0];
+      } catch (ve) {
+        // Table may not exist yet (migration pending) — continue without voucher
+        console.warn('clothing_refund_vouchers not yet created:', ve.message);
+      }
+    }
+
     await client.query('COMMIT');
-    res.status(201).json(exc);
+    res.status(201).json({ ...exc, voucher });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('processExchange error:', err);
@@ -280,27 +328,57 @@ async function getExchangeReceipt(req, res) {
       [req.params.id]
     );
 
-    const ex = excRows[0];
+    const ex       = excRows[0];
     const returned = items.filter(i => i.direction === 'returned');
     const issued   = items.filter(i => i.direction === 'issued');
     const net      = parseFloat(ex.net_refund_amount);
     const fmt      = n => Number(n || 0).toFixed(2);
     const esc      = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-    const QRCode = require('qrcode');
-    let qrBlock = '';
-    // QR code for net payment amount (customer pays extra)
+    // Look up voucher for this exchange (if net > 0)
+    let voucherBlock = '';
+    if (net > 0) {
+      try {
+        const { rows: vRows } = await db.query(
+          `SELECT * FROM clothing_refund_vouchers
+            WHERE exchange_id = $1 AND shop_id = $2
+            ORDER BY created_at DESC LIMIT 1`,
+          [ex.id, ex.shop_id]
+        );
+        if (vRows.length) {
+          const v = vRows[0];
+          const expDate = new Date(v.expires_at).toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric'
+          });
+          const barcodeImg = await barcodeBase64(v.voucher_code);
+          const usedLabel = v.used_at ? '<p style="color:#c00;font-weight:bold;text-align:center">⚠ VOUCHER USED</p>' : '';
+          voucherBlock = `
+<div class="divider"></div>
+<p style="text-align:center;font-weight:bold;font-size:1em;margin-bottom:2mm;">REFUND VOUCHER</p>
+${usedLabel}
+<img src="${barcodeImg}" style="display:block;margin:0 auto 1mm;max-width:100%;height:auto;" alt="${esc(v.voucher_code)}" />
+<p style="text-align:center;font-family:monospace;font-size:0.85em;margin-bottom:1.5mm;">${esc(v.voucher_code)}</p>
+<p style="text-align:center;font-size:1.05em;font-weight:bold;">Rs. ${fmt(v.amount)}</p>
+<p style="text-align:center;font-size:0.8em;color:#555;">Scan at checkout to apply as discount</p>
+<p style="text-align:center;font-size:0.8em;color:#c00;font-weight:bold;">Valid until: ${expDate} (10 days)</p>`;
+        }
+      } catch { /* voucher table may not exist yet */ }
+    }
+
+    // QR for customer payment when they owe money
+    let paymentBlock = '';
     if (net < 0) {
       const payAmt = Math.abs(net).toFixed(2);
       try {
-        const qrData  = `EXCHANGE-PAYMENT:${ex.exchange_number}:${payAmt}`;
-        const qrUrl   = await QRCode.toDataURL(qrData, { width: 120, margin: 1 });
-        qrBlock = `
+        const QRCode = require('qrcode');
+        const qrData = `EXCHANGE-PAYMENT:${ex.exchange_number}:${payAmt}`;
+        const qrUrl  = await QRCode.toDataURL(qrData, { width: 120, margin: 1 });
+        paymentBlock = `
 <div class="divider"></div>
-<div style="text-align:center; margin:3mm 0 2mm;">
-  <img src="${qrUrl}" width="90" height="90" alt="Payment QR" style="display:block; margin:0 auto 1.5mm;" />
-  <p style="font-size:0.85em; font-weight:bold; color:#c00;">Amount Due: Rs. ${payAmt}</p>
-  <p style="font-size:0.75em; color:#555;">Scan to pay the difference</p>
+<div style="text-align:center;margin:3mm 0 2mm;">
+  <img src="${qrUrl}" width="90" height="90" alt="Payment QR" style="display:block;margin:0 auto 1.5mm;" />
+  <p style="font-size:0.85em;font-weight:bold;color:#c00;">Amount Due: Rs. ${payAmt}</p>
+  <p style="font-size:0.75em;color:#555;">Scan to pay the difference</p>
 </div>`;
       } catch { /* skip if QR fails */ }
     }
@@ -410,17 +488,16 @@ ${issued.length ? `
 <table>
   <tfoot>
     <tr class="net-row">
-      <td colspan="3">${net >= 0 ? 'REFUND TO CUSTOMER' : 'AMOUNT DUE'}</td>
+      <td colspan="3">${net >= 0 ? 'REFUND VOUCHER VALUE' : 'AMOUNT DUE FROM CUSTOMER'}</td>
       <td>${net >= 0 ? `Rs. ${fmt(net)}` : `Rs. ${fmt(Math.abs(net))}`}</td>
     </tr>
   </tfoot>
 </table>
 
-${qrBlock}
+${voucherBlock}
+${paymentBlock}
+
 <div class="divider"></div>
-${net >= 0
-  ? `<p class="thank-you bold">Refund: Rs. ${fmt(net)} — Please pay the customer</p>`
-  : `<p class="thank-you bold" style="color:#c00;">Customer pays Rs. ${fmt(Math.abs(net))}</p>`}
 <p class="thank-you">Thank you!</p>
 <p class="thank-you" style="font-size:0.75em; margin-top:1mm; color:#777;">Powered by BillFlow</p>
 
@@ -444,4 +521,4 @@ ${net >= 0
   }
 }
 
-module.exports = { lookupTransaction, processExchange, listExchanges, getExchange, getExchangeReceipt };
+module.exports = { lookupTransaction, checkVoucher, processExchange, listExchanges, getExchange, getExchangeReceipt };

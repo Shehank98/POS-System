@@ -20,7 +20,8 @@ const fmtN = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDi
 // Quick-cash buttons
 const CASH_PRESETS = [5, 10, 20, 50, 100];
 
-export default function PaymentModal({ totals, items, onClose, onComplete }) {
+export default function PaymentModal({ totals, items, onClose, onComplete,
+    customerPhone, loyaltyPointsUsed = 0, voucherCode, voucherAmount = 0 }) {
   const user    = useAuthStore((s) => s.user);
   const isOnline = navigator.onLine;
 
@@ -30,7 +31,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
   const [saving,    setSaving]    = useState(false);
   const [done,      setDone]      = useState(null);    // { offline?: bool, server_id?, transaction_number? }
 
-  const grand    = totals.grandTotal;
+  const grand    = Math.max(0, totals.grandTotal - voucherAmount - (loyaltyPointsUsed / 100));
   const cashNum  = parseFloat(cashGiven) || 0;
   const cardNum  = parseFloat(cardAmt)  || 0;
   const change   = method === 'cash'  ? Math.max(0, cashNum - grand) : 0;
@@ -58,9 +59,12 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
     if (isOnline) {
       try {
         const { data } = await transactionsApi.create({
-          payment_method:  method === 'split' ? 'cash' : method,
-          discount_amount: totals.orderDiscount,
-          items:           itemsPayload,
+          payment_method:      method === 'split' ? 'cash' : method,
+          discount_amount:     totals.orderDiscount,
+          items:               itemsPayload,
+          customer_phone:      customerPhone || undefined,
+          loyalty_points_used: loyaltyPointsUsed || undefined,
+          voucher_code:        voucherCode   || undefined,
         });
         setDone({ server_id: data.id, transaction_number: data.transaction_number });
         toast.success('Payment successful!');
@@ -174,6 +178,16 @@ export default function PaymentModal({ totals, items, onClose, onComplete }) {
             <p className="text-4xl font-bold text-primary-700">{fmtN(grand)}</p>
             {totals.taxAmount > 0 && (
               <p className="text-xs text-gray-400 mt-1">incl. {fmt(totals.taxAmount)} tax</p>
+            )}
+            {voucherAmount > 0 && (
+              <p className="text-xs text-green-600 mt-1 font-semibold">
+                🎫 Refund Voucher applied: −Rs. {fmt(voucherAmount)}
+              </p>
+            )}
+            {loyaltyPointsUsed > 0 && (
+              <p className="text-xs text-indigo-600 mt-1 font-semibold">
+                ⭐ {loyaltyPointsUsed} pts redeemed: −Rs. {fmt(loyaltyPointsUsed / 100)}
+              </p>
             )}
           </div>
 

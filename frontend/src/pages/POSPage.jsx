@@ -327,7 +327,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
 }
 
 // ── Cart panel (desktop sidebar + mobile drawer) ───────────────
-function CartPanel({ onPayClick, onClose, clothingProps }) {
+function CartPanel({ onPayClick, onClose, clothingProps, voucherAmount = 0, voucherCode = '' }) {
   const {
     items, orderDiscount,
     setQty, setItemDiscount, removeItem, setOrderDiscount, clearCart,
@@ -448,12 +448,22 @@ function CartPanel({ onPayClick, onClose, clothingProps }) {
               />
             </div>
           </div>
+
+          {/* Refund voucher discount */}
+          {voucherAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-green-600 font-medium">🎫 Refund Voucher</span>
+              <span className="font-semibold text-green-600">−Rs. {fmt(voucherAmount)}</span>
+            </div>
+          )}
         </div>
 
         {/* Total row */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
           <span className="font-bold text-gray-900">Total</span>
-          <span className="text-xl font-extrabold text-primary-700">Rs. {fmt(totals.grandTotal)}</span>
+          <span className="text-xl font-extrabold text-primary-700">
+            Rs. {fmt(Math.max(0, totals.grandTotal - voucherAmount))}
+          </span>
         </div>
 
         {/* Charge button */}
@@ -550,6 +560,9 @@ export default function POSPage() {
   const [customerData,    setCustomerData]    = useState(null); // { loyalty_points, name }
   const [pointsToRedeem,  setPointsToRedeem]  = useState(0);
   const [showCustomer,    setShowCustomer]    = useState(false);
+  // Refund voucher (clothing)
+  const [voucherCode,     setVoucherCode]     = useState('');
+  const [voucherAmount,   setVoucherAmount]   = useState(0);
 
   // UI state
   const [barcodeInput,   setBarcodeInput]   = useState('');
@@ -649,6 +662,20 @@ export default function POSPage() {
 
   // ── Barcode resolver (clothing-aware) ────────────────────────
   const resolveBarcode = useCallback(async (code) => {
+    // Refund voucher codes always start with VCH-
+    if (code.toUpperCase().startsWith('VCH-')) {
+      try {
+        const { data } = await clothingApi.checkVoucher(code);
+        setVoucherCode(data.voucher_code);
+        setVoucherAmount(parseFloat(data.amount));
+        const expDate = new Date(data.expires_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+        toast.success(`🎫 Refund voucher applied — Rs. ${Number(data.amount).toFixed(2)} (valid until ${expDate})`);
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Voucher invalid or expired');
+      }
+      return;
+    }
+
     if (isClothing) {
       const { data } = await clothingApi.getVariantByBarcode(code);
       const cartItem = {
@@ -981,6 +1008,8 @@ export default function POSPage() {
                       overflow-hidden shrink-0">
         <CartPanel
           onPayClick={() => setShowPayment(true)}
+          voucherAmount={voucherAmount}
+          voucherCode={voucherCode}
           clothingProps={isClothing ? {
             phone: customerPhone, setPhone: setCustomerPhone,
             customerData, onLookup: lookupCustomer,
@@ -1038,6 +1067,8 @@ export default function POSPage() {
               <CartPanel
                 onPayClick={() => { setShowMobileCart(false); setShowPayment(true); }}
                 onClose={() => setShowMobileCart(false)}
+                voucherAmount={voucherAmount}
+                voucherCode={voucherCode}
                 clothingProps={isClothing ? {
                   phone: customerPhone, setPhone: setCustomerPhone,
                   customerData, onLookup: lookupCustomer,
@@ -1103,6 +1134,10 @@ export default function POSPage() {
         <PaymentModal
           totals={totals}
           items={items}
+          customerPhone={customerPhone || undefined}
+          loyaltyPointsUsed={pointsToRedeem}
+          voucherCode={voucherCode || undefined}
+          voucherAmount={voucherAmount}
           onClose={() => setShowPayment(false)}
           onComplete={async () => {
             if (activePreOrder) {
@@ -1116,6 +1151,11 @@ export default function POSPage() {
             }
             setShowPayment(false);
             clearCart();
+            setVoucherCode('');
+            setVoucherAmount(0);
+            setPointsToRedeem(0);
+            setCustomerData(null);
+            setCustomerPhone('');
             loadProducts();
             barcodeRef.current?.focus();
           }}

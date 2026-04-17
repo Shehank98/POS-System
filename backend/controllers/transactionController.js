@@ -127,8 +127,10 @@ async function createTransaction(req, res) {
     // Accept customer_phone + loyalty for clothing shops (graceful fallback)
     const customer_phone    = req.body.customer_phone || null;
     const loyalty_pts_used  = parseInt(req.body.loyalty_points_used, 10) || 0;
+    const voucher_code      = req.body.voucher_code   || null;
     let   customer_id       = null;
     let   loyalty_pts_earned = 0;
+    let   voucher_amount    = 0;
 
     if (customer_phone) {
       try {
@@ -148,12 +150,31 @@ async function createTransaction(req, res) {
       } catch { /* migration 013 not yet applied — continue without loyalty */ }
     }
 
-    const txnTotalAdjusted = subtotalSum + taxSum
+    // Validate and reserve refund voucher if provided
+    if (voucher_code) {
+      try {
+        const { rows: vRows } = await client.query(
+          `SELECT * FROM clothing_refund_vouchers
+            WHERE shop_id = $1 AND voucher_code = $2
+              AND used_at IS NULL AND expires_at > NOW()
+            FOR UPDATE`,
+          [req.shopId, voucher_code]
+        );
+        if (vRows.length) {
+          voucher_amount = parseFloat(vRows[0].amount);
+        }
+      } catch { /* voucher table may not exist yet */ }
+    }
+
+    const txnTotalAdjusted = Math.max(0, subtotalSum + taxSum
       - parseFloat(discount_amount)
-      - (loyalty_pts_used / 100);
+      - voucher_amount
+      - (loyalty_pts_used / 100));
 
     const txnNumber   = generateTxnNumber(req.shopId);
     loyalty_pts_earned = Math.floor(Math.max(0, txnTotalAdjusted));
+
+    const totalDiscountAmount = parseFloat(discount_amount) + voucher_amount + (loyalty_pts_used / 100);
 
     let txnRows;
     try {
@@ -165,7 +186,7 @@ async function createTransaction(req, res) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11)
          RETURNING *`,
         [req.shopId, req.user.id, txnNumber, txnTotalAdjusted, taxSum,
-         discount_amount, payment_method,
+         totalDiscountAmount, payment_method,
          customer_id, customer_phone, loyalty_pts_used, loyalty_pts_earned]
       ));
     } catch {
@@ -176,9 +197,8 @@ async function createTransaction(req, res) {
             discount_amount, payment_method, status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,'completed')
          RETURNING *`,
-        [req.shopId, req.user.id, txnNumber,
-         subtotalSum + taxSum - parseFloat(discount_amount),
-         taxSum, discount_amount, payment_method]
+        [req.shopId, req.user.id, txnNumber, txnTotalAdjusted,
+         taxSum, totalDiscountAmount, payment_method]
       ));
     }
 
@@ -194,6 +214,18 @@ async function createTransaction(req, res) {
           [loyalty_pts_earned, Math.max(0, txnTotalAdjusted), customer_id]
         );
       } catch { /* ignore if migration not applied */ }
+    }
+
+    // Mark refund voucher as used
+    if (voucher_code && voucher_amount > 0) {
+      try {
+        await client.query(
+          `UPDATE clothing_refund_vouchers
+              SET used_at = NOW(), transaction_id = $1
+            WHERE shop_id = $2 AND voucher_code = $3`,
+          [txn.id, req.shopId, voucher_code]
+        );
+      } catch { /* ignore */ }
     }
 
     for (const item of enrichedItems) {
