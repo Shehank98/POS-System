@@ -964,9 +964,9 @@ export default function POSPage() {
           </div>
         )}
 
-        {/* Product grid */}
-        {/* pb-28 = 112px: bottom nav 56px + cart button ~52px + 4px gap */}
-        <div className="flex-1 overflow-y-auto px-3 pb-28 md:pb-4">
+        {/* Product grid — pb accounts for bottom tab (56px) + floating cart (~56px) + safe area */}
+        <div className="flex-1 overflow-y-auto px-3 md:pb-4"
+             style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}>
           {loadingProds ? (
             /* Skeleton — matches compact card shape */
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pt-1">
@@ -1019,7 +1019,7 @@ export default function POSPage() {
       </div>
 
       {/* ── MOBILE: floating cart button ── */}
-      <div className="md:hidden fixed bottom-[3.75rem] left-0 right-0 z-30 px-3 pointer-events-none">
+      <div className="md:hidden fixed bottom-safe-tab left-0 right-0 z-30 px-3 pointer-events-none mb-1">
         <button
           className="w-full flex items-center justify-between
                      bg-primary-600 hover:bg-primary-700 active:bg-primary-800
@@ -1056,7 +1056,7 @@ export default function POSPage() {
         >
           <div
             className="absolute bottom-0 left-0 right-0 max-h-[88vh] bg-white
-                       rounded-t-3xl overflow-hidden flex flex-col shadow-2xl"
+                       rounded-t-3xl overflow-hidden flex flex-col shadow-2xl safe-area-bottom"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drag handle */}

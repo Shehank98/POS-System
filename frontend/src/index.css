@@ -8,6 +8,21 @@
   }
 }
 
+@layer utilities {
+  /* iOS safe-area support for bottom tab bar */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pb-safe-tab {
+    /* content padding = tab bar 56px + iOS home indicator */
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-safe-tab {
+    /* position just above the expanded tab bar */
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg

@@ -260,38 +260,42 @@ export default function Layout() {
       </div>
 
       {/* ── Mobile bottom tab bar ────────────────────────────── */}
+      {/* safe-area-bottom adds env(safe-area-inset-bottom) padding so the bar
+          extends into the iPhone home-indicator zone with the correct bg color */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t
-                      border-gray-200 flex h-14 safe-area-bottom">
-        {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
-               transition-colors ${isActive
-                ? 'text-primary-600'
-                : 'text-gray-500 hover:text-gray-700'}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
-                {label}
-              </>
-            )}
-          </NavLink>
-        ))}
+                      border-gray-200 safe-area-bottom">
+        <div className="flex h-14">
+          {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
+                 transition-colors ${isActive
+                  ? 'text-primary-600'
+                  : 'text-gray-500 hover:text-gray-700'}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
 
-        {/* More button */}
-        <button
-          onClick={() => setMoreOpen((v) => !v)}
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
-                      font-medium transition-colors
-                      ${moreActive ? 'text-primary-600' : 'text-gray-500'}`}
-        >
-          <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-primary-600' : 'text-gray-400'}`} />
-          More
-        </button>
+          {/* More button */}
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
+                        font-medium transition-colors
+                        ${moreActive ? 'text-primary-600' : 'text-gray-500'}`}
+          >
+            <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-primary-600' : 'text-gray-400'}`} />
+            More
+          </button>
+        </div>
       </div>
 
       {/* ── "More" bottom sheet ───────────────────────────────── */}
@@ -301,8 +305,8 @@ export default function Layout() {
           onClick={() => setMoreOpen(false)}
         >
           <div
-            className="absolute bottom-14 left-0 right-0 bg-white border-t border-gray-200
-                       rounded-t-2xl pb-2"
+            className="absolute left-0 right-0 bg-white border-t border-gray-200
+                       rounded-t-2xl pb-2 bottom-safe-tab"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drag handle */}
@@ -310,7 +314,8 @@ export default function Layout() {
               <div className="w-8 h-1 bg-gray-200 rounded-full" />
             </div>
 
-            <nav className="px-2 space-y-0.5">
+            {/* Scrollable nav list — max 65vh so it never overflows small screens */}
+            <nav className="px-2 space-y-0.5 overflow-y-auto max-h-[65vh]">
               {MORE_NAV
                 .filter(({ roles }) => !roles || roles.includes(user?.role))
                 .map(({ to, label, icon: Icon }) => (
@@ -324,12 +329,16 @@ export default function Layout() {
                         : 'text-gray-700 hover:bg-gray-50'}`
                     }
                   >
-                    <Icon className="w-5 h-5 shrink-0 text-gray-400" />
-                    {label}
-                    {to === '/pre-orders' && pendingCount > 0 && (
-                      <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
-                        {pendingCount}
-                      </span>
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                        {label}
+                        {to === '/pre-orders' && pendingCount > 0 && (
+                          <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </>
                     )}
                   </NavLink>
                 ))
@@ -350,7 +359,8 @@ export default function Layout() {
       )}
 
       {/* ── Main content ──────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 pt-14 md:pt-0 pb-14 md:pb-0">
+      {/* pb-safe-tab = 3.5rem (tab bar) + env(safe-area-inset-bottom) */}
+      <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pb-0 pb-safe-tab">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <Outlet />
         </div>
