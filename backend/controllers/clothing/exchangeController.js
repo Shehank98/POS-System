@@ -30,7 +30,12 @@ async function lookupTransaction(req, res) {
       ));
     }
 
-    if (!txnRows.length) return res.status(404).json({ error: 'Transaction not found' });
+    if (!txnRows.length) {
+      const msg = txn_number
+        ? 'Transaction not found'
+        : 'No orders found for this phone number';
+      return res.status(404).json({ error: msg });
+    }
 
     const result = await Promise.all(txnRows.map(async (txn) => {
       const { rows: items } = await db.query(
@@ -45,7 +50,22 @@ async function lookupTransaction(req, res) {
           WHERE ti.transaction_id = $1`,
         [txn.id]
       );
-      return { ...txn, items };
+
+      // Check if this transaction was already exchanged
+      const { rows: excRows } = await db.query(
+        `SELECT exchange_number FROM clothing_exchanges
+          WHERE original_transaction_id = $1 AND shop_id = $2
+            AND status = 'completed'
+          ORDER BY created_at DESC LIMIT 1`,
+        [txn.id, req.shopId]
+      );
+
+      return {
+        ...txn,
+        items,
+        already_exchanged: excRows.length > 0,
+        exchange_number:   excRows[0]?.exchange_number || null,
+      };
     }));
 
     res.json(txn_number ? result[0] : result);

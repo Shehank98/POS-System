@@ -43,13 +43,23 @@ export default function ClothingExchangesPage() {
     if (!lookupVal.trim()) { toast.error('Enter a receipt number or phone'); return; }
     setLoading(true);
     try {
-      const param = lookupVal.trim().startsWith('TXN-') || /^\d+$/.test(lookupVal.trim())
-        ? { txn_number: lookupVal.trim() }
-        : { phone: lookupVal.trim() };
+      // Only treat as transaction number if it starts with "TXN-"
+      // Phone numbers are all-digit strings and must NOT be sent as txn_number
+      const val = lookupVal.trim();
+      const param = val.toUpperCase().startsWith('TXN-')
+        ? { txn_number: val }
+        : { phone: val };
       const { data } = await clothingApi.lookupTransaction(param);
-      // data may be array (by phone) or single txn
-      const txn = Array.isArray(data) ? data[0] : data;
+      // data may be array (by phone) or single txn (by number)
+      const txnList = Array.isArray(data) ? data : [data];
+      if (!txnList.length) { toast.error('No orders found'); return; }
+      const txn = txnList[0];
       if (!txn) { toast.error('No transaction found'); return; }
+
+      // Show "already exchanged" warning but still allow the user to see the transaction
+      if (txn.already_exchanged) {
+        toast(`This transaction was already exchanged (${txn.exchange_number})`, { icon: '⚠️', duration: 5000 });
+      }
       setTransaction(txn);
       const init = {};
       (txn.items || []).forEach((it) => { init[it.id] = 0; });
@@ -158,7 +168,15 @@ export default function ClothingExchangesPage() {
         <div className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-700">{transaction.transaction_number}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-semibold text-gray-700">{transaction.transaction_number}</p>
+                {transaction.already_exchanged && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300
+                                   px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                    Already Exchanged · {transaction.exchange_number}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-400">
                 {new Date(transaction.transaction_date).toLocaleDateString()}
                 {transaction.customer_phone && ` · ${transaction.customer_phone}`}

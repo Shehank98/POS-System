@@ -189,7 +189,11 @@ export const clothingApi = {
   processExchange:    (data)         => client.post('/clothing/exchanges', data),
   listExchanges:      (params)       => client.get('/clothing/exchanges', { params }),
   getExchange:        (id)           => client.get(`/clothing/exchanges/${id}`),
-  openExchangeReceipt:(id)           => { const url = `${BASE_URL}/clothing/exchanges/${id}/receipt`; window.open(url, '_blank'); },
+  openExchangeReceipt:(id)           => {
+    const token = localStorage.getItem('pos_token') || '';
+    const url   = `${BASE_URL}/clothing/exchanges/${id}/receipt?token=${encodeURIComponent(token)}`;
+    window.open(url, '_blank', 'width=500,height=700,noopener');
+  },
   // Reports
   dashboard:          ()             => client.get('/clothing/dashboard'),
   bestSizes:          (params)       => client.get('/clothing/reports/best-sizes', { params }),
