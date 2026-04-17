@@ -49,10 +49,10 @@ router.post('/exchanges',              readOnly, exchanges.processExchange);
 router.get ('/exchanges/:id/receipt',  exchanges.getExchangeReceipt);
 router.get ('/exchanges/:id',          exchanges.getExchange);
 
-// ── Reports ───────────────────────────────────────────────────
-router.get('/reports/best-sizes',   requireRole('owner','manager'), reports.bestSizes);
-router.get('/reports/best-colors',  requireRole('owner','manager'), reports.bestColors);
-router.get('/reports/daily-sales',  requireRole('owner','manager'), reports.dailySales);
+// ── Reports (read-only — all authenticated shop members can view) ──
+router.get('/reports/best-sizes',  reports.bestSizes);
+router.get('/reports/best-colors', reports.bestColors);
+router.get('/reports/daily-sales', reports.dailySales);
 
 // ── Branches ──────────────────────────────────────────────────
 router.get ('/branches',             branches.listBranches);
