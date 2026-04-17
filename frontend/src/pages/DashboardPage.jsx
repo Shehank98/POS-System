@@ -259,10 +259,10 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <button
             className="btn-primary text-xs"
-            onClick={() => navigate('/analytics')}
+            onClick={() => navigate(user?.shop_type === 'clothing' ? '/clothing-analytics' : '/analytics')}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            Analytics
+            {user?.shop_type === 'clothing' ? 'Clothing Stats' : 'Analytics'}
           </button>
           <button
             className="btn-secondary text-xs"

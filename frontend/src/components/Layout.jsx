@@ -30,8 +30,9 @@ const NAV_BASE = [
 
 // Extra nav items shown only for clothing shop type
 const NAV_CLOTHING = [
-  { to: '/exchanges', label: 'Exchanges', icon: RotateCcw  },
-  { to: '/branches',  label: 'Branches',  icon: GitBranch, roles: ['owner'] },
+  { to: '/exchanges',          label: 'Exchanges',      icon: RotateCcw  },
+  { to: '/clothing-analytics', label: 'Clothing Stats', icon: TrendingUp },
+  { to: '/branches',           label: 'Branches',       icon: GitBranch, roles: ['owner'] },
 ];
 
 // Bottom tab bar - 4 main items + "More" sheet
@@ -60,8 +61,10 @@ export default function Layout() {
   const location = useLocation();
 
   const isClothing = user?.shop_type === 'clothing';
-  const NAV      = isClothing ? [...NAV_BASE, ...NAV_CLOTHING]      : NAV_BASE;
-  const MORE_NAV = isClothing ? [...MORE_NAV_BASE, ...NAV_CLOTHING] : MORE_NAV_BASE;
+  const baseFiltered     = isClothing ? NAV_BASE.filter((n) => n.to !== '/analytics')     : NAV_BASE;
+  const moreBaseFiltered = isClothing ? MORE_NAV_BASE.filter((n) => n.to !== '/analytics') : MORE_NAV_BASE;
+  const NAV      = isClothing ? [...baseFiltered,     ...NAV_CLOTHING] : baseFiltered;
+  const MORE_NAV = isClothing ? [...moreBaseFiltered, ...NAV_CLOTHING] : moreBaseFiltered;
 
   // Desktop hamburger (kept for very narrow viewports or overflow)
   const [drawerOpen, setDrawerOpen] = useState(false);
