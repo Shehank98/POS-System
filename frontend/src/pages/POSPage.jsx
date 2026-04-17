@@ -530,8 +530,9 @@ export default function POSPage() {
   const isClothing     = user?.shop_type === 'clothing';
 
   const [scannerMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
-  const showUsb   = barcodeEnabled && (scannerMode === 'usb'   || scannerMode === 'both');
-  const showPhone = barcodeEnabled && (scannerMode === 'phone' || scannerMode === 'both');
+  // Clothing shops always show all scanner options — barcode is the primary input method
+  const showUsb   = isClothing || (barcodeEnabled && (scannerMode === 'usb'   || scannerMode === 'both'));
+  const showPhone = isClothing || (barcodeEnabled && (scannerMode === 'phone' || scannerMode === 'both'));
 
   const { items, addItem, clearCart } = useCartStore();
   const totals = useCartStore((s) => s.totals);
@@ -810,7 +811,7 @@ export default function POSPage() {
               </button>
             )}
             {/* Camera scanner — direct device camera, ideal for mobile */}
-            {barcodeEnabled && !readOnly && (
+            {(barcodeEnabled || isClothing) && !readOnly && (
               <button
                 onClick={() => setShowCamera(true)}
                 title="Use device camera to scan barcode"
