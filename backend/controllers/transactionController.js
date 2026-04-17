@@ -28,6 +28,47 @@ async function createTransaction(req, res) {
     const enrichedItems = [];
 
     for (const item of items) {
+      // ── Clothing variant path ────────────────────────────────
+      if (item.clothing_variant_id) {
+        const { rows: cvRows } = await client.query(
+          `SELECT cv.*, COALESCE(cv.price_override, cp.base_price) AS effective_price,
+                  cp.tax_rate, cp.name AS product_name
+             FROM clothing_variants cv
+             JOIN clothing_products cp ON cp.id = cv.product_id
+            WHERE cv.id = $1 AND cv.shop_id = $2 AND cv.is_active = TRUE`,
+          [item.clothing_variant_id, req.shopId]
+        );
+        if (!cvRows.length) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: `Clothing variant ${item.clothing_variant_id} not found` });
+        }
+        const cv  = cvRows[0];
+        const qty = parseFloat(item.quantity) || 1;
+        if (cv.stock_quantity < qty) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `Insufficient stock for "${cv.product_name} / ${cv.color} / ${cv.size}". Available: ${cv.stock_quantity}`
+          });
+        }
+        const price    = parseFloat(item.unit_price) || parseFloat(cv.effective_price);
+        const disc     = parseFloat(item.discount) || 0;
+        const subtotal = (price * qty) - disc;
+        const taxAmt   = subtotal * (parseFloat(cv.tax_rate) / 100);
+        subtotalSum   += subtotal;
+        taxSum        += taxAmt;
+
+        await client.query(
+          `UPDATE clothing_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+          [qty, cv.id]
+        );
+        enrichedItems.push({
+          product_id: null, clothing_variant_id: cv.id,
+          quantity: qty, unit_price: price, discount: disc, subtotal,
+        });
+        continue;
+      }
+
+      // ── Standard product path ────────────────────────────────
       let productRows;
       try {
         ({ rows: productRows } = await client.query(
@@ -80,7 +121,7 @@ async function createTransaction(req, res) {
         );
       }
 
-      enrichedItems.push({ product_id: product.id, quantity: qty, unit_price: price, discount: disc, subtotal });
+      enrichedItems.push({ product_id: product.id, clothing_variant_id: null, quantity: qty, unit_price: price, discount: disc, subtotal });
     }
 
     const totalAmount = subtotalSum + taxSum - parseFloat(discount_amount);
@@ -96,11 +137,85 @@ async function createTransaction(req, res) {
 
     const txn = txnRows[0];
 
+    // Accept customer_phone + loyalty for clothing shops (graceful fallback)
+    const customer_phone    = req.body.customer_phone || null;
+    const loyalty_pts_used  = parseInt(req.body.loyalty_points_used, 10) || 0;
+    let   customer_id       = null;
+    let   loyalty_pts_earned = 0;
+
+    if (customer_phone) {
+      try {
+        const { rows: cRows } = await client.query(
+          `INSERT INTO customers (shop_id, phone) VALUES ($1,$2)
+           ON CONFLICT (shop_id, phone) DO UPDATE SET phone = EXCLUDED.phone
+           RETURNING id, loyalty_points`,
+          [req.shopId, customer_phone]
+        );
+        customer_id = cRows[0].id;
+        if (loyalty_pts_used > 0 && cRows[0].loyalty_points >= loyalty_pts_used) {
+          await client.query(
+            `UPDATE customers SET loyalty_points = loyalty_points - $1 WHERE id = $2`,
+            [loyalty_pts_used, customer_id]
+          );
+        }
+      } catch { /* migration 013 not yet applied — continue without loyalty */ }
+    }
+
+    const txnTotalAdjusted = subtotalSum + taxSum
+      - parseFloat(discount_amount)
+      - (loyalty_pts_used / 100);
+
+    const txnNumber   = generateTxnNumber(req.shopId);
+    loyalty_pts_earned = Math.floor(Math.max(0, txnTotalAdjusted));
+
+    let txnRows;
+    try {
+      ({ rows: txnRows } = await client.query(
+        `INSERT INTO transactions
+           (shop_id, user_id, transaction_number, total_amount, tax_amount,
+            discount_amount, payment_method, status,
+            customer_id, customer_phone, loyalty_points_used, loyalty_points_earned)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11)
+         RETURNING *`,
+        [req.shopId, req.user.id, txnNumber, txnTotalAdjusted, taxSum,
+         discount_amount, payment_method,
+         customer_id, customer_phone, loyalty_pts_used, loyalty_pts_earned]
+      ));
+    } catch {
+      // Fallback without loyalty columns (pre-migration 013)
+      ({ rows: txnRows } = await client.query(
+        `INSERT INTO transactions
+           (shop_id, user_id, transaction_number, total_amount, tax_amount,
+            discount_amount, payment_method, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'completed')
+         RETURNING *`,
+        [req.shopId, req.user.id, txnNumber,
+         subtotalSum + taxSum - parseFloat(discount_amount),
+         taxSum, discount_amount, payment_method]
+      ));
+    }
+
+    const txn = txnRows[0];
+
+    // Award loyalty points after txn is created
+    if (customer_id && loyalty_pts_earned > 0) {
+      try {
+        await client.query(
+          `UPDATE customers SET loyalty_points = loyalty_points + $1,
+                                total_spent     = total_spent     + $2
+            WHERE id = $3`,
+          [loyalty_pts_earned, Math.max(0, txnTotalAdjusted), customer_id]
+        );
+      } catch { /* ignore if migration not applied */ }
+    }
+
     for (const item of enrichedItems) {
       await client.query(
-        `INSERT INTO transaction_items (transaction_id, product_id, quantity, unit_price, discount, subtotal)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [txn.id, item.product_id, item.quantity, item.unit_price, item.discount, item.subtotal]
+        `INSERT INTO transaction_items
+           (transaction_id, product_id, clothing_variant_id, quantity, unit_price, discount, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [txn.id, item.product_id, item.clothing_variant_id ?? null,
+         item.quantity, item.unit_price, item.discount, item.subtotal]
       );
     }
 
@@ -108,9 +223,14 @@ async function createTransaction(req, res) {
 
     // Return full transaction with items
     const { rows: fullItems } = await db.query(
-      `SELECT ti.*, p.name AS product_name
+      `SELECT ti.*,
+              COALESCE(p.name, cp.name) AS product_name,
+              cv.size AS variant_size, cv.color AS variant_color,
+              cp.name AS clothing_product_name
          FROM transaction_items ti
          LEFT JOIN products p ON p.id = ti.product_id
+         LEFT JOIN clothing_variants cv ON cv.id = ti.clothing_variant_id
+         LEFT JOIN clothing_products cp ON cp.id = cv.product_id
         WHERE ti.transaction_id = $1`,
       [txn.id]
     );
@@ -232,14 +352,19 @@ async function voidTransaction(req, res) {
 
     // Restore stock (LEFT JOIN so items with deleted products are not skipped)
     const { rows: items } = await client.query(
-      `SELECT ti.product_id, ti.quantity, p.has_inventory
+      `SELECT ti.product_id, ti.clothing_variant_id, ti.quantity, p.has_inventory
          FROM transaction_items ti
          LEFT JOIN products p ON p.id = ti.product_id
         WHERE ti.transaction_id = $1`,
       [req.params.id]
     );
     for (const item of items) {
-      if (item.has_inventory && item.product_id) {
+      if (item.clothing_variant_id) {
+        await client.query(
+          `UPDATE clothing_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
+          [parseFloat(item.quantity), item.clothing_variant_id]
+        );
+      } else if (item.has_inventory && item.product_id) {
         await client.query(
           `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
           [parseFloat(item.quantity), item.product_id]
@@ -308,11 +433,15 @@ async function refundTransaction(req, res) {
       return res.status(400).json({ error: 'Cannot refund a voided transaction' });
     }
 
-    // Fetch original line items
+    // Fetch original line items (with clothing variant info)
     const { rows: origItems } = await client.query(
-      `SELECT ti.*, p.has_inventory, p.tax_rate
+      `SELECT ti.*, p.has_inventory,
+              COALESCE(p.tax_rate, cp.tax_rate, 0) AS tax_rate,
+              ti.clothing_variant_id
          FROM transaction_items ti
          LEFT JOIN products p ON p.id = ti.product_id
+         LEFT JOIN clothing_variants cv ON cv.id = ti.clothing_variant_id
+         LEFT JOIN clothing_products cp ON cp.id = cv.product_id
         WHERE ti.transaction_id = $1`,
       [original.id]
     );
@@ -349,7 +478,8 @@ async function refundTransaction(req, res) {
       refundTax      += taxAmt;
 
       enriched.push({
-        product_id: orig.product_id,
+        product_id:          orig.product_id,
+        clothing_variant_id: orig.clothing_variant_id,
         quantity:   qty,
         unit_price: orig.unit_price,
         discount:   parseFloat(orig.discount) * ratio,
@@ -377,13 +507,18 @@ async function refundTransaction(req, res) {
     for (const item of enriched) {
       await client.query(
         `INSERT INTO transaction_items
-           (transaction_id, product_id, quantity, unit_price, discount, subtotal)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [refundTxn.id, item.product_id, item.quantity,
-         item.unit_price, item.discount, item.subtotal]
+           (transaction_id, product_id, clothing_variant_id, quantity, unit_price, discount, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [refundTxn.id, item.product_id, item.clothing_variant_id ?? null,
+         item.quantity, item.unit_price, item.discount, item.subtotal]
       );
 
-      if (item.has_inventory && item.product_id) {
+      if (item.clothing_variant_id) {
+        await client.query(
+          `UPDATE clothing_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
+          [item.quantity, item.clothing_variant_id]
+        );
+      } else if (item.has_inventory && item.product_id) {
         await client.query(
           `UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2`,
           [item.quantity, item.product_id]
