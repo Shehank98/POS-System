@@ -480,7 +480,7 @@ function CartPanel({ onPayClick, onClose, clothingProps, voucherAmount = 0, vouc
               <CreditCard className="w-5 h-5" />
               <span className="text-base font-semibold">Charge</span>
             </div>
-            <span className="text-lg font-extrabold">Rs. {fmt(totals.grandTotal)}</span>
+            <span className="text-lg font-extrabold">Rs. {fmt(Math.max(0, totals.grandTotal - voucherAmount))}</span>
           </button>
         </div>
       </div>
@@ -1044,7 +1044,7 @@ export default function POSPage() {
                 : 'Cart is empty'}
             </span>
           </div>
-          <span className="text-base font-extrabold">Rs. {fmt(totals.grandTotal)}</span>
+          <span className="text-base font-extrabold">Rs. {fmt(Math.max(0, totals.grandTotal - voucherAmount))}</span>
         </button>
       </div>
 
