@@ -20,9 +20,13 @@ class AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      await _ref.read(secureStorageProvider).deleteAll();
-      // Invalidate auth so router redirects to login
-      _ref.invalidate(secureStorageProvider);
+      final body = err.response?.data;
+      final errorMsg = body is Map ? (body['error'] as String? ?? '') : '';
+      // Only clear session if token is invalid/expired — not for permission errors
+      if (errorMsg.contains('token') || errorMsg.contains('Token')) {
+        await _ref.read(secureStorageProvider).deleteAll();
+        _ref.invalidate(secureStorageProvider);
+      }
     }
     handler.next(err);
   }

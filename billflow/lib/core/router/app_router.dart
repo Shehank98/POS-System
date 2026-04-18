@@ -24,18 +24,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/dashboard',
+    initialLocation: '/',
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
       final isLoading = authState.isLoading;
-      final isLoginRoute = state.matchedLocation == '/login';
+      final loc = state.matchedLocation;
 
-      if (isLoading) return null;
-      if (!isLoggedIn && !isLoginRoute) return '/login';
-      if (isLoggedIn && isLoginRoute) return '/dashboard';
+      if (isLoading) return loc == '/' ? null : '/';
+      if (!isLoggedIn && loc != '/login') return '/login';
+      if (isLoggedIn && (loc == '/login' || loc == '/')) return '/dashboard';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
