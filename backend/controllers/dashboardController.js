@@ -322,22 +322,20 @@ async function getAnalytics(req, res) {
         WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
       `, jtParams),
 
-      // Top 20 products by revenue with profit breakdown (includes clothing)
+      // Top 20 products by revenue with profit breakdown
       db.query(`
         SELECT
-          COALESCE(cp.name, p.name, '[Deleted Product]')                           AS name,
-          SUM(ti.quantity)::numeric                                                  AS qty_sold,
-          COALESCE(SUM(ti.subtotal), 0)                                             AS revenue,
-          COALESCE(SUM(ti.quantity * COALESCE(cp.cost_price, p.cost_price, 0)), 0) AS cost,
+          COALESCE(p.name, '[Deleted Product]')                        AS name,
+          SUM(ti.quantity)::numeric                                     AS qty_sold,
+          COALESCE(SUM(ti.subtotal), 0)                                AS revenue,
+          COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0)   AS cost,
           COALESCE(SUM(ti.subtotal), 0)
-            - COALESCE(SUM(ti.quantity * COALESCE(cp.cost_price, p.cost_price, 0)), 0) AS profit
+            - COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS profit
         FROM transaction_items ti
         JOIN  transactions t ON t.id = ti.transaction_id
-        LEFT JOIN products          p  ON p.id  = ti.product_id
-        LEFT JOIN clothing_variants cv ON cv.id  = ti.clothing_variant_id
-        LEFT JOIN clothing_products cp ON cp.id  = cv.product_id
+        LEFT JOIN products  p ON p.id = ti.product_id
         WHERE t.shop_id = $1 AND t.status = 'completed' ${jtDateWhere}
-        GROUP BY COALESCE(cp.name, p.name)
+        GROUP BY p.name
         ORDER BY revenue DESC
         LIMIT 20
       `, jtParams),
