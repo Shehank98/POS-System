@@ -164,7 +164,7 @@ function ProductCard({ product, onSelect, disabled }) {
             </span>
           )}
           <span className="text-[13px] font-bold text-primary-700 shrink-0 ml-auto">
-            {fmt(product.price)}{product.unit_type === 'kg' ? '/kg' : ''}
+            {fmt(product.base_price ?? product.price)}{product.unit_type === 'kg' ? '/kg' : ''}
           </span>
         </div>
       </div>
