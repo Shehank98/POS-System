@@ -7,7 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import useCartStore   from '../store/cartStore';
 import useAuthStore   from '../store/authStore';
-import { productsApi, preOrdersApi, clothingApi } from '../api/client';
+import { productsApi, preOrdersApi, clothingApi, customersApi } from '../api/client';
 import PaymentModal      from '../components/PaymentModal';
 import usePosScanner     from '../hooks/usePosScanner';
 import PhoneScannerModal from '../components/PhoneScannerModal';
@@ -538,6 +538,7 @@ export default function POSPage() {
   const barcodeEnabled = user?.barcode_enabled ?? false;
   const readOnly       = user?.read_only ?? false;
   const isClothing     = user?.shop_type === 'clothing';
+  const hasLoyalty     = user?.loyalty_enabled && (isClothing || user?.shop_type === 'grocery' || user?.shop_type === 'retail');
 
   const [scannerMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
   // Clothing shops always show all scanner options — barcode is the primary input method
@@ -614,14 +615,18 @@ export default function POSPage() {
       .finally(() => setLoadingProds(false));
   }
 
-  // ── Clothing: lookup customer loyalty ────────────────────────
+  // ── Customer loyalty lookup ───────────────────────────────────
   async function lookupCustomer() {
     const phone = customerPhone.trim();
     if (!phone) return;
     try {
-      const { data } = await clothingApi.getCustomer(phone);
-      setCustomerData(data);
-      toast.success(`${data.name || phone} — ${data.loyalty_points} pts`);
+      const { data } = isClothing
+        ? await clothingApi.getCustomer(phone)
+        : await customersApi.getInsights(phone);
+      const pts  = data.loyalty_points ?? 0;
+      const name = data.name || data.customer_name || '';
+      setCustomerData({ loyalty_points: pts, name });
+      toast.success(`${name || phone} — ${pts} pts`);
     } catch {
       setCustomerData({ loyalty_points: 0 });
     }
@@ -1010,7 +1015,7 @@ export default function POSPage() {
           onPayClick={() => setShowPayment(true)}
           voucherAmount={voucherAmount}
           voucherCode={voucherCode}
-          clothingProps={isClothing ? {
+          clothingProps={hasLoyalty ? {
             phone: customerPhone, setPhone: setCustomerPhone,
             customerData, onLookup: lookupCustomer,
             pointsToRedeem, setPointsToRedeem,
@@ -1069,7 +1074,7 @@ export default function POSPage() {
                 onClose={() => setShowMobileCart(false)}
                 voucherAmount={voucherAmount}
                 voucherCode={voucherCode}
-                clothingProps={isClothing ? {
+                clothingProps={hasLoyalty ? {
                   phone: customerPhone, setPhone: setCustomerPhone,
                   customerData, onLookup: lookupCustomer,
                   pointsToRedeem, setPointsToRedeem,
