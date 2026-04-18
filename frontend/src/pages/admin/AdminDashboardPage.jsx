@@ -5,7 +5,12 @@ import {
   AlertTriangle, Users, ClipboardList, Plus, CalendarPlus,
   KeyRound, Loader2, BarChart2, TrendingUp, DollarSign,
   ShoppingCart, Package, Trash2, UserPlus, Search,
+  Bell, Send, Layers, Edit3, ToggleLeft, ToggleRight,
 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { adminApi } from '../../api/client';
@@ -1138,6 +1143,559 @@ function AuditRow({ record: r, preview }) {
   );
 }
 
+// ── Dashboard Overview Tab ────────────────────────────────────
+const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+function DashboardTab({ stats }) {
+  if (!stats) return null;
+
+  const monthlyData = (stats.monthly_revenue || []).map((r) => ({
+    month:   r.month,
+    revenue: Number(r.revenue),
+    count:   Number(r.payment_count),
+  }));
+
+  const pieData = (stats.plan_distribution || []).map((r) => ({
+    name:  r.plan,
+    value: Number(r.count),
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Extra stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <Users className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Trial Shops</p>
+            <p className="text-2xl font-bold text-white">{stats.trial_shops}</p>
+          </div>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-red-700 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Expired Shops</p>
+            <p className="text-2xl font-bold text-white">{stats.expired_shops}</p>
+          </div>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">New Shops (7d)</p>
+            <p className="text-2xl font-bold text-white">{stats.new_shops_7d}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly revenue chart */}
+      {monthlyData.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4">
+          <p className="text-sm font-semibold text-white mb-4">Monthly Revenue (last 6 months)</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <XAxis dataKey="month" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                axisLine={false} tickLine={false} width={60}
+                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+              />
+              <Tooltip
+                contentStyle={{ background: '#1f2937', border: 'none', borderRadius: 8 }}
+                labelStyle={{ color: '#e5e7eb' }}
+                formatter={(v) => [`Rs ${Number(v).toLocaleString()}`, 'Revenue']}
+              />
+              <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Plan distribution */}
+      {pieData.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4">
+          <p className="text-sm font-semibold text-white mb-4">Active Subscriptions by Plan</p>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#1f2937', border: 'none', borderRadius: 8 }}
+                  formatter={(v, name) => [v, name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-col gap-2 shrink-0">
+              {pieData.map((d, i) => (
+                <div key={d.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                  <span className="text-sm text-gray-300">{d.name}</span>
+                  <span className="text-sm font-bold text-white ml-2">{d.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {monthlyData.length === 0 && pieData.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <BarChart2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          <p>No subscription data yet</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Plans Tab ─────────────────────────────────────────────────
+function PlanModal({ plan, onClose, onSaved }) {
+  const isEdit = !!plan?.id;
+  const empty = {
+    name: '', base_monthly_price: '',
+    discount_3m: '10', discount_6m: '15', discount_12m: '20',
+    features: '', max_products: '', max_staff: '',
+    sort_order: '0', is_active: true,
+  };
+  const [form, setForm] = useState(() => {
+    if (!isEdit) return empty;
+    const lims = plan.limits || {};
+    return {
+      name:              plan.name,
+      base_monthly_price: String(plan.base_monthly_price),
+      discount_3m:       String(Math.round(Number(plan.discount_3m)  * 100)),
+      discount_6m:       String(Math.round(Number(plan.discount_6m)  * 100)),
+      discount_12m:      String(Math.round(Number(plan.discount_12m) * 100)),
+      features:          Array.isArray(plan.features) ? plan.features.join('\n') : '',
+      max_products:      lims.max_products != null ? String(lims.max_products) : '',
+      max_staff:         lims.max_staff    != null ? String(lims.max_staff)    : '',
+      sort_order:        String(plan.sort_order ?? 0),
+      is_active:         plan.is_active !== false,
+    };
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => {
+    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm((p) => ({ ...p, [k]: v }));
+  };
+
+  const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const featureList = form.features.split('\n').map((s) => s.trim()).filter(Boolean);
+      const limits = {};
+      if (form.max_products !== '') limits.max_products = parseInt(form.max_products, 10);
+      if (form.max_staff    !== '') limits.max_staff    = parseInt(form.max_staff,    10);
+      const payload = {
+        name:               form.name,
+        base_monthly_price: Number(form.base_monthly_price),
+        discount_3m:        Number(form.discount_3m)  / 100,
+        discount_6m:        Number(form.discount_6m)  / 100,
+        discount_12m:       Number(form.discount_12m) / 100,
+        features:           featureList,
+        limits,
+        sort_order:         parseInt(form.sort_order, 10) || 0,
+        is_active:          form.is_active,
+      };
+      if (isEdit) {
+        await adminApi.updatePlan(plan.id, payload);
+        toast.success('Plan updated');
+      } else {
+        await adminApi.createPlan(payload);
+        toast.success('Plan created');
+      }
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save plan');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="bg-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+           onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+          <p className="font-semibold text-white">{isEdit ? 'Edit Plan' : 'Create Plan'}</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-400 mb-1">Plan Name *</label>
+              <input className={inputCls} value={form.name} onChange={set('name')} required placeholder="e.g. Basic" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Monthly Price (Rs) *</label>
+              <input className={inputCls} type="number" min="0" value={form.base_monthly_price} onChange={set('base_monthly_price')} required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input className={inputCls} type="number" min="0" value={form.sort_order} onChange={set('sort_order')} />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Discounts</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[['3 Month %', 'discount_3m'], ['6 Month %', 'discount_6m'], ['12 Month %', 'discount_12m']].map(([label, key]) => (
+                <div key={key}>
+                  <label className="block text-xs text-gray-400 mb-1">{label}</label>
+                  <input className={inputCls} type="number" min="0" max="100" value={form[key]} onChange={set(key)} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Limits</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Max Products (-1 = unlimited)</label>
+                <input className={inputCls} type="number" min="-1" value={form.max_products} onChange={set('max_products')} placeholder="-1" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Max Staff (-1 = unlimited)</label>
+                <input className={inputCls} type="number" min="-1" value={form.max_staff} onChange={set('max_staff')} placeholder="-1" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Features (one per line)</label>
+            <textarea
+              className={`${inputCls} resize-none`}
+              rows={6}
+              value={form.features}
+              onChange={set('features')}
+              placeholder="POS Core&#10;Products (up to 100)&#10;1 Staff Account"
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm text-white">Plan Active</p>
+              <p className="text-xs text-gray-500">Inactive plans won't be shown to customers</p>
+            </div>
+            <button type="button" onClick={() => setForm((p) => ({ ...p, is_active: !p.is_active }))}>
+              {form.is_active
+                ? <ToggleRight className="w-8 h-8 text-green-400" />
+                : <ToggleLeft  className="w-8 h-8 text-gray-600" />}
+            </button>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose}
+                    className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">
+              Cancel
+            </button>
+            <button type="submit" disabled={busy}
+                    className="flex-1 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg
+                               hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50">
+              {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {busy ? 'Saving…' : (isEdit ? 'Update Plan' : 'Create Plan')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PlansTab() {
+  const [plans,    setPlans]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [editPlan, setEditPlan] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.getPlans();
+      setPlans(data);
+    } catch {
+      toast.error('Failed to load plans');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleDelete(plan) {
+    if (!window.confirm(`Delete plan "${plan.name}"? This cannot be undone.`)) return;
+    try {
+      await adminApi.deletePlan(plan.id);
+      toast.success('Plan deleted');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">Manage subscription tiers shown to customers in the Billing page.</p>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700
+                     text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Plan
+        </button>
+      </div>
+
+      {loading && (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+      )}
+
+      {!loading && plans.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Layers className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          <p>No plans yet. Create your first plan above.</p>
+        </div>
+      )}
+
+      {!loading && plans.map((p) => {
+        const featureList = Array.isArray(p.features) ? p.features : [];
+        const lims = p.limits || {};
+        return (
+          <div key={p.id} className="bg-gray-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-white text-lg">{p.name}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                    ${p.is_active ? 'bg-green-900/50 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+                    {p.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-primary-400 mt-1">
+                  Rs {Number(p.base_monthly_price).toLocaleString()}
+                  <span className="text-sm font-normal text-gray-400">/mo</span>
+                </p>
+                <div className="flex gap-3 mt-1 text-xs text-gray-400">
+                  <span>3m: {Math.round(Number(p.discount_3m) * 100)}% off</span>
+                  <span>6m: {Math.round(Number(p.discount_6m) * 100)}% off</span>
+                  <span>12m: {Math.round(Number(p.discount_12m) * 100)}% off</span>
+                </div>
+                {(lims.max_products != null || lims.max_staff != null) && (
+                  <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                    {lims.max_products != null && (
+                      <span>Products: {lims.max_products === -1 ? 'Unlimited' : lims.max_products}</span>
+                    )}
+                    {lims.max_staff != null && (
+                      <span>Staff: {lims.max_staff === -1 ? 'Unlimited' : lims.max_staff}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setEditPlan(p)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700
+                                   hover:bg-gray-600 text-gray-300 rounded-lg">
+                  <Edit3 className="w-3.5 h-3.5" /> Edit
+                </button>
+                <button onClick={() => handleDelete(p)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-900/40
+                                   hover:bg-red-900/70 text-red-400 rounded-lg">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {featureList.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {featureList.map((f, i) => (
+                  <span key={i} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {showCreate && (
+        <PlanModal
+          plan={null}
+          onClose={() => setShowCreate(false)}
+          onSaved={() => { setShowCreate(false); load(); }}
+        />
+      )}
+      {editPlan && (
+        <PlanModal
+          plan={editPlan}
+          onClose={() => setEditPlan(null)}
+          onSaved={() => { setEditPlan(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Notifications Tab ─────────────────────────────────────────
+function NotificationsTab({ shops }) {
+  const [title,    setTitle]    = useState('');
+  const [body,     setBody]     = useState('');
+  const [target,   setTarget]   = useState('all');
+  const [shopId,   setShopId]   = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [result,   setResult]   = useState(null);
+
+  const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  async function handleSend(e) {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return toast.error('Title and body are required');
+    if (target === 'specific' && !shopId) return toast.error('Select a shop');
+    setBusy(true);
+    setResult(null);
+    try {
+      const { data } = await adminApi.dispatchNotification({
+        title: title.trim(), body: body.trim(),
+        target,
+        shop_id: target === 'specific' ? Number(shopId) : undefined,
+      });
+      setResult(data);
+      toast.success(`Sent to ${data.sent} shop${data.sent !== 1 ? 's' : ''}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send notification');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const targetOptions = [
+    { value: 'all',      label: 'All Shops'      },
+    { value: 'active',   label: 'Active Shops'   },
+    { value: 'trial',    label: 'Trial Shops'    },
+    { value: 'expired',  label: 'Expired Shops'  },
+    { value: 'specific', label: 'Specific Shop'  },
+  ];
+
+  return (
+    <div className="space-y-5 max-w-lg">
+      <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Bell className="w-4 h-4 text-indigo-400" />
+          <p className="text-sm font-semibold text-white">Dispatch Push Notification</p>
+        </div>
+        <p className="text-xs text-gray-400">
+          Sends a push notification to shop owners via the mobile app.
+          Shops must be subscribed to the <span className="font-mono text-gray-300">shop_&#123;id&#125;_alerts</span> topic.
+        </p>
+      </div>
+
+      <form onSubmit={handleSend} className="space-y-4">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Target</label>
+          <select className={inputCls} value={target} onChange={(e) => { setTarget(e.target.value); setShopId(''); }}>
+            {targetOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {target === 'specific' && (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Shop *</label>
+            <select className={inputCls} value={shopId} onChange={(e) => setShopId(e.target.value)} required>
+              <option value="">— Select shop —</option>
+              {shops.map((s) => (
+                <option key={s.id} value={s.id}>{s.name} (ID {s.id})</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Notification Title *</label>
+          <input
+            className={inputCls}
+            placeholder="e.g. Subscription Expiring Soon"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Message *</label>
+          <textarea
+            className={`${inputCls} resize-none`}
+            rows={4}
+            placeholder="e.g. Your subscription expires in 3 days. Renew now to avoid interruption."
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600
+                     hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg
+                     transition-colors disabled:opacity-50"
+        >
+          {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {busy ? 'Sending…' : 'Send Notification'}
+        </button>
+      </form>
+
+      {result && (
+        <div className="bg-gray-800 rounded-xl p-4 space-y-1">
+          <p className="text-sm font-semibold text-white">Result</p>
+          <div className="flex gap-6 text-sm">
+            <div>
+              <span className="text-gray-400">Targeted: </span>
+              <span className="font-bold text-white">{result.total}</span>
+            </div>
+            <div>
+              <span className="text-gray-400">Sent: </span>
+              <span className="font-bold text-green-400">{result.sent}</span>
+            </div>
+            {result.failed > 0 && (
+              <div>
+                <span className="text-gray-400">Failed: </span>
+                <span className="font-bold text-red-400">{result.failed}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const logout   = useAdminStore((s) => s.logout);
   const navigate = useNavigate();
@@ -1260,10 +1818,13 @@ export default function AdminDashboardPage() {
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-800 rounded-xl p-1 w-fit flex-wrap">
           {[
-            { id: 'payments', label: 'Payments',  badge: pendingCount },
-            { id: 'shops',    label: 'Shops'      },
-            { id: 'analysis', label: 'Analysis', icon: BarChart2 },
-            { id: 'audit',    label: 'Audit Log'  },
+            { id: 'payments',      label: 'Payments',      badge: pendingCount },
+            { id: 'shops',         label: 'Shops'          },
+            { id: 'analysis',      label: 'Analysis',      icon: BarChart2 },
+            { id: 'audit',         label: 'Audit Log'      },
+            { id: 'dashboard_tab', label: 'Overview',      icon: TrendingUp },
+            { id: 'plans',         label: 'Plans',         icon: Layers },
+            { id: 'notifications', label: 'Notifications', icon: Bell },
           ].map((t) => (
             <button
               key={t.id}
@@ -1553,6 +2114,15 @@ export default function AdminDashboardPage() {
             )}
           </div>
         )}
+        {/* Overview tab */}
+        {tab === 'dashboard_tab' && <DashboardTab stats={stats} />}
+
+        {/* Plans tab */}
+        {tab === 'plans' && <PlansTab />}
+
+        {/* Notifications tab */}
+        {tab === 'notifications' && <NotificationsTab shops={shops} />}
+
       </div>
 
       {/* Modals */}

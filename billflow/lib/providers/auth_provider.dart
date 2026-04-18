@@ -22,6 +22,7 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
       try {
         PushNotificationService.subscribeToTopic('shop_${user.shopId}_preorders');
         PushNotificationService.subscribeToTopic('shop_${user.shopId}_low_stock');
+        PushNotificationService.subscribeToTopic('shop_${user.shopId}_alerts');
       } catch (_) {}
     }
     return user;
@@ -50,10 +51,9 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     final user = state.valueOrNull;
     if (user == null) return;
     try {
-      PushNotificationService.subscribeToTopic(
-          'shop_${user.shopId}_preorders');
-      PushNotificationService.subscribeToTopic(
-          'shop_${user.shopId}_low_stock');
+      PushNotificationService.subscribeToTopic('shop_${user.shopId}_preorders');
+      PushNotificationService.subscribeToTopic('shop_${user.shopId}_low_stock');
+      PushNotificationService.subscribeToTopic('shop_${user.shopId}_alerts');
     } catch (_) {}
   }
 

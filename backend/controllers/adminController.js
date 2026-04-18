@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const db     = require('../config/database');
 const { createNotification, TYPES } = require('./notificationController');
+const { sendToTopic } = require('../utils/fcm');
 
 // ── POST /api/admin/login ─────────────────────────────────────
 async function adminLogin(req, res) {
@@ -34,14 +35,42 @@ async function getDashboard(req, res) {
   try {
     const { rows } = await db.query(`
       SELECT
-        (SELECT COUNT(*) FROM shops)                                           AS total_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'active')     AS active_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'trial')      AS trial_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'expired')    AS expired_shops,
-        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'verified') AS total_revenue,
-        (SELECT COUNT(*) FROM payments WHERE status = 'pending')              AS pending_payments
+        (SELECT COUNT(*) FROM shops)                                                          AS total_shops,
+        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'active')                    AS active_shops,
+        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'trial')                     AS trial_shops,
+        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'expired')                   AS expired_shops,
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'verified')            AS total_revenue,
+        (SELECT COUNT(*) FROM payments WHERE status = 'pending')                             AS pending_payments,
+        (SELECT COUNT(*) FROM shops WHERE created_at >= NOW() - INTERVAL '7 days')          AS new_shops_7d
     `);
-    res.json(rows[0]);
+
+    const { rows: monthly } = await db.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', payment_date), 'Mon YY')  AS month,
+        TO_CHAR(DATE_TRUNC('month', payment_date), 'YYYY-MM') AS month_key,
+        COALESCE(SUM(amount), 0)                               AS revenue,
+        COUNT(*)                                               AS payment_count
+      FROM payments
+      WHERE status = 'verified'
+        AND payment_date >= DATE_TRUNC('month', NOW()) - INTERVAL '5 months'
+      GROUP BY DATE_TRUNC('month', payment_date)
+      ORDER BY DATE_TRUNC('month', payment_date)
+    `);
+
+    const { rows: planDist } = await db.query(`
+      WITH latest AS (
+        SELECT DISTINCT ON (shop_id) shop_id, plan_name
+        FROM payments
+        WHERE status = 'verified'
+        ORDER BY shop_id, payment_date DESC
+      )
+      SELECT COALESCE(plan_name, 'Unknown') AS plan, COUNT(*) AS count
+      FROM latest
+      GROUP BY plan_name
+      ORDER BY count DESC
+    `);
+
+    res.json({ ...rows[0], monthly_revenue: monthly, plan_distribution: planDist });
   } catch (err) {
     console.error('getDashboard error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -640,6 +669,145 @@ async function getPaymentProof(req, res) {
   }
 }
 
+// ── GET /api/admin/plans ──────────────────────────────────────
+async function getPlans(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM subscription_plans ORDER BY sort_order`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('getPlans error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── POST /api/admin/plans ─────────────────────────────────────
+async function createPlan(req, res) {
+  const {
+    name, base_monthly_price,
+    discount_3m = 0.10, discount_6m = 0.15, discount_12m = 0.20,
+    features = [], limits = {}, sort_order = 0,
+  } = req.body;
+
+  if (!name || base_monthly_price == null) {
+    return res.status(400).json({ error: 'name and base_monthly_price are required' });
+  }
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO subscription_plans
+         (name, base_monthly_price, discount_3m, discount_6m, discount_12m, features, limits, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        name, Number(base_monthly_price),
+        Number(discount_3m), Number(discount_6m), Number(discount_12m),
+        JSON.stringify(features), JSON.stringify(limits), Number(sort_order),
+      ]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Plan name already exists' });
+    console.error('createPlan error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/plans/:id ──────────────────────────────────
+async function updatePlan(req, res) {
+  const {
+    name, base_monthly_price,
+    discount_3m, discount_6m, discount_12m,
+    features, limits, is_active, sort_order,
+  } = req.body;
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE subscription_plans
+          SET name               = COALESCE($1,  name),
+              base_monthly_price = COALESCE($2,  base_monthly_price),
+              discount_3m        = COALESCE($3,  discount_3m),
+              discount_6m        = COALESCE($4,  discount_6m),
+              discount_12m       = COALESCE($5,  discount_12m),
+              features           = COALESCE($6,  features),
+              limits             = COALESCE($7,  limits),
+              is_active          = COALESCE($8,  is_active),
+              sort_order         = COALESCE($9,  sort_order)
+        WHERE id = $10
+        RETURNING *`,
+      [
+        name || null,
+        base_monthly_price != null ? Number(base_monthly_price) : null,
+        discount_3m  != null ? Number(discount_3m)  : null,
+        discount_6m  != null ? Number(discount_6m)  : null,
+        discount_12m != null ? Number(discount_12m) : null,
+        features  != null ? JSON.stringify(features)  : null,
+        limits    != null ? JSON.stringify(limits)    : null,
+        is_active != null ? Boolean(is_active)        : null,
+        sort_order != null ? Number(sort_order)       : null,
+        req.params.id,
+      ]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Plan not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('updatePlan error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── DELETE /api/admin/plans/:id ───────────────────────────────
+async function deletePlan(req, res) {
+  try {
+    const { rowCount } = await db.query(
+      `DELETE FROM subscription_plans WHERE id = $1`, [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Plan not found' });
+    res.status(204).end();
+  } catch (err) {
+    console.error('deletePlan error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── POST /api/admin/notifications/dispatch ────────────────────
+async function dispatchNotification(req, res) {
+  const { title, body, target = 'all', shop_id } = req.body;
+  if (!title || !body) return res.status(400).json({ error: 'title and body are required' });
+
+  try {
+    let shopIds = [];
+    if (target === 'specific' && shop_id) {
+      shopIds = [Number(shop_id)];
+    } else {
+      const statusMap = { active: 'active', trial: 'trial', expired: 'expired' };
+      const filter = statusMap[target]
+        ? `WHERE subscription_status = '${statusMap[target]}'`
+        : '';
+      const { rows } = await db.query(`SELECT id FROM shops ${filter}`);
+      shopIds = rows.map((r) => r.id);
+    }
+
+    let sent = 0;
+    const failed = [];
+    await Promise.all(
+      shopIds.map(async (id) => {
+        try {
+          await sendToTopic(`shop_${id}_alerts`, title, body, { type: 'admin_broadcast' });
+          sent++;
+        } catch {
+          failed.push(id);
+        }
+      })
+    );
+
+    res.json({ sent, failed: failed.length, total: shopIds.length });
+  } catch (err) {
+    console.error('dispatchNotification error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   adminLogin, getDashboard,
   listShops, createShop, getShop, updateShop, deleteShop,
@@ -647,4 +815,6 @@ module.exports = {
   updateSubscription, getShopSales,
   listPayments, verifyPayment, rejectPayment, getPaymentProof,
   getAnalysis,
+  getPlans, createPlan, updatePlan, deletePlan,
+  dispatchNotification,
 };

@@ -266,6 +266,13 @@ export const adminApi = {
   deleteShop:       (id)               => adminClient.delete(`/admin/shops/${id}`, { data: { confirm: 'DELETE' } }),
   addShopUser:      (id, data)         => adminClient.post(`/admin/shops/${id}/users`, data),
   deleteShopUser:   (id, userId)       => adminClient.delete(`/admin/shops/${id}/users/${userId}`),
+  // Subscription plans
+  getPlans:         ()           => adminClient.get('/admin/plans'),
+  createPlan:       (data)       => adminClient.post('/admin/plans', data),
+  updatePlan:       (id, data)   => adminClient.put(`/admin/plans/${id}`, data),
+  deletePlan:       (id)         => adminClient.delete(`/admin/plans/${id}`),
+  // Notification dispatch
+  dispatchNotification: (data)   => adminClient.post('/admin/notifications/dispatch', data),
 };
 
 export default client;

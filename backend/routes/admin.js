@@ -34,4 +34,13 @@ router.put('/payments/:id/reject',          ctrl.rejectPayment);
 // Audit log (all shops)
 router.get('/audit-log',                    auditCtrl.getAdminAuditLog);
 
+// Subscription plans
+router.get('/plans',                        ctrl.getPlans);
+router.post('/plans',                       ctrl.createPlan);
+router.put('/plans/:id',                    ctrl.updatePlan);
+router.delete('/plans/:id',                 ctrl.deletePlan);
+
+// Admin notification dispatch
+router.post('/notifications/dispatch',      ctrl.dispatchNotification);
+
 module.exports = router;
