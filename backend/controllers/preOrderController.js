@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sendToTopic } = require('../utils/fcm');
 
 // ── Token generation helpers ──────────────────────────────────
 function parseToken(token) {
@@ -291,6 +292,15 @@ async function createPreOrder(req, res) {
     // Track the new order (best effort — don't fail the order if tracking fails)
     upsertCancellationTracking(shop_id, phone, { incrementOrders: true })
       .catch((e) => console.warn('cancellation tracking upsert failed:', e.message));
+
+    // Push notification to shop staff (best effort)
+    const customerLabel = customer_name ? customer_name.trim() : phone;
+    sendToTopic(
+      `shop_${shop_id}_preorders`,
+      'New Pre-Order',
+      `${customerLabel} placed order #${rows[0].token_number}`,
+      { orderId: String(rows[0].id), type: 'preorder' }
+    ).catch(() => {});
 
     res.status(201).json({ success: true, token: rows[0].token_number, orderId: rows[0].id });
   } catch (err) {
