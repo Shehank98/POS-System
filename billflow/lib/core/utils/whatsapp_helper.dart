@@ -10,9 +10,9 @@ class WhatsAppHelper {
     final message = _buildInvoiceText(txn, user);
     final encoded = Uri.encodeComponent(message);
     final url = Uri.parse('https://wa.me/?text=$encoded');
-    if (await canLaunchUrl(url)) {
+    try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
+    } catch (_) {}
   }
 
   static String _buildInvoiceText(TransactionModel txn, UserModel user) {

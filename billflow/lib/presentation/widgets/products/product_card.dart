@@ -20,16 +20,17 @@ class ProductCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     Color stockColor;
     String stockLabel;
+    final unit = product.unitType == 'kg' ? ' kg' : '';
     if (product.isOutOfStock) {
       stockColor = AppColors.outOfStock;
       stockLabel = 'Out of stock';
     } else if (product.isLowStock) {
       stockColor = AppColors.lowStock;
-      stockLabel = 'Low: ${formatNumber(product.stockQuantity)}';
+      stockLabel = 'Low: ${formatNumber(product.stockQuantity)}$unit';
     } else {
       stockColor = AppColors.inStock;
       stockLabel = product.hasInventory
-          ? formatNumber(product.stockQuantity)
+          ? '${formatNumber(product.stockQuantity)}$unit'
           : 'Available';
     }
 

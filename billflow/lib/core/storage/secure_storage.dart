@@ -35,6 +35,14 @@ class SecureStorage {
     };
   }
 
+  static const _biometricKey = 'pos_biometric_enabled';
+
+  Future<void> saveBiometricEnabled(bool v) =>
+      _storage.write(key: _biometricKey, value: v.toString());
+
+  Future<bool> readBiometricEnabled() async =>
+      await _storage.read(key: _biometricKey) == 'true';
+
   Future<void> deleteAll() => _storage.deleteAll();
 }
 

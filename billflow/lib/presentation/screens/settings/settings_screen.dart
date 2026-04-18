@@ -1,13 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/storage/secure_storage.dart';
+import '../../../data/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/theme_provider.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _biometricEnabled = false;
+  bool _biometricAvailable = false;
+  bool _biometricLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricState();
+  }
+
+  Future<void> _loadBiometricState() async {
+    final storage = ref.read(secureStorageProvider);
+    final service = ref.read(biometricServiceProvider);
+    final enabled = await storage.readBiometricEnabled();
+    final available = await service.isAvailable();
+    if (mounted) {
+      setState(() {
+        _biometricEnabled = enabled;
+        _biometricAvailable = available;
+      });
+    }
+  }
+
+  Future<void> _toggleBiometric(bool enable) async {
+    final storage = ref.read(secureStorageProvider);
+    final service = ref.read(biometricServiceProvider);
+
+    if (enable) {
+      if (!_biometricAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'No fingerprint enrolled on this device. Go to Android Settings → Security → Fingerprint to add one.'),
+          duration: Duration(seconds: 5),
+        ));
+        return;
+      }
+      setState(() => _biometricLoading = true);
+      final ok = await service.authenticate();
+      setState(() => _biometricLoading = false);
+      if (!ok) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Fingerprint verification failed. Try again.'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        return;
+      }
+    }
+
+    await storage.saveBiometricEnabled(enable);
+    if (mounted) setState(() => _biometricEnabled = enable);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(enable
+            ? 'Fingerprint login enabled — active on next app open'
+            : 'Fingerprint login disabled'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).valueOrNull;
     final themeMode = ref.watch(themeModeProvider);
 
@@ -43,11 +112,9 @@ class SettingsScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          user?.username ?? '—',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        Text(user?.username ?? '—',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
                         Text(user?.shopName ?? '—',
                             style: TextStyle(
                                 color: Theme.of(context)
@@ -85,13 +152,9 @@ class SettingsScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text('Preferences',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant)),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
           const SizedBox(height: 8),
 
@@ -102,14 +165,33 @@ class SettingsScreen extends ConsumerWidget {
                 SwitchListTile(
                   title: const Text('Dark Mode'),
                   subtitle: const Text('Switch between light and dark theme'),
-                  secondary:
-                      const Icon(Icons.dark_mode_outlined),
+                  secondary: const Icon(Icons.dark_mode_outlined),
                   value: themeMode == ThemeMode.dark,
                   onChanged: (v) {
                     ref.read(themeModeProvider.notifier).state =
                         v ? ThemeMode.dark : ThemeMode.light;
                   },
                 ),
+                const Divider(height: 1),
+                _biometricLoading
+                    ? const ListTile(
+                        leading: Icon(Icons.fingerprint),
+                        title: Text('Fingerprint Login'),
+                        trailing: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : SwitchListTile(
+                        title: const Text('Fingerprint Login'),
+                        subtitle: Text(_biometricAvailable
+                            ? 'Use fingerprint to unlock app'
+                            : 'No fingerprint enrolled on device'),
+                        secondary: const Icon(Icons.fingerprint),
+                        value: _biometricEnabled,
+                        onChanged:
+                            _biometricAvailable ? _toggleBiometric : null,
+                      ),
               ],
             ),
           ),
@@ -118,13 +200,9 @@ class SettingsScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text('About',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant)),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
           const SizedBox(height: 8),
 
@@ -132,19 +210,17 @@ class SettingsScreen extends ConsumerWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: const Text('App Version'),
-                  trailing: const Text('1.0.0',
-                      style: TextStyle(color: Colors.grey)),
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('App Version'),
+                  trailing:
+                      Text('1.0.0', style: TextStyle(color: Colors.grey)),
                 ),
                 ListTile(
                   leading: const Icon(Icons.store_outlined),
                   title: const Text('Shop Type'),
-                  trailing: Text(
-                    user?.shopType ?? '—',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
+                  trailing: Text(user?.shopType ?? '—',
+                      style: const TextStyle(color: Colors.grey)),
                 ),
               ],
             ),
@@ -159,8 +235,7 @@ class SettingsScreen extends ConsumerWidget {
               label: const Text('Sign Out',
                   style: TextStyle(color: Colors.red)),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-              ),
+                  side: const BorderSide(color: Colors.red)),
             ),
           ),
           const SizedBox(height: 32),
@@ -185,8 +260,6 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirm == true) {
-      ref.read(authProvider.notifier).logout();
-    }
+    if (confirm == true) ref.read(authProvider.notifier).logout();
   }
 }

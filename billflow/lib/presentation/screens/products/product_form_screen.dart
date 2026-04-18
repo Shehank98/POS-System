@@ -203,9 +203,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _stockCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Stock Quantity',
-                    prefixIcon: Icon(Icons.warehouse_outlined),
+                  decoration: InputDecoration(
+                    labelText: _unitType == 'kg' ? 'Stock (kg)' : 'Stock Quantity',
+                    prefixIcon: Icon(_unitType == 'kg'
+                        ? Icons.scale_outlined
+                        : Icons.warehouse_outlined),
+                    suffixText: _unitType == 'kg' ? 'kg' : null,
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
