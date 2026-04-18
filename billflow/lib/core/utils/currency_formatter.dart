@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-String formatCurrency(double amount, {String symbol = 'RM'}) {
+String formatCurrency(double amount, {String symbol = 'Rs.'}) {
   final formatter = NumberFormat.currency(
     symbol: '$symbol ',
     decimalDigits: 2,

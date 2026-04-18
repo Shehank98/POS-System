@@ -4,6 +4,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/whatsapp_helper.dart';
 import '../../../data/models/transaction_model.dart';
+import '../../../data/models/user_model.dart';
 import '../../../data/services/transaction_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/transaction_provider.dart';
@@ -35,6 +36,39 @@ class _TransactionDetailScreenState
     } else {
       _fetch();
     }
+  }
+
+  Future<void> _shareWhatsApp(
+      BuildContext _, TransactionModel txn, UserModel user) async {
+    final phoneCtrl = TextEditingController();
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Send Receipt'),
+        content: TextField(
+          controller: phoneCtrl,
+          decoration: const InputDecoration(
+            labelText: 'WhatsApp Number',
+            hintText: 'e.g. +601112345678',
+            prefixIcon: Icon(Icons.phone),
+          ),
+          keyboardType: TextInputType.phone,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, phoneCtrl.text),
+              child: const Text('Send')),
+        ],
+      ),
+    );
+    phoneCtrl.dispose();
+    if (phone == null || !mounted) return;
+    await WhatsAppHelper.shareReceiptImage(context, txn, user,
+        phoneNumber: phone);
   }
 
   Future<void> _fetch() async {
@@ -114,7 +148,7 @@ class _TransactionDetailScreenState
           if (user != null)
             IconButton(
               icon: const Icon(Icons.share_outlined),
-              onPressed: () => WhatsAppHelper.shareReceipt(txn, user),
+              onPressed: () => _shareWhatsApp(context, txn, user),
               tooltip: 'Share via WhatsApp',
             ),
         ],

@@ -1,7 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'data/services/push_notification_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -9,6 +12,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initNotifications();
+  await _initFirebase();
   runApp(const ProviderScope(child: BillFlowApp()));
 }
 
@@ -25,4 +29,15 @@ Future<void> _initNotifications() async {
     iOS: iosSettings,
   );
   await flutterLocalNotificationsPlugin.initialize(initSettings);
+}
+
+Future<void> _initFirebase() async {
+  try {
+    await Firebase.initializeApp();
+    await PushNotificationService.initialize();
+    PushNotificationService.subscribeToTopic('preorders');
+    PushNotificationService.subscribeToTopic('low_stock');
+  } catch (_) {
+    // Firebase not configured — push notifications disabled
+  }
 }

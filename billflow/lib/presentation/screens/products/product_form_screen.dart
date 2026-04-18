@@ -131,7 +131,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     controller: _priceCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Selling Price *',
-                      prefixText: 'RM ',
+                      prefixText: 'Rs. ',
                     ),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
@@ -148,7 +148,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     controller: _costCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Cost Price',
-                      prefixText: 'RM ',
+                      prefixText: 'Rs. ',
                     ),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),

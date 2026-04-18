@@ -206,7 +206,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                               controller: _discountCtrl,
                               decoration: const InputDecoration(
                                 labelText: 'Order Discount',
-                                prefixText: 'RM ',
+                                prefixText: 'Rs. ',
                                 isDense: true,
                                 contentPadding: EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 10),

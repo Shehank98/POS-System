@@ -8,6 +8,7 @@ import '../../../providers/cart_provider.dart';
 import '../../../providers/transaction_provider.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/whatsapp_helper.dart';
+import '../../../data/models/user_model.dart';
 import '../../widgets/sales/payment_method_selector.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -50,6 +51,38 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  Future<void> _shareWhatsApp(TransactionModel txn, UserModel user) async {
+    final phoneCtrl = TextEditingController(text: _phoneCtrl.text);
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Send Receipt'),
+        content: TextField(
+          controller: phoneCtrl,
+          decoration: const InputDecoration(
+            labelText: 'WhatsApp Number',
+            hintText: 'e.g. +601112345678',
+            prefixIcon: Icon(Icons.phone),
+          ),
+          keyboardType: TextInputType.phone,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, phoneCtrl.text),
+              child: const Text('Send')),
+        ],
+      ),
+    );
+    phoneCtrl.dispose();
+    if (phone == null || !mounted) return;
+    await WhatsAppHelper.shareReceiptImage(context, txn, user,
+        phoneNumber: phone);
   }
 
   void _showSuccessDialog(TransactionModel txn) {
@@ -96,7 +129,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         actions: [
           if (user != null && txn.items != null)
             OutlinedButton.icon(
-              onPressed: () => WhatsAppHelper.shareReceipt(txn, user),
+              onPressed: () => _shareWhatsApp(txn, user),
               icon: const Icon(Icons.share),
               label: const Text('Share via WhatsApp'),
             ),
