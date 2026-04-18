@@ -46,6 +46,19 @@ class DashboardService {
     }
   }
 
+  Future<AnalyticsResult> getAnalytics({String? from, String? to}) async {
+    try {
+      final response = await _dio.get(ApiConstants.dashboardAnalytics,
+          queryParameters: {
+            if (from != null) 'from': from,
+            if (to != null) 'to': to,
+          });
+      return AnalyticsResult.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
   Future<List<LowStockProduct>> getLowStock({int threshold = 10}) async {
     try {
       final response = await _dio.get(ApiConstants.dashboardLowStock,

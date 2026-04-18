@@ -56,7 +56,10 @@ class AppScaffold extends ConsumerWidget {
       );
     }
 
-    // Build nav items — base 4 always present, Reports appended when enabled
+    final customersOn = ref.watch(customersEnabledProvider);
+    final analyticsOn = ref.watch(analyticsEnabledProvider);
+
+    // Build nav items — base 4 always present; Customers, Reports, Analytics appended when enabled
     final items = <_NavItem>[
       const _NavItem(
         route: '/dashboard',
@@ -82,12 +85,26 @@ class AppScaffold extends ConsumerWidget {
         selectedIcon: Icons.inventory_2,
         label: 'Products',
       ),
+      if (customersOn)
+        const _NavItem(
+          route: '/customers',
+          icon: Icons.people_outline,
+          selectedIcon: Icons.people,
+          label: 'Customers',
+        ),
       if (reportsOn)
         const _NavItem(
           route: '/reports',
           icon: Icons.bar_chart_outlined,
           selectedIcon: Icons.bar_chart,
           label: 'Reports',
+        ),
+      if (analyticsOn)
+        const _NavItem(
+          route: '/analytics',
+          icon: Icons.insights_outlined,
+          selectedIcon: Icons.insights,
+          label: 'Analytics',
         ),
     ];
 

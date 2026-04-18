@@ -18,6 +18,9 @@ import '../../presentation/screens/transactions/transaction_detail_screen.dart';
 import '../../presentation/screens/reports/reports_screen.dart';
 import '../../presentation/screens/notifications/notifications_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
+import '../../presentation/screens/analytics/analytics_screen.dart';
+import '../../presentation/screens/carwash/carwash_screen.dart';
+import '../../presentation/screens/customers/customers_screen.dart';
 import '../../presentation/screens/pre_orders/pre_orders_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
 
@@ -44,8 +47,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && !needsBiometric) {
         // Subscription gate: fully locked accounts can only access /billing and /settings
         final isLocked = user.readOnly && !user.inGracePeriod;
-        final allowedWhenLocked = loc == '/billing' || loc == '/settings';
-        if (isLocked && !allowedWhenLocked) return '/billing';
+        const allowedWhenLocked = {'/billing', '/settings'};
+        if (isLocked && !allowedWhenLocked.contains(loc)) return '/billing';
 
         if (loc == '/login' || loc == '/' || loc == '/biometric') {
           return '/dashboard';
@@ -92,6 +95,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/reports',
             builder: (context, state) => const ReportsScreen(),
+          ),
+          GoRoute(
+            path: '/customers',
+            builder: (context, state) => const CustomersScreen(),
+          ),
+          GoRoute(
+            path: '/carwash',
+            builder: (context, state) => const CarwashScreen(),
+          ),
+          GoRoute(
+            path: '/analytics',
+            builder: (context, state) => const AnalyticsScreen(),
           ),
         ],
       ),

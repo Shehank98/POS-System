@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/cart_item_model.dart';
+import '../data/models/clothing_model.dart';
 import '../data/models/product_model.dart';
 
 class CartState {
@@ -90,6 +91,41 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void setCustomerPhone(String? phone) =>
       state = state.copyWith(customerPhone: phone);
+
+  // Add a clothing variant as a cart item.
+  // Uses negative IDs (-variantId) to prevent collision with regular product IDs.
+  void addClothingVariant(ClothingProduct clothingProduct, ClothingVariant variant) {
+    final existing =
+        state.items.indexWhere((i) => i.clothingVariantId == variant.id);
+    if (existing >= 0) {
+      final updated = List<CartItem>.from(state.items);
+      updated[existing] =
+          updated[existing].copyWith(quantity: updated[existing].quantity + 1);
+      state = state.copyWith(items: updated);
+    } else {
+      final pseudo = ProductModel(
+        id: -variant.id,
+        shopId: 0,
+        name:
+            '${clothingProduct.name} · ${variant.size} / ${variant.color}',
+        barcode: variant.barcode ?? variant.sku,
+        price: variant.effectivePrice,
+        costPrice: 0,
+        stockQuantity: variant.stockQuantity.toDouble(),
+        hasInventory: true,
+        category: clothingProduct.category,
+        taxRate: clothingProduct.taxRate ?? 0,
+        unitType: 'unit',
+      );
+      state = state.copyWith(items: [
+        ...state.items,
+        CartItem(
+            product: pseudo,
+            quantity: 1,
+            clothingVariantId: variant.id),
+      ]);
+    }
+  }
 
   void clearCart() => state = CartState.empty();
 }

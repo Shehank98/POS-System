@@ -3,12 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../data/models/clothing_model.dart';
+import '../../../data/models/product_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/cart_provider.dart';
+import '../../../providers/clothing_provider.dart';
+import '../../../providers/feature_flag_provider.dart';
 import '../../../providers/product_provider.dart';
 import '../../widgets/products/category_filter_bar.dart';
 import '../../widgets/products/pos_product_card.dart';
 import '../../widgets/sales/cart_item_tile.dart';
+import '../../widgets/sales/clothing_variant_picker.dart';
 import '../../widgets/sales/scanner_overlay.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
@@ -48,12 +53,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
-    final productsAsync = ref.watch(productsProvider);
-    final user = ref.watch(authProvider).valueOrNull;
-    final cs = Theme.of(context).colorScheme;
+    final shopType = ref.watch(shopTypeProvider);
+    final isClothing = shopType == 'clothing';
 
     return Scaffold(
-      // ── AppBar: title + clear ─────────────────────────────────
       appBar: AppBar(
         title: const Text('POS'),
         centerTitle: false,
@@ -74,143 +77,15 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             ),
         ],
       ),
-
-      body: Column(
-        children: [
-          // ── Search + Scan row ───────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: TextField(
-                      controller: _searchCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Search products…',
-                        hintStyle: const TextStyle(fontSize: 13),
-                        prefixIcon: const Icon(Icons.search, size: 18),
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 0),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              BorderSide(color: cs.outlineVariant),
-                        ),
-                        filled: true,
-                        fillColor: cs.surfaceContainerLowest,
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                      onChanged: (v) => ref
-                          .read(productSearchQueryProvider.notifier)
-                          .state = v,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Barcode scanner button
-                SizedBox(
-                  height: 40,
-                  width: 40,
-                  child: FilledButton.tonal(
-                    onPressed: _openScanner,
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Icon(Icons.qr_code_scanner, size: 20),
-                  ),
-                ),
-              ],
+      body: isClothing
+          ? _ClothingPosBody(
+              searchCtrl: _searchCtrl,
+              onScannerTap: _openScanner,
+            )
+          : _RetailPosBody(
+              searchCtrl: _searchCtrl,
+              onScannerTap: _openScanner,
             ),
-          ),
-
-          // ── Category filter bar ─────────────────────────────────
-          const CategoryFilterBar(),
-
-          // ── Product grid (3 columns, compact) ──────────────────
-          Expanded(
-            child: productsAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.wifi_off_outlined,
-                        size: 40, color: Colors.grey),
-                    const SizedBox(height: 8),
-                    Text(e.toString(),
-                        style: const TextStyle(color: Colors.grey),
-                        textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () =>
-                          ref.invalidate(productsProvider),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-              data: (products) => products.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.inventory_2_outlined,
-                              size: 40, color: cs.onSurfaceVariant),
-                          const SizedBox(height: 8),
-                          Text('No products found',
-                              style:
-                                  TextStyle(color: cs.onSurfaceVariant)),
-                        ],
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 0.82,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
-                      itemCount: products.length,
-                      itemBuilder: (ctx, i) {
-                        final p = products[i];
-                        return PosProductCard(
-                          product: p,
-                          onTap: () {
-                            ref
-                                .read(cartProvider.notifier)
-                                .addProduct(p);
-                            // Haptic-like micro-snack feedback
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(SnackBar(
-                                content: Text(
-                                    '${p.name} added',
-                                    style: const TextStyle(fontSize: 13)),
-                                duration:
-                                    const Duration(milliseconds: 600),
-                                behavior: SnackBarBehavior.floating,
-                                margin: const EdgeInsets.fromLTRB(
-                                    10, 0, 10, 72),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
-                              ));
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
-      ),
-
-      // ── Persistent checkout FAB ─────────────────────────────────
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: cart.isEmpty
           ? null
@@ -232,7 +107,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Item count badge
                     Container(
                       margin: const EdgeInsets.all(8),
                       padding: const EdgeInsets.symmetric(
@@ -284,6 +158,281 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 }
 
+// ── Retail / Grocery product grid ─────────────────────────────────────────────
+class _RetailPosBody extends ConsumerWidget {
+  final TextEditingController searchCtrl;
+  final VoidCallback onScannerTap;
+
+  const _RetailPosBody(
+      {required this.searchCtrl, required this.onScannerTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final productsAsync = ref.watch(productsProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        _SearchBar(ctrl: searchCtrl, onScannerTap: onScannerTap),
+        const CategoryFilterBar(),
+        Expanded(
+          child: productsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => _ErrorView(
+                error: e.toString(),
+                onRetry: () => ref.invalidate(productsProvider)),
+            data: (products) => products.isEmpty
+                ? _EmptyState(
+                    icon: Icons.inventory_2_outlined, label: 'No products found')
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.82,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: products.length,
+                    itemBuilder: (ctx, i) {
+                      final p = products[i];
+                      return PosProductCard(
+                        product: p,
+                        onTap: () {
+                          ref.read(cartProvider.notifier).addProduct(p);
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(SnackBar(
+                              content: Text('${p.name} added',
+                                  style: const TextStyle(fontSize: 13)),
+                              duration: const Duration(milliseconds: 600),
+                              behavior: SnackBarBehavior.floating,
+                              margin:
+                                  const EdgeInsets.fromLTRB(10, 0, 10, 72),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                            ));
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Clothing product grid ─────────────────────────────────────────────────────
+// Tapping a product opens the variant picker instead of directly adding to cart.
+class _ClothingPosBody extends ConsumerStatefulWidget {
+  final TextEditingController searchCtrl;
+  final VoidCallback onScannerTap;
+
+  const _ClothingPosBody(
+      {required this.searchCtrl, required this.onScannerTap});
+
+  @override
+  ConsumerState<_ClothingPosBody> createState() => _ClothingPosBodyState();
+}
+
+class _ClothingPosBodyState extends ConsumerState<_ClothingPosBody> {
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(clothingProductsProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        _SearchBar(
+          ctrl: widget.searchCtrl,
+          onScannerTap: widget.onScannerTap,
+          hintText: 'Search clothing…',
+          onChanged: (v) =>
+              ref.read(clothingSearchProvider.notifier).state = v,
+        ),
+        Expanded(
+          child: productsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => _ErrorView(
+                error: e.toString(),
+                onRetry: () => ref.invalidate(clothingProductsProvider)),
+            data: (products) => products.isEmpty
+                ? _EmptyState(
+                    icon: Icons.checkroom_outlined, label: 'No products found')
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.82,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: products.length,
+                    itemBuilder: (ctx, i) {
+                      final p = products[i];
+                      // Convert ClothingProduct to a display-only ProductModel
+                      final pseudo = _clothingToDisplay(p);
+                      return PosProductCard(
+                        product: pseudo,
+                        onTap: () => showClothingVariantPicker(
+                          context: context,
+                          product: p,
+                          onVariantSelected: (variant) {
+                            ref
+                                .read(cartProvider.notifier)
+                                .addClothingVariant(p, variant);
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(SnackBar(
+                                content: Text(
+                                    '${p.name} (${variant.size}/${variant.color}) added',
+                                    style: const TextStyle(fontSize: 13)),
+                                duration:
+                                    const Duration(milliseconds: 700),
+                                behavior: SnackBarBehavior.floating,
+                                margin: const EdgeInsets.fromLTRB(
+                                    10, 0, 10, 72),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                              ));
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Builds a ProductModel shell from a ClothingProduct for the PosProductCard display.
+ProductModel _clothingToDisplay(ClothingProduct p) => ProductModel(
+      id: p.id,
+      shopId: 0,
+      name: p.name,
+      price: p.basePrice,
+      costPrice: 0,
+      stockQuantity: p.totalStock.toDouble(),
+      hasInventory: true,
+      category: p.category,
+      taxRate: p.taxRate ?? 0,
+      unitType: 'unit',
+    );
+
+// ── Shared widgets ────────────────────────────────────────────────────────────
+class _SearchBar extends StatelessWidget {
+  final TextEditingController ctrl;
+  final VoidCallback onScannerTap;
+  final String hintText;
+  final void Function(String)? onChanged;
+
+  const _SearchBar({
+    required this.ctrl,
+    required this.onScannerTap,
+    this.hintText = 'Search products…',
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 40,
+              child: TextField(
+                controller: ctrl,
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  hintStyle: const TextStyle(fontSize: 13),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
+                  filled: true,
+                  fillColor: cs.surfaceContainerLowest,
+                ),
+                style: const TextStyle(fontSize: 13),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 40,
+            width: 40,
+            child: FilledButton.tonal(
+              onPressed: onScannerTap,
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Icon(Icons.qr_code_scanner, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String error;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.error, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_outlined, size: 40, color: Colors.grey),
+          const SizedBox(height: 8),
+          Text(error,
+              style: const TextStyle(color: Colors.grey),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _EmptyState({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 40, color: cs.onSurfaceVariant),
+          const SizedBox(height: 8),
+          Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Cart bottom sheet ─────────────────────────────────────────────────────────
 class _CartSheet extends ConsumerWidget {
   final TextEditingController discountCtrl;
@@ -316,7 +465,6 @@ class _CartSheet extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              // Drag handle
               Container(
                 margin: const EdgeInsets.only(top: 10, bottom: 4),
                 width: 40,
@@ -326,8 +474,6 @@ class _CartSheet extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-
-              // Header
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -355,8 +501,6 @@ class _CartSheet extends ConsumerWidget {
                 ),
               ),
               const Divider(height: 1),
-
-              // Cart items
               Expanded(
                 child: cart.isEmpty
                     ? Center(
@@ -368,8 +512,7 @@ class _CartSheet extends ConsumerWidget {
                             const SizedBox(height: 8),
                             Text('Cart is empty',
                                 style: TextStyle(
-                                    color: cs.onSurfaceVariant,
-                                    fontSize: 15)),
+                                    color: cs.onSurfaceVariant, fontSize: 15)),
                           ],
                         ),
                       )
@@ -380,10 +523,8 @@ class _CartSheet extends ConsumerWidget {
                             .toList(),
                       ),
               ),
-
               if (!cart.isEmpty) ...[
                 const Divider(height: 1),
-                // Discount + totals + charge
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                       16,
@@ -392,7 +533,6 @@ class _CartSheet extends ConsumerWidget {
                       MediaQuery.of(context).viewInsets.bottom + 16),
                   child: Column(
                     children: [
-                      // Discount field + totals
                       Row(
                         children: [
                           Expanded(
@@ -440,8 +580,6 @@ class _CartSheet extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // Charge button
                       FilledButton.icon(
                         onPressed: (user?.readOnly == true)
                             ? null
@@ -455,8 +593,7 @@ class _CartSheet extends ConsumerWidget {
                               ? 'Read Only Mode'
                               : 'Charge — ${formatCurrency(cart.total)}',
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15),
+                              fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.accent,

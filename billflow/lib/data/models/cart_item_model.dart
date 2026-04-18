@@ -4,11 +4,14 @@ class CartItem {
   final ProductModel product;
   final double quantity;
   final double itemDiscount;
+  // Non-null when item is a clothing variant (uses clothing_variant_id in API payload)
+  final int? clothingVariantId;
 
   const CartItem({
     required this.product,
     required this.quantity,
     this.itemDiscount = 0.0,
+    this.clothingVariantId,
   });
 
   double get subtotalBeforeDiscount => product.price * quantity;
@@ -20,13 +23,24 @@ class CartItem {
       product: product,
       quantity: quantity ?? this.quantity,
       itemDiscount: itemDiscount ?? this.itemDiscount,
+      clothingVariantId: clothingVariantId,
     );
   }
 
-  Map<String, dynamic> toApiJson() => {
-        'product_id': product.id,
+  Map<String, dynamic> toApiJson() {
+    if (clothingVariantId != null) {
+      return {
+        'clothing_variant_id': clothingVariantId,
         'quantity': quantity,
         'unit_price': product.price,
         'discount': itemDiscount,
       };
+    }
+    return {
+      'product_id': product.id,
+      'quantity': quantity,
+      'unit_price': product.price,
+      'discount': itemDiscount,
+    };
+  }
 }

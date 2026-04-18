@@ -139,6 +139,34 @@ class DashboardToday {
   }
 }
 
+class AnalyticsResult {
+  final DashboardSummary summary;
+  final List<TopProduct> topProducts;
+  final List<DailyPoint> daily;
+
+  const AnalyticsResult({
+    required this.summary,
+    required this.topProducts,
+    required this.daily,
+  });
+
+  factory AnalyticsResult.fromJson(Map<String, dynamic> json) =>
+      AnalyticsResult(
+        summary: json['summary'] != null
+            ? DashboardSummary.fromJson(
+                json['summary'] as Map<String, dynamic>)
+            : DashboardSummary.empty(),
+        topProducts: (json['top_products'] as List<dynamic>?)
+                ?.map((e) => TopProduct.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        daily: (json['daily'] as List<dynamic>?)
+                ?.map((e) => DailyPoint.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+}
+
 class LowStockProduct {
   final int id;
   final String name;
