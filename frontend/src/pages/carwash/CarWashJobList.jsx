@@ -137,10 +137,12 @@ export default function CarWashJobList() {
                       {job.staff_name && ` · ${job.staff_name}`}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {new Date(job.created_at).toLocaleString('en-US', {
-                        month: 'short', day: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
+                      {job.created_at
+                        ? new Date(job.created_at).toLocaleString('en-US', {
+                            month: 'short', day: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })
+                        : '—'}
                     </p>
                   </div>
                 </div>

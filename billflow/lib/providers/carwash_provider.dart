@@ -25,3 +25,8 @@ final carwashJobDetailProvider =
     FutureProvider.autoDispose.family<CarwashJob, int>(
   (ref, id) => ref.watch(carwashApiServiceProvider).getJob(id),
 );
+
+final carwashBookingsProvider =
+    FutureProvider.autoDispose<List<CarwashBooking>>((ref) async {
+  return ref.watch(carwashApiServiceProvider).listBookings();
+});

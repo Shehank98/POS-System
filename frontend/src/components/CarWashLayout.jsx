@@ -12,7 +12,7 @@ import SubscriptionStatusBar from './SubscriptionStatusBar';
 const NAV = [
   { to: '/carwash/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
   { to: '/carwash/jobs',      label: 'Jobs',        icon: ClipboardList   },
-  { to: '/carwash/bookings',  label: 'Bookings',    icon: CalendarDays    },
+  { to: '/carwash/bookings',  label: 'Pre-Bookings', icon: CalendarDays    },
   { to: '/carwash/services',  label: 'Services',    icon: Wrench,   roles: ['owner','manager'] },
   { to: '/carwash/products',  label: 'Products',    icon: Package,  roles: ['owner','manager'] },
   { to: '/carwash/staff',     label: 'My Jobs',     icon: Users           },
@@ -23,7 +23,7 @@ const NAV = [
 const BOTTOM_TABS = [
   { to: '/carwash/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/carwash/jobs',      label: 'Jobs',       icon: ClipboardList   },
-  { to: '/carwash/bookings',  label: 'Bookings',   icon: CalendarDays    },
+  { to: '/carwash/bookings',  label: 'Pre-Bookings', icon: CalendarDays  },
 ];
 
 const MORE_NAV = [
@@ -88,7 +88,7 @@ export default function CarWashLayout() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-gray-900 truncate">
-                    {user?.shop_name || 'Car Wash'}
+                    {user?.shop_name || 'Car Service'}
                   </p>
                   <p className="text-xs text-gray-400 truncate">{user?.username}</p>
                 </div>
@@ -185,7 +185,7 @@ export default function CarWashLayout() {
             <Car className="w-3.5 h-3.5 text-white" />
           </div>
           <span className="font-bold text-gray-900 text-sm truncate max-w-[140px]">
-            {user?.shop_name || 'Car Wash'}
+            {user?.shop_name || 'Car Service'}
           </span>
         </div>
         <div className="flex items-center gap-2">

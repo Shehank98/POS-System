@@ -50,9 +50,10 @@ async function login(req, res) {
               COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
               COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
               COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
-              COALESCE(s.exchanges_enabled,  TRUE)  AS exchanges_enabled,
-              COALESCE(s.branches_enabled,   TRUE)  AS branches_enabled,
-              COALESCE(s.grace_period_days,  5)     AS grace_period_days
+              COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
+              COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
+              COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
+              COALESCE(s.grace_period_days,            5)     AS grace_period_days
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.username = $1 AND u.shop_id = $2`,
@@ -117,8 +118,9 @@ async function login(req, res) {
         refunds_enabled:       user.refunds_enabled,
         void_enabled:          user.void_enabled,
         offline_enabled:       user.offline_enabled,
-        exchanges_enabled:     user.exchanges_enabled,
-        branches_enabled:      user.branches_enabled,
+        exchanges_enabled:              user.exchanges_enabled,
+        branches_enabled:               user.branches_enabled,
+        car_service_products_enabled:   user.car_service_products_enabled,
       },
     });
   } catch (err) {
@@ -203,9 +205,10 @@ async function getMe(req, res) {
               COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
               COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
               COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
-              COALESCE(s.exchanges_enabled,  TRUE)  AS exchanges_enabled,
-              COALESCE(s.branches_enabled,   TRUE)  AS branches_enabled,
-              COALESCE(s.grace_period_days,  5)     AS grace_period_days
+              COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
+              COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
+              COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
+              COALESCE(s.grace_period_days,            5)     AS grace_period_days
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,

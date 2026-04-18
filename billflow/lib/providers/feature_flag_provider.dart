@@ -81,12 +81,19 @@ final exchangesEnabledProvider = Provider<bool>((ref) =>
 final branchesEnabledProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.branchesEnabled ?? true);
 
+// Car Service Only
+final carServiceProductsEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.carServiceProductsEnabled ?? true);
+
 // ── Shop-type helpers ─────────────────────────────────────────────────────────
 final shopTypeProvider = Provider<String>((ref) =>
     ref.watch(authProvider).valueOrNull?.shopType ?? 'retail');
 
 final isClothingShopProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.isClothingShop ?? false);
+
+final isCarServiceShopProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.isCarServiceShop ?? false);
 
 // ── Subscription gate ─────────────────────────────────────────────────────────
 // true = account has full access; false = locked (expired beyond grace period)

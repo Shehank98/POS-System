@@ -44,7 +44,7 @@ function BookingForm({ initial, services, staff, onSave, onClose }) {
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-gray-900">{initial?.id ? 'Edit Booking' : 'New Booking'}</h2>
+          <h2 className="font-bold text-gray-900">{initial?.id ? 'Edit Pre-Booking' : 'New Pre-Booking'}</h2>
           <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <form onSubmit={handleSave} className="space-y-3">
@@ -160,7 +160,7 @@ function SlipModal({ booking, shopId, shopName, onClose }) {
             <span className="text-white font-bold text-sm">{shopName?.charAt(0) || 'W'}</span>
           </div>
           <div>
-            <p className="font-bold text-gray-900">{shopName || 'Car Wash'}</p>
+            <p className="font-bold text-gray-900">{shopName || 'Car Service'}</p>
             <p className="text-xs text-gray-400">Booking Confirmation</p>
           </div>
 
@@ -310,20 +310,20 @@ export default function CarWashBookings() {
   }
 
   const headerLabel = date
-    ? `Bookings — ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
-    : 'Upcoming Bookings';
+    ? `Pre-Bookings — ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+    : 'Upcoming Pre-Bookings';
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Bookings</h1>
+        <h1 className="text-xl font-bold text-gray-900">Pre-Bookings</h1>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
           className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700
                      text-white text-sm font-semibold rounded-xl transition-colors"
         >
-          <Plus className="w-4 h-4" /> New Booking
+          <Plus className="w-4 h-4" /> New Pre-Booking
         </button>
       </div>
 

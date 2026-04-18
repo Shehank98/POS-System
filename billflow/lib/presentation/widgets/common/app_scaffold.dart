@@ -30,6 +30,7 @@ class AppScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).valueOrNull;
     final unread = ref.watch(unreadNotificationCountProvider);
+    final isCarService = ref.watch(isCarServiceShopProvider);
 
     // Subscription lock: fully expired → only billing allowed
     final isLocked = (user?.readOnly ?? false) && !(user?.inGracePeriod ?? false);
@@ -50,11 +51,16 @@ class AppScaffold extends ConsumerWidget {
       );
     }
 
+    // ── Car Service navigation ─────────────────────────────────────
+    if (isCarService) {
+      return _CarServiceScaffold(
+          child: child, user: user, unread: unread);
+    }
+
+    // ── Standard retail navigation ─────────────────────────────────
     final customersOn = ref.watch(customersEnabledProvider);
     final analyticsOn = ref.watch(analyticsEnabledProvider);
 
-    // Base items always present; optional items appended when enabled
-    // Reports tab removed — use Analytics instead
     final allItems = <_NavItem>[
       const _NavItem(
         route: '/dashboard',
@@ -96,7 +102,6 @@ class AppScaffold extends ConsumerWidget {
         ),
     ];
 
-    // Split into visible (up to max-1) + overflow
     final bool hasOverflow = allItems.length >= _kMaxNavItems;
     final visibleItems = hasOverflow
         ? allItems.sublist(0, _kMaxNavItems - 1)
@@ -106,14 +111,12 @@ class AppScaffold extends ConsumerWidget {
         : <_NavItem>[];
 
     final location = GoRouterState.of(context).matchedLocation;
-    final allRoutes = allItems.map((e) => e.route).toList();
     final visibleRoutes = visibleItems.map((e) => e.route).toList();
 
-    // If active route is in overflow, highlight "More" tab
     final isOverflowActive = overflowItems.any((e) => location.startsWith(e.route));
     final visibleIdx = visibleRoutes.indexWhere((r) => location.startsWith(r));
     final selectedIndex = isOverflowActive
-        ? visibleItems.length // "More" tab index
+        ? visibleItems.length
         : (visibleIdx < 0 ? 0 : visibleIdx);
 
     void openMoreSheet() {
@@ -149,6 +152,229 @@ class AppScaffold extends ConsumerWidget {
             child: const Icon(Icons.more_horiz_outlined),
           ),
           selectedIcon: const Icon(Icons.more_horiz),
+          label: 'More',
+        ),
+    ];
+
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (user?.inGracePeriod ?? false)
+            _GracePeriodBanner(graceDays: user!.graceDaysRemaining),
+          NavigationBar(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: (i) {
+              if (hasOverflow && i == visibleItems.length) {
+                openMoreSheet();
+              } else {
+                context.go(visibleRoutes[i]);
+              }
+            },
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: navDestinations,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Car Service Scaffold ──────────────────────────────────────────────────────
+class _CarServiceScaffold extends ConsumerWidget {
+  final Widget child;
+  final dynamic user;
+  final int unread;
+
+  const _CarServiceScaffold({
+    required this.child,
+    required this.user,
+    required this.unread,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isStaff = user?.role == 'staff';
+    final productsEnabled = ref.watch(carServiceProductsEnabledProvider);
+    final location = GoRouterState.of(context).matchedLocation;
+
+    // Car Service bottom nav items
+    final mainItems = <_NavItem>[
+      const _NavItem(
+        route: '/carwash',
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard,
+        label: 'Dashboard',
+      ),
+      const _NavItem(
+        route: '/carwash/bookings',
+        icon: Icons.calendar_today_outlined,
+        selectedIcon: Icons.calendar_today,
+        label: 'Pre-Bookings',
+      ),
+    ];
+
+    // More items (accessed via sheet)
+    final moreItems = <_NavItem>[
+      const _NavItem(
+        route: '/carwash/services',
+        icon: Icons.build_outlined,
+        selectedIcon: Icons.build,
+        label: 'Services',
+      ),
+      if (productsEnabled)
+        const _NavItem(
+          route: '/products',
+          icon: Icons.inventory_2_outlined,
+          selectedIcon: Icons.inventory_2,
+          label: 'Products',
+        ),
+      const _NavItem(
+        route: '/billing',
+        icon: Icons.credit_card_outlined,
+        selectedIcon: Icons.credit_card,
+        label: 'Billing',
+      ),
+      const _NavItem(
+        route: '/settings',
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: 'Settings',
+      ),
+    ];
+
+    // My Jobs tab — visible to all roles but shown in main nav for staff
+    // For owners/managers it goes in More sheet; for staff it's a main tab
+    final myJobsItem = const _NavItem(
+      route: '/carwash',
+      icon: Icons.work_outline,
+      selectedIcon: Icons.work,
+      label: 'My Jobs',
+    );
+
+    // Build visible nav based on role
+    List<_NavItem> visibleItems;
+    List<_NavItem> overflowItems;
+
+    if (isStaff) {
+      // Staff: Dashboard | My Jobs | Pre-Bookings | More
+      visibleItems = [
+        const _NavItem(
+          route: '/carwash',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard,
+          label: 'Dashboard',
+        ),
+        myJobsItem,
+        const _NavItem(
+          route: '/carwash/bookings',
+          icon: Icons.calendar_today_outlined,
+          selectedIcon: Icons.calendar_today,
+          label: 'Pre-Bookings',
+        ),
+      ];
+      overflowItems = [];
+    } else {
+      // Owner/Manager: Dashboard | Pre-Bookings | Services | More
+      visibleItems = [
+        const _NavItem(
+          route: '/carwash',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard,
+          label: 'Dashboard',
+        ),
+        const _NavItem(
+          route: '/carwash/bookings',
+          icon: Icons.calendar_today_outlined,
+          selectedIcon: Icons.calendar_today,
+          label: 'Pre-Bookings',
+        ),
+        const _NavItem(
+          route: '/carwash/services',
+          icon: Icons.build_outlined,
+          selectedIcon: Icons.build,
+          label: 'Services',
+        ),
+      ];
+      overflowItems = [
+        if (productsEnabled)
+          const _NavItem(
+            route: '/products',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            label: 'Products',
+          ),
+        const _NavItem(
+          route: '/billing',
+          icon: Icons.credit_card_outlined,
+          selectedIcon: Icons.credit_card,
+          label: 'Billing',
+        ),
+        const _NavItem(
+          route: '/settings',
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings,
+          label: 'Settings',
+        ),
+      ];
+    }
+
+    final isOverflowActive = overflowItems.any((e) => location.startsWith(e.route));
+    final visibleRoutes = visibleItems.map((e) => e.route).toList();
+    final visibleIdx = visibleRoutes.indexWhere((r) => location.startsWith(r));
+
+    // Exact match for /carwash to avoid matching /carwash/bookings etc.
+    int selectedIndex;
+    if (isOverflowActive) {
+      selectedIndex = visibleItems.length;
+    } else {
+      // Special: /carwash should only match if location IS /carwash exactly
+      selectedIndex = 0;
+      for (int i = 0; i < visibleItems.length; i++) {
+        final route = visibleItems[i].route;
+        if (route == '/carwash') {
+          if (location == '/carwash') {
+            selectedIndex = i;
+            break;
+          }
+        } else if (location.startsWith(route)) {
+          selectedIndex = i;
+          break;
+        }
+      }
+    }
+
+    final hasOverflow = overflowItems.isNotEmpty;
+
+    void openMoreSheet() {
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (_) => _MoreSheet(
+          items: overflowItems,
+          currentLocation: location,
+          unread: 0,
+          onTap: (route) {
+            Navigator.pop(context);
+            context.go(route);
+          },
+        ),
+      );
+    }
+
+    final navDestinations = <NavigationDestination>[
+      ...visibleItems.map((item) => NavigationDestination(
+            icon: Icon(item.icon),
+            selectedIcon: Icon(item.selectedIcon),
+            label: item.label,
+          )),
+      if (hasOverflow)
+        const NavigationDestination(
+          icon: Icon(Icons.more_horiz_outlined),
+          selectedIcon: Icon(Icons.more_horiz),
           label: 'More',
         ),
     ];

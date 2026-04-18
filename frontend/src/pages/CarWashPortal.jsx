@@ -155,7 +155,7 @@ export default function CarWashPortal() {
             <Car className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-gray-900">{shopInfo?.name || 'Car Wash'}</p>
+            <p className="font-bold text-gray-900">{shopInfo?.name || 'Car Service'}</p>
             <p className="text-xs text-gray-400">Customer Portal</p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function CarWashPortal() {
         <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
           {[
             { id: 'lookup',  label: 'Track My Car'   },
-            { id: 'booking', label: 'Book a Wash'    },
+            { id: 'booking', label: 'Book a Service'  },
           ].map((t) => (
             <button
               key={t.id}
@@ -276,7 +276,7 @@ export default function CarWashPortal() {
         {/* Booking tab */}
         {tab === 'booking' && (
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h2 className="font-semibold text-gray-900 mb-3">Book a Wash</h2>
+            <h2 className="font-semibold text-gray-900 mb-3">Book a Service</h2>
             <BookingForm
               shopId={shopId}
               services={services}
@@ -286,7 +286,7 @@ export default function CarWashPortal() {
         )}
 
         <p className="text-center text-xs text-gray-400 pb-4">
-          Powered by Car Wash POS
+          Powered by Car Service POS
         </p>
       </div>
     </div>

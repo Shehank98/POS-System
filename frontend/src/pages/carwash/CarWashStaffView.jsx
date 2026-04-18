@@ -129,7 +129,7 @@ export default function CarWashStaffView() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900">
-                    {new Date(b.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {b.booking_date ? new Date(b.booking_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                     {' at '}{b.time_slot}
                   </p>
                   <p className="text-xs text-gray-500 truncate">

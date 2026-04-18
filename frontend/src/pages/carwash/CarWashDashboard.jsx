@@ -158,7 +158,7 @@ export default function CarWashDashboard() {
         >
           <CheckCircle2 className="w-5 h-5 text-blue-500" />
           <div>
-            <p className="text-sm font-semibold text-gray-900">Bookings</p>
+            <p className="text-sm font-semibold text-gray-900">Pre-Bookings</p>
             <p className="text-xs text-gray-400">Manage schedule</p>
           </div>
         </Link>

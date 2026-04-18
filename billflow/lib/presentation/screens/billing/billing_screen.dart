@@ -275,7 +275,8 @@ class BillingScreen extends ConsumerWidget {
       case 'restaurant':
         return 'Restaurant / Cafe';
       case 'carwash':
-        return 'Car Wash';
+      case 'car_wash':
+        return 'Car Service';
       default:
         return 'Retail';
     }

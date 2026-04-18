@@ -262,7 +262,7 @@ function CreateShopModal({ onClose, onCreated }) {
                 <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
                 <select className={inputCls} value={form.shop_type} onChange={set('shop_type')}>
                   <option value="retail">Retail / General</option>
-                  <option value="car_wash">Car Wash</option>
+                  <option value="car_wash">Car Service</option>
                   <option value="clothing">Clothing Shop</option>
                   <option value="grocery">Grocery / Supermarket</option>
                   <option value="restaurant">Restaurant / Cafe</option>
@@ -323,17 +323,18 @@ function ShopControlCenter({ shop, onClose, onDone }) {
   // Features
   const [shopType, setShopType] = useState(shop.shop_type || 'retail');
   const [flags, setFlags] = useState({
-    barcode_enabled:    !!shop.barcode_enabled,
-    pre_orders_enabled: shop.pre_orders_enabled !== false,
-    customers_enabled:  shop.customers_enabled  !== false,
-    reports_enabled:    shop.reports_enabled    !== false,
-    analytics_enabled:  shop.analytics_enabled  !== false,
-    loyalty_enabled:    shop.loyalty_enabled    !== false,
-    refunds_enabled:    shop.refunds_enabled    !== false,
-    void_enabled:       shop.void_enabled       !== false,
-    offline_enabled:    shop.offline_enabled    !== false,
-    exchanges_enabled:  shop.exchanges_enabled  !== false,
-    branches_enabled:   shop.branches_enabled   !== false,
+    barcode_enabled:              !!shop.barcode_enabled,
+    pre_orders_enabled:           shop.pre_orders_enabled           !== false,
+    customers_enabled:            shop.customers_enabled            !== false,
+    reports_enabled:              shop.reports_enabled              !== false,
+    analytics_enabled:            shop.analytics_enabled            !== false,
+    loyalty_enabled:              shop.loyalty_enabled              !== false,
+    refunds_enabled:              shop.refunds_enabled              !== false,
+    void_enabled:                 shop.void_enabled                 !== false,
+    offline_enabled:              shop.offline_enabled              !== false,
+    exchanges_enabled:            shop.exchanges_enabled            !== false,
+    branches_enabled:             shop.branches_enabled             !== false,
+    car_service_products_enabled: shop.car_service_products_enabled !== false,
   });
   const toggleFlag = (key) => setFlags((p) => ({ ...p, [key]: !p[key] }));
 
@@ -380,8 +381,9 @@ function ShopControlCenter({ shop, onClose, onDone }) {
         refunds_enabled:    flags.refunds_enabled,
         void_enabled:       flags.void_enabled,
         offline_enabled:    flags.offline_enabled,
-        exchanges_enabled:  flags.exchanges_enabled,
-        branches_enabled:   flags.branches_enabled,
+        exchanges_enabled:            flags.exchanges_enabled,
+        branches_enabled:             flags.branches_enabled,
+        car_service_products_enabled: flags.car_service_products_enabled,
         extra_staff_slots:  parseInt(extraSlots, 10)      || 0,
         default_tax_rate:   parseFloat(defaultTaxRate)    || 0,
         grace_period_days:  parseInt(gracePeriodDays, 10) || 5,
@@ -597,7 +599,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                   <label className="block text-xs text-gray-400 mb-1">Shop Type</label>
                   <select className={inputCls} value={shopType} onChange={(e) => setShopType(e.target.value)}>
                     <option value="retail">Retail / General</option>
-                    <option value="car_wash">Car Wash</option>
+                    <option value="car_wash">Car Service</option>
                     <option value="clothing">Clothing Shop</option>
                     <option value="grocery">Grocery / Supermarket</option>
                     <option value="restaurant">Restaurant / Cafe</option>
@@ -629,6 +631,12 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                 <p className="text-xs text-gray-600 mb-2">Only apply when shop type is "Clothing"</p>
                 <FeatureRow label="Exchanges / Returns" flagKey="exchanges_enabled" note="Single-transaction exchange module" />
                 <FeatureRow label="Multi-Branch"        flagKey="branches_enabled"  note="Branch inventory management" />
+              </div>
+
+              <div className="bg-gray-900/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Car Service Only</p>
+                <p className="text-xs text-gray-600 mb-2">Only apply when shop type is "Car Service"</p>
+                <FeatureRow label="Products / Add-ons" flagKey="car_service_products_enabled" note="Show products tab in Car Service module" />
               </div>
             </div>
           )}

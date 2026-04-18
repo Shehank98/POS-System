@@ -410,7 +410,7 @@ async function updateShop(req, res) {
     // Feature flags
     pre_orders_enabled, customers_enabled, reports_enabled, analytics_enabled,
     loyalty_enabled, refunds_enabled, void_enabled, offline_enabled,
-    exchanges_enabled, branches_enabled,
+    exchanges_enabled, branches_enabled, car_service_products_enabled,
   } = req.body;
 
   const emailVal        = email         && email.trim()        ? email.trim()        : null;
@@ -444,9 +444,10 @@ async function updateShop(req, res) {
               refunds_enabled     = COALESCE($18, refunds_enabled),
               void_enabled        = COALESCE($19, void_enabled),
               offline_enabled     = COALESCE($20, offline_enabled),
-              exchanges_enabled   = COALESCE($21, exchanges_enabled),
-              branches_enabled    = COALESCE($22, branches_enabled)
-        WHERE id = $23
+              exchanges_enabled            = COALESCE($21, exchanges_enabled),
+              branches_enabled             = COALESCE($22, branches_enabled),
+              car_service_products_enabled = COALESCE($23, car_service_products_enabled)
+        WHERE id = $24
         RETURNING *`,
       [
         name, owner_name, emailVal, phone, address,
@@ -460,6 +461,7 @@ async function updateShop(req, res) {
         boolOrNull(loyalty_enabled),    boolOrNull(refunds_enabled),
         boolOrNull(void_enabled),       boolOrNull(offline_enabled),
         boolOrNull(exchanges_enabled),  boolOrNull(branches_enabled),
+        boolOrNull(car_service_products_enabled),
         req.params.id,
       ]
     );

@@ -33,7 +33,7 @@ class _CarwashScreenState extends ConsumerState<CarwashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Car Wash'),
+        title: const Text('Car Service'),
         centerTitle: false,
         titleTextStyle: const TextStyle(
             fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),

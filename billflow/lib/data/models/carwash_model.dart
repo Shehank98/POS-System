@@ -122,6 +122,54 @@ class CarwashJobListResult {
       );
 }
 
+class CarwashBooking {
+  final int id;
+  final String? vehicleNumber;
+  final String? phoneNumber;
+  final String? customerName;
+  final String? serviceName;
+  final String? bookingDate;
+  final String? timeSlot;
+  final String? staffName;
+  final String status; // booked | arrived | converted_to_job | cancelled
+  final String? notes;
+  final DateTime createdAt;
+
+  const CarwashBooking({
+    required this.id,
+    this.vehicleNumber,
+    this.phoneNumber,
+    this.customerName,
+    this.serviceName,
+    this.bookingDate,
+    this.timeSlot,
+    this.staffName,
+    required this.status,
+    this.notes,
+    required this.createdAt,
+  });
+
+  bool get isBooked => status == 'booked';
+  bool get isArrived => status == 'arrived';
+  bool get isConverted => status == 'converted_to_job';
+  bool get isCancelled => status == 'cancelled';
+
+  factory CarwashBooking.fromJson(Map<String, dynamic> j) => CarwashBooking(
+        id: toInt(j['id']),
+        vehicleNumber: j['vehicle_number'] as String?,
+        phoneNumber: j['phone_number'] as String?,
+        customerName: j['customer_name'] as String?,
+        serviceName: j['service_name'] as String?,
+        bookingDate: j['booking_date'] as String?,
+        timeSlot: j['time_slot'] as String?,
+        staffName: j['staff_name'] as String?,
+        status: j['status'] as String? ?? 'booked',
+        notes: j['notes'] as String?,
+        createdAt: DateTime.tryParse(j['created_at'] as String? ?? '') ??
+            DateTime.now(),
+      );
+}
+
 class CarwashDashboard {
   final int todayJobs;
   final double todayRevenue;

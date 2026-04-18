@@ -327,7 +327,7 @@ export default function CarWashJobDetail() {
         )}
         <div className="flex justify-between text-gray-600">
           <span>Created</span>
-          <span>{new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{job.created_at ? new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
         </div>
         {job.notes && (
           <div className="pt-1 border-t border-gray-100 text-gray-500 italic">
@@ -415,7 +415,7 @@ export default function CarWashJobDetail() {
               <div className="text-right">
                 <span className="font-semibold text-gray-900">Rs. {parseFloat(p.amount).toFixed(2)}</span>
                 <span className="block text-xs text-gray-400">
-                  {new Date(p.paid_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {p.paid_at ? new Date(p.paid_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                 </span>
               </div>
             </div>

@@ -110,6 +110,27 @@ class CarwashApiService {
       throw ApiException.fromDioException(e);
     }
   }
+
+  Future<List<CarwashBooking>> listBookings({String? date, String? status}) async {
+    try {
+      final res = await _dio.get(
+        ApiConstants.carwashBookings,
+        queryParameters: {
+          if (date != null) 'date': date,
+          if (status != null) 'status': status,
+        },
+      );
+      final data = res.data;
+      final list = (data is Map ? (data['bookings'] ?? data['data'] ?? data) : data)
+              as List<dynamic>? ??
+          [];
+      return list
+          .map((e) => CarwashBooking.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
 }
 
 final carwashApiServiceProvider = Provider<CarwashApiService>(

@@ -20,6 +20,8 @@ import '../../presentation/screens/notifications/notifications_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
 import '../../presentation/screens/analytics/analytics_screen.dart';
 import '../../presentation/screens/carwash/carwash_screen.dart';
+import '../../presentation/screens/carwash/carwash_bookings_screen.dart';
+import '../../presentation/screens/carwash/carwash_services_screen.dart';
 import '../../presentation/screens/customers/customers_screen.dart';
 import '../../presentation/screens/pre_orders/pre_orders_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
@@ -51,7 +53,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         if (isLocked && !allowedWhenLocked.contains(loc)) return '/billing';
 
         if (loc == '/login' || loc == '/' || loc == '/biometric') {
-          return '/dashboard';
+          // Car service shops go to their own dashboard
+          return user.isCarServiceShop ? '/carwash' : '/dashboard';
         }
       }
 
@@ -103,6 +106,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/carwash',
             builder: (context, state) => const CarwashScreen(),
+          ),
+          GoRoute(
+            path: '/carwash/bookings',
+            builder: (context, state) => const CarwashBookingsScreen(),
+          ),
+          GoRoute(
+            path: '/carwash/services',
+            builder: (context, state) => const CarwashServicesScreen(),
           ),
           GoRoute(
             path: '/analytics',

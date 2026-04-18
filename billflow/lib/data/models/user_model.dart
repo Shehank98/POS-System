@@ -34,6 +34,9 @@ class UserModel {
   final bool exchangesEnabled;  // Exchanges / Returns
   final bool branchesEnabled;   // Multi-Branch
 
+  // Car Service Only
+  final bool carServiceProductsEnabled;  // Products / Add-ons tab
+
   const UserModel({
     required this.id,
     required this.username,
@@ -59,11 +62,13 @@ class UserModel {
     required this.analyticsEnabled,
     required this.exchangesEnabled,
     required this.branchesEnabled,
+    required this.carServiceProductsEnabled,
   });
 
   bool get isOwner => role == 'owner';
   bool get isManagerOrAbove => role == 'owner' || role == 'manager';
   bool get isClothingShop => shopType == 'clothing';
+  bool get isCarServiceShop => shopType == 'car_wash';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -94,6 +99,8 @@ class UserModel {
       // Clothing Only
       exchangesEnabled: json['exchanges_enabled'] as bool? ?? true,
       branchesEnabled: json['branches_enabled'] as bool? ?? true,
+      // Car Service Only
+      carServiceProductsEnabled: json['car_service_products_enabled'] as bool? ?? true,
     );
   }
 
@@ -125,5 +132,7 @@ class UserModel {
         // Clothing Only
         'exchanges_enabled': exchangesEnabled,
         'branches_enabled': branchesEnabled,
+        // Car Service Only
+        'car_service_products_enabled': carServiceProductsEnabled,
       };
 }
