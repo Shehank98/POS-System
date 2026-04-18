@@ -111,7 +111,7 @@ async function getPublicProducts(req, res) {
       ));
     } else {
       ({ rows } = await db.query(
-        `SELECT id, name, price, category, stock_quantity, has_inventory
+        `SELECT id, name, price, category, stock_quantity, has_inventory, unit_type
            FROM products
           WHERE shop_id = $1
           ORDER BY

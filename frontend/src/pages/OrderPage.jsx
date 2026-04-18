@@ -14,8 +14,9 @@ function timeAgo(dateStr) {
 }
 
 // ── Product Card ──────────────────────────────────────────────
-function ProductCard({ product, qty, onAdd, onRemove }) {
+function ProductCard({ product, qty, onAdd, onRemove, onSetKg }) {
   const outOfStock = product.has_inventory && product.stock_quantity <= 0;
+  const isKg = product.unit_type === 'kg';
 
   return (
     <div className={`bg-white rounded-xl border ${outOfStock ? 'opacity-50' : 'border-gray-200'} p-3 flex flex-col gap-2`}>
@@ -24,13 +25,28 @@ function ProductCard({ product, qty, onAdd, onRemove }) {
           <span className="text-xs text-gray-400 uppercase tracking-wide">{product.category}</span>
         )}
         <p className="font-semibold text-gray-800 leading-tight mt-0.5">{product.name}</p>
-        <p className="text-primary-600 font-bold text-base mt-1">Rs {Number(product.price).toFixed(2)}</p>
+        <p className="text-primary-600 font-bold text-base mt-1">
+          Rs {Number(product.price).toFixed(2)}{isKg ? ' / kg' : ''}
+        </p>
         {outOfStock && <p className="text-xs text-red-500 mt-0.5">Out of stock</p>}
       </div>
       {outOfStock ? (
         <button disabled className="w-full py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm">
           Unavailable
         </button>
+      ) : isKg ? (
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={qty || ''}
+            placeholder="0.0"
+            onChange={(e) => onSetKg(product.id, parseFloat(e.target.value) || 0)}
+            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-primary-500"
+          />
+          <span className="text-xs text-gray-500 whitespace-nowrap">kg</span>
+        </div>
       ) : qty > 0 ? (
         <div className="flex items-center justify-between bg-primary-50 rounded-lg px-2 py-1">
           <button onClick={onRemove} className="p-1 rounded-full hover:bg-primary-100 text-primary-700">
@@ -214,6 +230,14 @@ export default function OrderPage() {
       return next;
     });
 
+  const setKgQty = (productId, kg) =>
+    setCart((prev) => {
+      const next = { ...prev };
+      if (!kg || kg <= 0) delete next[productId];
+      else next[productId] = kg;
+      return next;
+    });
+
   const cartItems = products.filter((p) => cart[p.id] > 0);
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const cartTotal = cartItems.reduce((sum, p) => sum + Number(p.price) * cart[p.id], 0);
@@ -250,6 +274,7 @@ export default function OrderPage() {
       name:       p.name,
       price:      Number(p.price),
       quantity:   cart[p.id],
+      unit_type:  p.unit_type || 'unit',
     }));
 
     setSubmitting(true);
@@ -418,6 +443,7 @@ export default function OrderPage() {
             qty={cart[product.id] || 0}
             onAdd={() => addItem(product.id)}
             onRemove={() => removeItem(product.id)}
+            onSetKg={setKgQty}
           />
         ))}
         {filtered.length === 0 && (
@@ -444,26 +470,45 @@ export default function OrderPage() {
                 <p className="text-center text-gray-400 py-6">Your cart is empty</p>
               ) : (
                 <div className="space-y-2 mb-4">
-                  {cartItems.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                        <p className="text-xs text-gray-500">Rs {Number(p.price).toFixed(2)} × {cart[p.id]}</p>
+                  {cartItems.map((p) => {
+                    const isKg = p.unit_type === 'kg';
+                    const qty = cart[p.id];
+                    return (
+                      <div key={p.id} className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                          <p className="text-xs text-gray-500">
+                            Rs {Number(p.price).toFixed(2)}{isKg ? '/kg' : ''} × {isKg ? `${qty}kg` : qty}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-3">
+                          {isKg ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={qty}
+                              onChange={(e) => setKgQty(p.id, parseFloat(e.target.value) || 0)}
+                              className="w-16 border border-gray-300 rounded px-1 py-0.5 text-sm text-center"
+                            />
+                          ) : (
+                            <>
+                              <button onClick={() => removeItem(p.id)} className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">
+                                <Minus size={12} />
+                              </button>
+                              <span className="w-5 text-center text-sm font-bold">{qty}</span>
+                              <button onClick={() => addItem(p.id)} className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">
+                                <Plus size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 ml-3 w-16 text-right">
+                          Rs {(Number(p.price) * qty).toFixed(2)}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 ml-3">
-                        <button onClick={() => removeItem(p.id)} className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">
-                          <Minus size={12} />
-                        </button>
-                        <span className="w-5 text-center text-sm font-bold">{cart[p.id]}</span>
-                        <button onClick={() => addItem(p.id)} className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-800 ml-3 w-16 text-right">
-                        Rs {(Number(p.price) * cart[p.id]).toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div className="flex justify-between border-t border-gray-100 pt-2 mt-2">
                     <span className="font-bold text-gray-800">Total</span>
                     <span className="font-bold text-primary-700">Rs {cartTotal.toFixed(2)}</span>
