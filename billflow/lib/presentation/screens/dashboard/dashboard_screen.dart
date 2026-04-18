@@ -298,7 +298,7 @@ class DashboardScreen extends ConsumerWidget {
                       Expanded(
                         child: _QuickAction(
                           icon: Icons.point_of_sale,
-                          label: 'New Sale',
+                          label: 'Billing',
                           color: AppColors.accent,
                           onTap: () => context.go('/sales'),
                         ),
@@ -306,19 +306,19 @@ class DashboardScreen extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _QuickAction(
-                          icon: Icons.receipt_long,
-                          label: 'Receipts',
-                          color: AppColors.primary,
-                          onTap: () => context.go('/transactions'),
+                          icon: Icons.inbox_outlined,
+                          label: 'Pre Orders',
+                          color: const Color(0xFF1565C0),
+                          onTap: () => context.push('/pre-orders'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _QuickAction(
-                          icon: Icons.bar_chart,
-                          label: 'Reports',
+                          icon: Icons.settings_outlined,
+                          label: 'Settings',
                           color: const Color(0xFF6A1B9A),
-                          onTap: () => context.go('/reports'),
+                          onTap: () => context.push('/settings'),
                         ),
                       ),
                     ]),
