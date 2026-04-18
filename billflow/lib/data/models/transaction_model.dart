@@ -1,3 +1,5 @@
+import '../../core/utils/json_parse.dart';
+
 class TransactionItem {
   final int id;
   final int transactionId;
@@ -21,13 +23,13 @@ class TransactionItem {
 
   factory TransactionItem.fromJson(Map<String, dynamic> json) {
     return TransactionItem(
-      id: json['id'] as int,
-      transactionId: json['transaction_id'] as int,
-      productId: json['product_id'] as int?,
-      quantity: (json['quantity'] as num).toDouble(),
-      unitPrice: (json['unit_price'] as num).toDouble(),
-      discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      subtotal: (json['subtotal'] as num).toDouble(),
+      id: toInt(json['id']),
+      transactionId: toInt(json['transaction_id']),
+      productId: json['product_id'] != null ? toInt(json['product_id']) : null,
+      quantity: toDouble(json['quantity']),
+      unitPrice: toDouble(json['unit_price']),
+      discount: toDouble(json['discount']),
+      subtotal: toDouble(json['subtotal']),
       productName: json['product_name'] as String? ?? json['name'] as String?,
     );
   }
@@ -64,11 +66,11 @@ class TransactionModel {
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
-      id: json['id'] as int,
+      id: toInt(json['id']),
       transactionNumber: json['transaction_number'] as String? ?? '#${json['id']}',
-      totalAmount: (json['total_amount'] as num).toDouble(),
-      taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0.0,
-      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: toDouble(json['total_amount']),
+      taxAmount: toDouble(json['tax_amount']),
+      discountAmount: toDouble(json['discount_amount']),
       paymentMethod: json['payment_method'] as String? ?? 'cash',
       status: json['status'] as String? ?? 'completed',
       transactionDate: DateTime.parse(json['transaction_date'] as String),
@@ -109,17 +111,17 @@ class TransactionSummary {
 
   factory TransactionSummary.fromJson(Map<String, dynamic> json) {
     return TransactionSummary(
-      totalTransactions: int.tryParse(json['total_transactions']?.toString() ?? '0') ?? 0,
-      totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
-      totalTax: (json['total_tax'] as num?)?.toDouble() ?? 0.0,
-      totalDiscounts: (json['total_discounts'] as num?)?.toDouble() ?? 0.0,
-      voidedTransactions: int.tryParse(json['voided_transactions']?.toString() ?? '0') ?? 0,
-      refundTransactions: int.tryParse(json['refund_transactions']?.toString() ?? '0') ?? 0,
-      totalRefunds: (json['total_refunds'] as num?)?.toDouble() ?? 0.0,
-      netRevenue: (json['net_revenue'] as num?)?.toDouble() ?? 0.0,
-      cashCount: int.tryParse(json['cash_count']?.toString() ?? '0') ?? 0,
-      cardCount: int.tryParse(json['card_count']?.toString() ?? '0') ?? 0,
-      mobileCount: int.tryParse(json['mobile_count']?.toString() ?? '0') ?? 0,
+      totalTransactions: toInt(json['total_transactions']),
+      totalRevenue: toDouble(json['total_revenue']),
+      totalTax: toDouble(json['total_tax']),
+      totalDiscounts: toDouble(json['total_discounts']),
+      voidedTransactions: toInt(json['voided_transactions']),
+      refundTransactions: toInt(json['refund_transactions']),
+      totalRefunds: toDouble(json['total_refunds']),
+      netRevenue: toDouble(json['net_revenue']),
+      cashCount: toInt(json['cash_count']),
+      cardCount: toInt(json['card_count']),
+      mobileCount: toInt(json['mobile_count']),
     );
   }
 }

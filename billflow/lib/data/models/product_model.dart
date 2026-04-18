@@ -1,3 +1,5 @@
+import '../../core/utils/json_parse.dart';
+
 class ProductModel {
   final int id;
   final int shopId;
@@ -32,16 +34,16 @@ class ProductModel {
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
-      id: json['id'] as int,
-      shopId: json['shop_id'] as int? ?? 0,
+      id: toInt(json['id']),
+      shopId: toInt(json['shop_id']),
       name: json['name'] as String,
       barcode: json['barcode'] as String?,
-      price: (json['price'] as num).toDouble(),
-      costPrice: (json['cost_price'] as num?)?.toDouble() ?? 0.0,
-      stockQuantity: (json['stock_quantity'] as num?)?.toDouble() ?? 0.0,
+      price: toDouble(json['price']),
+      costPrice: toDouble(json['cost_price']),
+      stockQuantity: toDouble(json['stock_quantity']),
       hasInventory: json['has_inventory'] as bool? ?? false,
       category: json['category'] as String?,
-      taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0.0,
+      taxRate: toDouble(json['tax_rate']),
       unitType: json['unit_type'] as String? ?? 'unit',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)

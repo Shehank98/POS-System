@@ -1,3 +1,5 @@
+import '../../core/utils/json_parse.dart';
+
 class PreOrderItem {
   final String name;
   final int qty;
@@ -11,8 +13,8 @@ class PreOrderItem {
 
   factory PreOrderItem.fromJson(Map<String, dynamic> json) => PreOrderItem(
         name: json['name'] as String? ?? '',
-        qty: (json['qty'] ?? json['quantity'] ?? 1) as int,
-        price: (json['price'] as num?)?.toDouble() ?? 0,
+        qty: toInt(json['qty'] ?? json['quantity'] ?? 1),
+        price: toDouble(json['price']),
       );
 }
 
@@ -49,12 +51,12 @@ class PreOrderModel {
           .toList();
     }
     return PreOrderModel(
-      id: json['id'] as int,
+      id: toInt(json['id']),
       tokenNumber: json['token_number'] as String? ?? '',
       customerPhone: json['customer_phone'] as String? ?? '',
       customerName: json['customer_name'] as String?,
       items: items,
-      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+      totalAmount: toDouble(json['total_amount']),
       status: (json['status'] as String? ?? 'PENDING').toUpperCase(),
       paymentStatus:
           (json['payment_status'] as String? ?? 'pending').toLowerCase(),

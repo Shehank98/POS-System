@@ -1,3 +1,5 @@
+import '../../core/utils/json_parse.dart';
+
 class DashboardSummary {
   final int transactionCount;
   final double totalSales;
@@ -23,15 +25,15 @@ class DashboardSummary {
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     return DashboardSummary(
-      transactionCount: int.tryParse(json['transaction_count']?.toString() ?? '0') ?? 0,
-      totalSales: (json['total_sales'] as num?)?.toDouble() ?? 0.0,
-      totalTax: (json['total_tax'] as num?)?.toDouble() ?? 0.0,
-      totalDiscounts: (json['total_discounts'] as num?)?.toDouble() ?? 0.0,
-      totalRefunds: (json['total_refunds'] as num?)?.toDouble() ?? 0.0,
-      netSales: (json['net_sales'] as num?)?.toDouble() ?? 0.0,
-      cashSales: (json['cash_sales'] as num?)?.toDouble() ?? 0.0,
-      cardSales: (json['card_sales'] as num?)?.toDouble() ?? 0.0,
-      mobileSales: (json['mobile_sales'] as num?)?.toDouble() ?? 0.0,
+      transactionCount: toInt(json['transaction_count']),
+      totalSales: toDouble(json['total_sales']),
+      totalTax: toDouble(json['total_tax']),
+      totalDiscounts: toDouble(json['total_discounts']),
+      totalRefunds: toDouble(json['total_refunds']),
+      netSales: toDouble(json['net_sales']),
+      cashSales: toDouble(json['cash_sales']),
+      cardSales: toDouble(json['card_sales']),
+      mobileSales: toDouble(json['mobile_sales']),
     );
   }
 
@@ -62,8 +64,8 @@ class TopProduct {
   factory TopProduct.fromJson(Map<String, dynamic> json) {
     return TopProduct(
       name: json['name'] as String,
-      qtySold: (json['qty_sold'] as num?)?.toDouble() ?? 0.0,
-      revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
+      qtySold: toDouble(json['qty_sold']),
+      revenue: toDouble(json['revenue']),
     );
   }
 }
@@ -81,9 +83,9 @@ class HourlyPoint {
 
   factory HourlyPoint.fromJson(Map<String, dynamic> json) {
     return HourlyPoint(
-      hour: (json['hour'] as num).toInt(),
-      sales: (json['sales'] as num?)?.toDouble() ?? 0.0,
-      count: int.tryParse(json['count']?.toString() ?? '0') ?? 0,
+      hour: toInt(json['hour']),
+      sales: toDouble(json['sales']),
+      count: toInt(json['count']),
     );
   }
 }
@@ -102,8 +104,8 @@ class DailyPoint {
   factory DailyPoint.fromJson(Map<String, dynamic> json) {
     return DailyPoint(
       day: json['day'] as String? ?? json['date'] as String? ?? '',
-      sales: (json['sales'] as num?)?.toDouble() ?? 0.0,
-      transactions: int.tryParse(json['transactions']?.toString() ?? '0') ?? 0,
+      sales: toDouble(json['sales']),
+      transactions: toInt(json['transactions']),
     );
   }
 }
@@ -124,7 +126,7 @@ class DashboardToday {
   factory DashboardToday.fromJson(Map<String, dynamic> json) {
     return DashboardToday(
       summary: DashboardSummary.fromJson(json['summary'] as Map<String, dynamic>),
-      itemsSold: (json['items_sold'] as num?)?.toDouble() ?? 0.0,
+      itemsSold: toDouble(json['items_sold']),
       topProducts: (json['top_products'] as List<dynamic>?)
               ?.map((e) => TopProduct.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -154,9 +156,9 @@ class LowStockProduct {
 
   factory LowStockProduct.fromJson(Map<String, dynamic> json) {
     return LowStockProduct(
-      id: json['id'] as int,
+      id: toInt(json['id']),
       name: json['name'] as String,
-      stockQuantity: (json['stock_quantity'] as num?)?.toDouble() ?? 0.0,
+      stockQuantity: toDouble(json['stock_quantity']),
       category: json['category'] as String?,
       unitType: json['unit_type'] as String? ?? 'unit',
     );

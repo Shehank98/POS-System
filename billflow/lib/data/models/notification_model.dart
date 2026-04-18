@@ -35,7 +35,7 @@ class AppNotification {
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
-      id: json['id'] as int,
+      id: int.tryParse(json['id'].toString()) ?? 0,
       type: json['type'] as String? ?? 'info',
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
