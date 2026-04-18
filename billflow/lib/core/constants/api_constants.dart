@@ -1,7 +1,7 @@
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = 'https://yourapp.up.railway.app/api';
+  static const String baseUrl = 'https://pos-system-production-74ed.up.railway.app/api';
 
   // Auth
   static const String login = '/auth/login';

@@ -10,12 +10,10 @@ import '../../presentation/screens/sales/sales_screen.dart';
 import '../../presentation/screens/sales/payment_screen.dart';
 import '../../presentation/screens/products/products_screen.dart';
 import '../../presentation/screens/products/product_form_screen.dart';
-import '../../presentation/screens/inventory/inventory_screen.dart';
 import '../../presentation/screens/transactions/transactions_screen.dart';
 import '../../presentation/screens/transactions/transaction_detail_screen.dart';
 import '../../presentation/screens/reports/reports_screen.dart';
 import '../../presentation/screens/notifications/notifications_screen.dart';
-import '../../presentation/screens/settings/settings_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -55,16 +53,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const SalesScreen(),
           ),
           GoRoute(
-            path: '/products',
-            builder: (context, state) => const ProductsScreen(),
-          ),
-          GoRoute(
-            path: '/inventory',
-            builder: (context, state) => const InventoryScreen(),
-          ),
-          GoRoute(
             path: '/transactions',
             builder: (context, state) => const TransactionsScreen(),
+          ),
+          GoRoute(
+            path: '/products',
+            builder: (context, state) => const ProductsScreen(),
           ),
           GoRoute(
             path: '/reports',
@@ -98,10 +92,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
-      ),
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

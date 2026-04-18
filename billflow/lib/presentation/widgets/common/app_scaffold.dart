@@ -10,9 +10,8 @@ class AppScaffold extends ConsumerWidget {
   static const _routes = [
     '/dashboard',
     '/sales',
-    '/products',
-    '/inventory',
     '/transactions',
+    '/products',
     '/reports',
   ];
 
@@ -29,41 +28,38 @@ class AppScaffold extends ConsumerWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
-        onTap: (i) => context.go(_routes[i]),
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (i) => context.go(_routes[i]),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: false,
-              child: const Icon(Icons.point_of_sale_outlined),
-            ),
-            activeIcon: const Icon(Icons.point_of_sale),
-            label: 'Sales',
+          const NavigationDestination(
+            icon: Icon(Icons.point_of_sale_outlined),
+            selectedIcon: Icon(Icons.point_of_sale),
+            label: 'POS',
           ),
-          const BottomNavigationBarItem(
+          const NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Receipts',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2),
+            selectedIcon: Icon(Icons.inventory_2),
             label: 'Products',
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.warehouse_outlined),
-            activeIcon: Icon(Icons.warehouse),
-            label: 'Inventory',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long_outlined),
-            activeIcon: Icon(Icons.receipt_long),
-            label: 'Sales Log',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            activeIcon: Icon(Icons.bar_chart),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text('$unread'),
+              child: const Icon(Icons.bar_chart_outlined),
+            ),
+            selectedIcon: const Icon(Icons.bar_chart),
             label: 'Reports',
           ),
         ],
