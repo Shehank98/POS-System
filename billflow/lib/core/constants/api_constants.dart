@@ -13,6 +13,10 @@ class ApiConstants {
   static String productByBarcode(String barcode) => '/products/by-barcode/$barcode';
   static String productById(int id) => '/products/$id';
 
+  // Clothing shop products
+  static const String clothingProducts = '/clothing/products';
+  static String clothingProductById(int id) => '/clothing/products/$id';
+
   // Transactions
   static const String transactions = '/transactions';
   static const String transactionSummary = '/transactions/summary';

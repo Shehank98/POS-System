@@ -15,6 +15,7 @@ class ProductService {
     bool? lowStock,
     int page = 1,
     int limit = 50,
+    String shopType = 'retail',
   }) async {
     try {
       final params = <String, dynamic>{
@@ -24,18 +25,47 @@ class ProductService {
         if (category != null) 'category': category,
         if (lowStock == true) 'low_stock': 'true',
       };
-      final response = await _dio.get(ApiConstants.products,
-          queryParameters: params);
+
+      final isClothing = shopType == 'clothing';
+      final endpoint = isClothing
+          ? ApiConstants.clothingProducts
+          : ApiConstants.products;
+
+      final response = await _dio.get(endpoint, queryParameters: params);
       final data = response.data;
-      final List<dynamic> raw = data is List ? data : (data['products'] as List<dynamic>? ?? []);
-      final products = raw
-          .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-      final total = (data is Map ? data['total'] as int? : null) ?? products.length;
+      final List<dynamic> raw =
+          data is List ? data : (data['products'] as List<dynamic>? ?? []);
+
+      final products = raw.map((e) {
+        final map = e as Map<String, dynamic>;
+        if (isClothing) return _mapClothingProduct(map);
+        return ProductModel.fromJson(map);
+      }).toList();
+
+      final total =
+          (data is Map ? data['total'] as int? : null) ?? products.length;
       return (products: products, total: total);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
+  }
+
+  ProductModel _mapClothingProduct(Map<String, dynamic> m) {
+    final totalStock = (m['total_stock'] as num?)?.toDouble() ?? 0;
+    final variantCount = (m['variant_count'] as num?)?.toInt() ?? 0;
+    return ProductModel(
+      id: m['id'] as int,
+      shopId: m['shop_id'] as int? ?? 0,
+      name: m['name'] as String? ?? '',
+      barcode: null,
+      price: (m['base_price'] as num?)?.toDouble() ?? 0,
+      costPrice: (m['cost_price'] as num?)?.toDouble() ?? 0,
+      category: m['category'] as String?,
+      taxRate: (m['tax_rate'] as num?)?.toDouble() ?? 0,
+      hasInventory: variantCount > 0,
+      stockQuantity: totalStock,
+      unitType: 'unit',
+    );
   }
 
   Future<ProductModel> getByBarcode(String barcode) async {

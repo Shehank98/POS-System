@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/product_model.dart';
 import '../data/services/product_service.dart';
+import 'auth_provider.dart';
 
 final productSearchQueryProvider = StateProvider<String>((ref) => '');
 final productCategoryFilterProvider = StateProvider<String?>((ref) => null);
@@ -12,9 +13,11 @@ class ProductsNotifier extends AsyncNotifier<List<ProductModel>> {
   Future<List<ProductModel>> _fetch() async {
     final search = ref.watch(productSearchQueryProvider);
     final category = ref.watch(productCategoryFilterProvider);
+    final shopType = ref.read(authProvider).valueOrNull?.shopType ?? 'retail';
     final result = await ref.read(productServiceProvider).listProducts(
           search: search.isEmpty ? null : search,
           category: category,
+          shopType: shopType,
         );
     return result.products;
   }
