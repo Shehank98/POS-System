@@ -7,6 +7,7 @@ import '../../data/models/product_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/biometric_screen.dart';
+import '../../presentation/screens/billing/billing_screen.dart';
 import '../../presentation/screens/dashboard/dashboard_screen.dart';
 import '../../presentation/screens/sales/sales_screen.dart';
 import '../../presentation/screens/sales/payment_screen.dart';
@@ -31,15 +32,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
       final isLoading = authState.isLoading;
       final loc = state.matchedLocation;
 
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';
       if (isLoggedIn && needsBiometric && loc != '/biometric') return '/biometric';
-      if (isLoggedIn && !needsBiometric &&
-          (loc == '/login' || loc == '/' || loc == '/biometric')) return '/dashboard';
+
+      if (isLoggedIn && !needsBiometric) {
+        // Subscription gate: fully locked accounts can only access /billing and /settings
+        final isLocked = user.readOnly && !user.inGracePeriod;
+        final allowedWhenLocked = loc == '/billing' || loc == '/settings';
+        if (isLocked && !allowedWhenLocked) return '/billing';
+
+        if (loc == '/login' || loc == '/' || loc == '/biometric') {
+          return '/dashboard';
+        }
+      }
+
       return null;
     },
     routes: [
@@ -82,6 +94,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ReportsScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/billing',
+        builder: (context, state) => const BillingScreen(),
       ),
       GoRoute(
         path: '/pre-orders',

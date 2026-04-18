@@ -143,7 +143,7 @@ async function getYesterday(req, res) {
 async function getWeek(req, res) {
   try {
     const [dailyRes, topProductsRes] = await Promise.all([
-      // Daily totals for last 7 days
+      // Daily totals for last 7 days — filter by UTC date to match grouping
       db.query(
         `SELECT DATE(transaction_date AT TIME ZONE 'UTC') AS day,
                 COALESCE(SUM(total_amount), 0) AS sales,
@@ -151,7 +151,7 @@ async function getWeek(req, res) {
            FROM transactions
           WHERE shop_id = $1
             AND status  = 'completed'
-            AND transaction_date >= NOW() - INTERVAL '6 days'
+            AND DATE(transaction_date AT TIME ZONE 'UTC') >= CURRENT_DATE - 6
           GROUP BY day
           ORDER BY day ASC`,
         [req.shopId]
@@ -169,7 +169,7 @@ async function getWeek(req, res) {
            LEFT JOIN clothing_products cp ON cp.id = cv.product_id
           WHERE t.shop_id = $1
             AND t.status  = 'completed'
-            AND t.transaction_date >= NOW() - INTERVAL '6 days'
+            AND DATE(t.transaction_date AT TIME ZONE 'UTC') >= CURRENT_DATE - 6
           GROUP BY COALESCE(cp.name, p.name)
           ORDER BY qty_sold DESC
           LIMIT 5`,
@@ -397,25 +397,29 @@ async function getAnalytics(req, res) {
 }
 
 // ── Helper: fill in missing dates with 0 ─────────────────────
+// All date arithmetic is done in UTC to match SQL's AT TIME ZONE 'UTC' grouping.
 function fillDays(rows, count, fromMonthStart = false) {
   const map = {};
   rows.forEach((r) => { map[r.day.toISOString().split('T')[0]] = r; });
 
+  const now = new Date();
+  const todayUtcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
   const result = [];
   for (let i = fromMonthStart ? 0 : count - 1; i >= 0; i--) {
-    const d = new Date();
+    let key;
     if (fromMonthStart) {
-      d.setDate(i + 1);
+      // i = 0 → day 1 of current UTC month, i = 1 → day 2, ...
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), i + 1));
+      key = d.toISOString().split('T')[0];
     } else {
-      d.setDate(d.getDate() - i);
+      // i = count-1 → oldest day, i = 0 → today
+      const d = new Date(todayUtcMs - i * 86_400_000);
+      key = d.toISOString().split('T')[0];
     }
-    const key = d.toISOString().split('T')[0];
-    result.push(
-      map[key] || { day: key, sales: '0', transactions: '0' }
-    );
+    result.push(map[key] || { day: key, sales: '0', transactions: '0' });
   }
-  // If fromMonthStart, result is already in order
-  return fromMonthStart ? result : result;
+  return result;
 }
 
 module.exports = { getToday, getYesterday, getWeek, getMonth, getLowStock, getAnalytics };

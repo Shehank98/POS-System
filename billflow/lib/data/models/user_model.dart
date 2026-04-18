@@ -25,6 +25,10 @@ class UserModel {
   final bool offlineEnabled;
   final bool exchangesEnabled;
   final bool branchesEnabled;
+  final bool posEnabled;
+  final bool productsEnabled;
+  final bool notificationsEnabled;
+  final bool inventoryEnabled;
 
   const UserModel({
     required this.id,
@@ -51,6 +55,10 @@ class UserModel {
     required this.offlineEnabled,
     required this.exchangesEnabled,
     required this.branchesEnabled,
+    required this.posEnabled,
+    required this.productsEnabled,
+    required this.notificationsEnabled,
+    required this.inventoryEnabled,
   });
 
   bool get isOwner => role == 'owner';
@@ -82,6 +90,10 @@ class UserModel {
       offlineEnabled: json['offline_enabled'] as bool? ?? false,
       exchangesEnabled: json['exchanges_enabled'] as bool? ?? false,
       branchesEnabled: json['branches_enabled'] as bool? ?? false,
+      posEnabled: json['pos_enabled'] as bool? ?? true,
+      productsEnabled: json['products_enabled'] as bool? ?? true,
+      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
+      inventoryEnabled: json['inventory_enabled'] as bool? ?? true,
     );
   }
 
@@ -110,5 +122,9 @@ class UserModel {
         'offline_enabled': offlineEnabled,
         'exchanges_enabled': exchangesEnabled,
         'branches_enabled': branchesEnabled,
+        'pos_enabled': posEnabled,
+        'products_enabled': productsEnabled,
+        'notifications_enabled': notificationsEnabled,
+        'inventory_enabled': inventoryEnabled,
       };
 }

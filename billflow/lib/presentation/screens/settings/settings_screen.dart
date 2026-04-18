@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../data/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/feature_flag_provider.dart';
 import '../../../providers/theme_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -195,6 +197,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+          // Billing / Subscription tile
+          Builder(builder: (context) {
+            final isLocked = ref.watch(isSubscriptionActiveProvider) == false ||
+                (user?.inGracePeriod ?? false);
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListTile(
+                leading: Icon(
+                  Icons.credit_card_outlined,
+                  color: isLocked ? Colors.red : null,
+                ),
+                title: const Text('Billing & Subscription'),
+                subtitle: Text(
+                  user?.subscriptionStatus == 'active'
+                      ? 'Active'
+                      : user?.inGracePeriod == true
+                          ? 'Grace period — ${user?.graceDaysRemaining} days left'
+                          : 'Expired — renew to restore access',
+                  style: TextStyle(
+                    color: isLocked ? Colors.red : Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/billing'),
+              ),
+            );
+          }),
 
           const SizedBox(height: 16),
           Padding(
