@@ -17,10 +17,16 @@ async function sendToTopic(topic, title, body, data = {}) {
   initFirebase();
   if (!initialized) return;
   try {
+    // Data-only payload — no 'notification' field — prevents Android from
+    // auto-showing a system notification while the background handler also
+    // shows one, which would result in two notifications per message.
+    const stringData = {};
+    for (const [k, v] of Object.entries({ title, body, ...data })) {
+      stringData[k] = String(v);
+    }
     await admin.messaging().send({
       topic,
-      notification: { title, body },
-      data,
+      data: stringData,
       android: { priority: 'high' },
     });
   } catch (e) {

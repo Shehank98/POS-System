@@ -3,15 +3,27 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+const _kNotificationDetails = NotificationDetails(
+  android: AndroidNotificationDetails(
+    'billflow_high',
+    'BillFlow Alerts',
+    channelDescription: 'Pre-order and stock alerts',
+    importance: Importance.high,
+    priority: Priority.high,
+    icon: '@mipmap/ic_launcher',
+  ),
+);
+
 // Top-level background handler — runs in a separate Dart isolate.
-// Must call Firebase.initializeApp() first and initialize local notifications
-// independently (static state is not shared across isolates).
+// Backend sends data-only FCM messages (no 'notification' field) so Android
+// does not auto-show a system notification, and this handler shows exactly one.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
-  final notification = message.notification;
-  if (notification == null) return;
+  final title = message.data['title'] ?? message.notification?.title;
+  final body = message.data['body'] ?? message.notification?.body;
+  if (title == null && body == null) return;
 
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(
@@ -20,19 +32,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     ),
   );
   await plugin.show(
-    notification.hashCode,
-    notification.title,
-    notification.body,
-    const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'billflow_high',
-        'BillFlow Alerts',
-        channelDescription: 'Pre-order and stock alerts',
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-      ),
-    ),
+    message.hashCode,
+    title,
+    body,
+    _kNotificationDetails,
   );
 }
 
@@ -48,7 +51,6 @@ class PushNotificationService {
   );
 
   static Future<void> initialize() async {
-    // Register background handler before anything else
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     await _localNotifications
@@ -68,7 +70,6 @@ class PushNotificationService {
       sound: true,
     );
 
-    // Foreground messages — show via local notifications
     FirebaseMessaging.onMessage.listen(showLocalNotification);
 
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -79,23 +80,15 @@ class PushNotificationService {
   }
 
   static Future<void> showLocalNotification(RemoteMessage message) async {
-    final notification = message.notification;
-    if (notification == null) return;
+    final title = message.data['title'] ?? message.notification?.title;
+    final body = message.data['body'] ?? message.notification?.body;
+    if (title == null && body == null) return;
 
     await _localNotifications.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'billflow_high',
-          'BillFlow Alerts',
-          channelDescription: 'Pre-order and stock alerts',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
+      message.hashCode,
+      title,
+      body,
+      _kNotificationDetails,
     );
   }
 
