@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/transaction_model.dart';
 
 class PaymentPieChart extends StatelessWidget {
@@ -10,7 +9,7 @@ class PaymentPieChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = summary.totalRevenue;
+    final total = (summary.cashCount + summary.cardCount + summary.mobileCount).toDouble();
     if (total == 0) {
       return const SizedBox(
           height: 160,
@@ -18,30 +17,30 @@ class PaymentPieChart extends StatelessWidget {
     }
 
     final sections = <PieChartSectionData>[];
-    if (summary.cashSales > 0) {
+    if (summary.cashCount > 0) {
       sections.add(PieChartSectionData(
-        value: summary.cashSales,
-        title: '${((summary.cashSales / total) * 100).toStringAsFixed(0)}%',
+        value: summary.cashCount.toDouble(),
+        title: '${((summary.cashCount / total) * 100).toStringAsFixed(0)}%',
         color: Colors.blue[600]!,
         radius: 60,
         titleStyle: const TextStyle(
             fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
       ));
     }
-    if (summary.mobileSales > 0) {
+    if (summary.mobileCount > 0) {
       sections.add(PieChartSectionData(
-        value: summary.mobileSales,
-        title: '${((summary.mobileSales / total) * 100).toStringAsFixed(0)}%',
+        value: summary.mobileCount.toDouble(),
+        title: '${((summary.mobileCount / total) * 100).toStringAsFixed(0)}%',
         color: Colors.green[600]!,
         radius: 60,
         titleStyle: const TextStyle(
             fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
       ));
     }
-    if (summary.cardSales > 0) {
+    if (summary.cardCount > 0) {
       sections.add(PieChartSectionData(
-        value: summary.cardSales,
-        title: '${((summary.cardSales / total) * 100).toStringAsFixed(0)}%',
+        value: summary.cardCount.toDouble(),
+        title: '${((summary.cardCount / total) * 100).toStringAsFixed(0)}%',
         color: Colors.orange[600]!,
         radius: 60,
         titleStyle: const TextStyle(
@@ -59,12 +58,12 @@ class PaymentPieChart extends StatelessWidget {
         Wrap(
           spacing: 16,
           children: [
-            if (summary.cashSales > 0)
-              _Legend('Cash', Colors.blue[600]!, formatCurrency(summary.cashSales)),
-            if (summary.mobileSales > 0)
-              _Legend('Mobile/QR', Colors.green[600]!, formatCurrency(summary.mobileSales)),
-            if (summary.cardSales > 0)
-              _Legend('Card', Colors.orange[600]!, formatCurrency(summary.cardSales)),
+            if (summary.cashCount > 0)
+              _Legend('Cash', Colors.blue[600]!, '${summary.cashCount} txn'),
+            if (summary.mobileCount > 0)
+              _Legend('Mobile/QR', Colors.green[600]!, '${summary.mobileCount} txn'),
+            if (summary.cardCount > 0)
+              _Legend('Card', Colors.orange[600]!, '${summary.cardCount} txn'),
           ],
         ),
       ],
