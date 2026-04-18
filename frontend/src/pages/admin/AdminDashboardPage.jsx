@@ -1674,19 +1674,31 @@ function NotificationsTab({ shops }) {
       {result && (
         <div className="bg-gray-800 rounded-xl p-4 space-y-1">
           <p className="text-sm font-semibold text-white">Result</p>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap gap-4 text-sm">
             <div>
               <span className="text-gray-400">Targeted: </span>
               <span className="font-bold text-white">{result.total}</span>
             </div>
             <div>
-              <span className="text-gray-400">Sent: </span>
-              <span className="font-bold text-green-400">{result.sent}</span>
+              <span className="text-gray-400">In-app: </span>
+              <span className="font-bold text-green-400">{result.inapp_sent}</span>
             </div>
-            {result.failed > 0 && (
+            {result.fcm_sent > 0 && (
               <div>
-                <span className="text-gray-400">Failed: </span>
-                <span className="font-bold text-red-400">{result.failed}</span>
+                <span className="text-gray-400">FCM push: </span>
+                <span className="font-bold text-blue-400">{result.fcm_sent}</span>
+              </div>
+            )}
+            {result.fcm_skipped > 0 && (
+              <div>
+                <span className="text-gray-400">FCM skipped: </span>
+                <span className="font-bold text-yellow-400">{result.fcm_skipped}</span>
+              </div>
+            )}
+            {result.fcm_failed > 0 && (
+              <div>
+                <span className="text-gray-400">FCM failed: </span>
+                <span className="font-bold text-red-400">{result.fcm_failed}</span>
               </div>
             )}
           </div>

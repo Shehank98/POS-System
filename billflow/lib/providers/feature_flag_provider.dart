@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/services/auth_service.dart';
+import '../data/services/push_notification_service.dart';
 import 'auth_provider.dart';
 
 // ── Periodic feature-flag refresh ────────────────────────────────────────────
@@ -20,6 +21,14 @@ class FeatureFlagRefresher extends AsyncNotifier<void> {
     try {
       final user = await ref.read(authServiceProvider).getMe();
       ref.read(authProvider.notifier).state = AsyncData(user);
+
+      // Re-subscribe to all topics on every refresh so that users who were
+      // already logged in when a new topic was added get subscribed automatically.
+      try {
+        PushNotificationService.subscribeToTopic('shop_${user.shopId}_preorders');
+        PushNotificationService.subscribeToTopic('shop_${user.shopId}_low_stock');
+        PushNotificationService.subscribeToTopic('shop_${user.shopId}_alerts');
+      } catch (_) {}
     } catch (_) {
       // Silent fail — keep using cached flags until next successful refresh
     }

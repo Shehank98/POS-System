@@ -7,6 +7,7 @@ const TYPES = {
   LOW_STOCK:             'low_stock',
   PAYMENT_APPROVED:      'payment_approved',
   PAYMENT_REJECTED:      'payment_rejected',
+  ADMIN_BROADCAST:       'admin_broadcast',
 };
 
 // ── Internal helper ───────────────────────────────────────────

@@ -795,20 +795,42 @@ async function dispatchNotification(req, res) {
       shopIds = rows.map((r) => r.id);
     }
 
-    let sent = 0;
-    const failed = [];
+    let fcmSent    = 0;
+    let fcmFailed  = 0;
+    let fcmSkipped = 0; // FCM not configured
+
     await Promise.all(
       shopIds.map(async (id) => {
+        // 1. Always create in-app notification (visible in web + mobile bell)
+        await createNotification(
+          id,
+          TYPES.ADMIN_BROADCAST,
+          title,
+          body,
+          { source: 'admin_dispatch', target }
+        );
+
+        // 2. Try FCM push (mobile) — sendToTopic returns false if not configured
         try {
-          await sendToTopic(`shop_${id}_alerts`, title, body, { type: 'admin_broadcast' });
-          sent++;
-        } catch {
-          failed.push(id);
+          const fcmResult = await sendToTopic(
+            `shop_${id}_alerts`, title, body, { type: 'admin_broadcast' }
+          );
+          if (fcmResult === false) fcmSkipped++;
+          else fcmSent++;
+        } catch (fcmErr) {
+          console.warn(`FCM dispatch failed for shop ${id}:`, fcmErr.message);
+          fcmFailed++;
         }
       })
     );
 
-    res.json({ sent, failed: failed.length, total: shopIds.length });
+    res.json({
+      total:      shopIds.length,
+      inapp_sent: shopIds.length,    // in-app always created
+      fcm_sent:   fcmSent,
+      fcm_failed: fcmFailed,
+      fcm_skipped: fcmSkipped,       // FCM not configured on server
+    });
   } catch (err) {
     console.error('dispatchNotification error:', err);
     res.status(500).json({ error: 'Server error' });
