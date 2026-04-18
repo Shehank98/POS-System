@@ -59,6 +59,20 @@ function ShopTypeIndex() {
   return <Navigate to="/pos" replace />;
 }
 
+/** Guards a route behind a feature flag — redirects home if flag is false */
+function FeatureRoute({ feature, children }) {
+  const user = useAuthStore((s) => s.user);
+  if (user?.[feature] === false) return <Navigate to="/" replace />;
+  return children;
+}
+
+/** Guards a route to a specific shop_type — redirects home if type doesn't match */
+function ShopTypeRoute({ shopType, children }) {
+  const user = useAuthStore((s) => s.user);
+  if (user?.shop_type !== shopType) return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -102,17 +116,17 @@ export default function App() {
           <Route path="dashboard"   element={<DashboardPage />} />
           <Route path="products"    element={<ProductsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="reports"     element={<ReportsPage />} />
-          <Route path="analytics"   element={<AnalyticsPage />} />
+          <Route path="reports"     element={<FeatureRoute feature="reports_enabled"><ReportsPage /></FeatureRoute>} />
+          <Route path="analytics"   element={<FeatureRoute feature="analytics_enabled"><AnalyticsPage /></FeatureRoute>} />
           <Route path="billing"     element={<BillingPage />} />
           <Route path="audit-log"   element={<AuditLogPage />} />
           <Route path="settings"    element={<SettingsPage />} />
-          <Route path="pre-orders"  element={<PreOrdersPage />} />
-          <Route path="customers"   element={<CustomersPage />} />
-          {/* Clothing module routes */}
-          <Route path="exchanges"          element={<ClothingExchangesPage />} />
-          <Route path="clothing-analytics" element={<ClothingAnalyticsPage />} />
-          <Route path="branches"           element={<BranchManagementPage />} />
+          <Route path="pre-orders"  element={<FeatureRoute feature="pre_orders_enabled"><PreOrdersPage /></FeatureRoute>} />
+          <Route path="customers"   element={<FeatureRoute feature="customers_enabled"><CustomersPage /></FeatureRoute>} />
+          {/* Clothing module routes — also require correct shop type */}
+          <Route path="exchanges"          element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="exchanges_enabled"><ClothingExchangesPage /></FeatureRoute></ShopTypeRoute>} />
+          <Route path="clothing-analytics" element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="analytics_enabled"><ClothingAnalyticsPage /></FeatureRoute></ShopTypeRoute>} />
+          <Route path="branches"           element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="branches_enabled"><BranchManagementPage /></FeatureRoute></ShopTypeRoute>} />
         </Route>
 
         {/* ── Car Wash module ───────────────────────────────── */}
@@ -120,7 +134,9 @@ export default function App() {
           path="/carwash"
           element={
             <PrivateRoute>
-              <CarWashLayout />
+              <ShopTypeRoute shopType="car_wash">
+                <CarWashLayout />
+              </ShopTypeRoute>
             </PrivateRoute>
           }
         >

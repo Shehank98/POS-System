@@ -111,6 +111,7 @@ export const auditApi = {
 // ── Payments (shop subscription payments) ────────────────────
 export const paymentsApi = {
   bankInfo: () => client.get('/payments/bank-info'),
+  plans:    () => client.get('/payments/plans'),
   list:     () => client.get('/payments'),
   submit:   (data) => client.post('/payments', data),
 };

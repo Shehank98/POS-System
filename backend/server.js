@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+// ── Startup environment validation ───────────────────────────
+const _required = ['JWT_SECRET', 'DATABASE_URL'];
+const _missing  = _required.filter((k) => !process.env[k]);
+if (_missing.length > 0) {
+  console.error(`FATAL: Missing required environment variables: ${_missing.join(', ')}`);
+  process.exit(1);
+}
+
 const http           = require('http');
 const express        = require('express');
 const cors           = require('cors');

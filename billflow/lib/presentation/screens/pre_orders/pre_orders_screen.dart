@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/pre_order_model.dart';
 import '../../../providers/pre_order_provider.dart';
+import '../../../providers/feature_flag_provider.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/common/loading_overlay.dart';
 
@@ -40,6 +41,25 @@ class _PreOrdersScreenState extends ConsumerState<PreOrdersScreen>
 
   @override
   Widget build(BuildContext context) {
+    final preOrdersEnabled = ref.watch(preOrdersEnabledProvider);
+
+    if (!preOrdersEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pre-Orders')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              Text('Pre-Orders is not enabled for your plan.',
+                  style: TextStyle(color: Colors.grey.shade600)),
+            ],
+          ),
+        ),
+      );
+    }
+
     final ordersAsync = ref.watch(preOrderProvider);
 
     return Scaffold(

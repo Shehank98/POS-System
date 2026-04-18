@@ -59,4 +59,21 @@ async function getMyPayments(req, res) {
   }
 }
 
-module.exports = { getBankInfo, submitPayment, getMyPayments };
+// ── GET /api/payments/plans (public) ─────────────────────────
+async function getPublicPlans(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, base_monthly_price, discount_3m, discount_6m, discount_12m,
+              features, limits, sort_order
+         FROM subscription_plans
+        WHERE is_active = TRUE
+        ORDER BY sort_order`
+    );
+    res.json(rows);
+  } catch (err) {
+    // Table might not exist yet (migration not run) — return empty gracefully
+    res.json([]);
+  }
+}
+
+module.exports = { getBankInfo, submitPayment, getMyPayments, getPublicPlans };

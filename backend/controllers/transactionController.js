@@ -681,8 +681,8 @@ async function syncTransactions(req, res) {
     // ── Idempotency check ───────────────────────────────────
     try {
       const { rows: existing } = await db.query(
-        `SELECT id, transaction_number FROM transactions WHERE client_id = $1`,
-        [client_id]
+        `SELECT id, transaction_number FROM transactions WHERE client_id = $1 AND shop_id = $2`,
+        [client_id, req.shopId]
       );
       if (existing.length > 0) {
         results.push({ client_id, status: 'duplicate', server_id: existing[0].id,

@@ -9,17 +9,24 @@ async function adminLogin(req, res) {
   const { email, password } = req.body;
 
   const adminEmail    = process.env.ADMIN_EMAIL    || 'admin@pos.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'changeme123!';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    console.error('ADMIN_PASSWORD environment variable is not set');
+    return res.status(503).json({ error: 'Admin login not configured' });
+  }
 
   if (email !== adminEmail) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  const valid = await bcrypt.compare(password, adminPassword).catch(() => false);
-  // Also support plain-text comparison during development when ADMIN_PASSWORD is not hashed
-  const plainMatch = password === adminPassword;
+  // Support both bcrypt hash ($2a$/$2b$) and plain-text for initial setup only
+  const isBcrypt = adminPassword.startsWith('$2');
+  const valid = isBcrypt
+    ? await bcrypt.compare(password, adminPassword).catch(() => false)
+    : password === adminPassword;
 
-  if (!valid && !plainMatch) {
+  if (!valid) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 

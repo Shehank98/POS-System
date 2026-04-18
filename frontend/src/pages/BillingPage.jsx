@@ -8,56 +8,48 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import { paymentsApi } from '../api/client';
 
-// ── Plan tier definitions ─────────────────────────────────────
-const TIER_PLANS = [
+// ── Plan tier fallback (used until API responds) ──────────────
+const PLAN_COLORS = ['gray', 'primary', 'purple'];
+const PLAN_CTAS   = ['Choose Basic', 'Upgrade to Standard', 'Go Premium'];
+
+function apiPlanToTier(plan, idx) {
+  const featureList = (Array.isArray(plan.features) ? plan.features : [])
+    .map((f) => ({ text: f, ok: true }));
+  return {
+    id:       String(plan.id || plan.name.toLowerCase()),
+    name:     plan.name,
+    price:    Number(plan.base_monthly_price),
+    color:    PLAN_COLORS[idx] ?? 'gray',
+    popular:  idx === 1,
+    features: featureList,
+    cta:      PLAN_CTAS[idx] ?? `Choose ${plan.name}`,
+  };
+}
+
+const TIER_PLANS_FALLBACK = [
   {
-    id:       'basic',
-    name:     'Basic',
-    price:    2000,
-    color:    'gray',
-    popular:  false,
+    id: 'basic', name: 'Basic', price: 2000, color: 'gray', popular: false,
     features: [
-      { text: 'POS System',         ok: true  },
-      { text: 'Barcode Scanner',    ok: true  },
-      { text: 'Basic Customers',    ok: true  },
-      { text: 'Limited Offline',    ok: true  },
-      { text: 'Refunds & Void',     ok: false },
-      { text: 'Loyalty Points',     ok: false },
-      { text: 'Reports',            ok: false },
-      { text: 'Analytics',          ok: false },
-      { text: 'Pre-Orders',         ok: false },
-      { text: 'Mobile App',         ok: false },
+      { text: 'POS System', ok: true }, { text: 'Barcode Scanner', ok: true },
+      { text: 'Sales Reports', ok: true }, { text: 'Refunds & Void', ok: false },
+      { text: 'Analytics', ok: false }, { text: 'Pre-Orders', ok: false },
     ],
     cta: 'Choose Basic',
   },
   {
-    id:       'standard',
-    name:     'Standard',
-    price:    3500,
-    color:    'primary',
-    popular:  true,
+    id: 'standard', name: 'Standard', price: 3500, color: 'primary', popular: true,
     features: [
-      { text: 'Everything in Basic', ok: true },
-      { text: 'Refunds & Void',      ok: true },
-      { text: 'Loyalty Points',      ok: true },
-      { text: 'Reports',             ok: true },
-      { text: 'Full Analytics',      ok: true },
-      { text: 'Pre-Orders',          ok: true },
-      { text: 'Mobile App',          ok: true },
+      { text: 'Everything in Basic', ok: true }, { text: 'Refunds & Void', ok: true },
+      { text: 'Reports & Analytics', ok: true }, { text: 'Pre-Orders', ok: true },
+      { text: 'Loyalty Points', ok: true }, { text: 'Mobile App', ok: true },
     ],
     cta: 'Upgrade to Standard',
   },
   {
-    id:       'premium',
-    name:     'Premium',
-    price:    6000,
-    color:    'purple',
-    popular:  false,
+    id: 'premium', name: 'Premium', price: 6000, color: 'purple', popular: false,
     features: [
-      { text: 'Everything in Standard', ok: true },
-      { text: 'Multi-Branch',           ok: true },
-      { text: 'Advanced Reports',       ok: true },
-      { text: 'Priority Support',       ok: true },
+      { text: 'Everything in Standard', ok: true }, { text: 'Multi-Branch', ok: true },
+      { text: 'Unlimited Products', ok: true }, { text: 'Priority Support', ok: true },
     ],
     cta: 'Go Premium',
   },
@@ -300,6 +292,7 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
   function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Only image files are accepted'); return; }
     if (file.size > 2 * 1024 * 1024) { toast.error('Image too large — max 2 MB'); return; }
     setProofFile(file);
     const reader = new FileReader();
@@ -419,6 +412,7 @@ export default function BillingPage() {
 
   const [bankInfo,     setBankInfo]     = useState(null);
   const [payments,     setPayments]     = useState([]);
+  const [tierPlans,    setTierPlans]    = useState(TIER_PLANS_FALLBACK);
   const [loading,      setLoading]      = useState(true);
   const [selectedTier, setSelectedTier] = useState(null);
   const [selectedDur,  setSelectedDur]  = useState(null);
@@ -429,9 +423,16 @@ export default function BillingPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [bankRes, payRes] = await Promise.all([paymentsApi.bankInfo(), paymentsApi.list()]);
+        const [bankRes, payRes, plansRes] = await Promise.all([
+          paymentsApi.bankInfo(),
+          paymentsApi.list(),
+          paymentsApi.plans().catch(() => ({ data: [] })),
+        ]);
         setBankInfo(bankRes.data);
         setPayments(payRes.data);
+        if (plansRes.data?.length > 0) {
+          setTierPlans(plansRes.data.map(apiPlanToTier));
+        }
       } catch {
         toast.error('Failed to load billing info');
       } finally {
@@ -509,7 +510,7 @@ export default function BillingPage() {
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {TIER_PLANS.map((plan) => (
+          {tierPlans.map((plan) => (
             <TierCard
               key={plan.id}
               plan={plan}

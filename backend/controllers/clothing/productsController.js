@@ -52,9 +52,9 @@ async function getClothingProduct(req, res) {
 
     const { rows: variants } = await db.query(
       `SELECT * FROM clothing_variants
-        WHERE product_id = $1
+        WHERE product_id = $1 AND shop_id = $2
         ORDER BY size, color`,
-      [req.params.id]
+      [req.params.id, req.shopId]
     );
 
     res.json({ ...pRows[0], variants });
