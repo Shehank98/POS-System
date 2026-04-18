@@ -35,8 +35,8 @@ Future<void> _initFirebase() async {
   try {
     await Firebase.initializeApp();
     await PushNotificationService.initialize();
-    // Topics subscribed per-shop after login (see auth_provider.dart)
-  } catch (_) {
-    // Firebase not configured — push notifications disabled
+  } catch (e) {
+    // ignore — push notifications disabled if Firebase not configured
+    debugPrint('Firebase init error: $e');
   }
 }
