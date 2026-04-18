@@ -167,6 +167,104 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 }
 
+// ── KG weight input dialog ────────────────────────────────────────────────────
+Future<void> _showKgInputDialog(
+    BuildContext context, WidgetRef ref, ProductModel product) async {
+  final kgCtrl = TextEditingController();
+  final gramCtrl = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(product.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Enter weight',
+                style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    fontSize: 13)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: kgCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'KG',
+                      suffixText: 'kg',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    validator: (v) {
+                      if ((v == null || v.isEmpty) &&
+                          (gramCtrl.text.isEmpty)) {
+                        return 'Enter weight';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    controller: gramCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Grams',
+                      suffixText: 'g',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Price: ${formatCurrency(product.price)} / kg',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            if (!formKey.currentState!.validate()) return;
+            final kg = double.tryParse(kgCtrl.text) ?? 0.0;
+            final grams = double.tryParse(gramCtrl.text) ?? 0.0;
+            final totalKg = kg + (grams / 1000.0);
+            if (totalKg <= 0) return;
+            ref.read(cartProvider.notifier).addProduct(product, qty: totalKg);
+            Navigator.pop(ctx);
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(
+                content: Text(
+                    '${product.name} ${totalKg.toStringAsFixed(3)} kg added'),
+                duration: const Duration(milliseconds: 800),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.fromLTRB(10, 0, 10, 72),
+              ));
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
+
+  kgCtrl.dispose();
+  gramCtrl.dispose();
+}
+
 // ── Retail / Grocery product grid ─────────────────────────────────────────────
 class _RetailPosBody extends ConsumerWidget {
   final TextEditingController searchCtrl;
@@ -207,20 +305,23 @@ class _RetailPosBody extends ConsumerWidget {
                       final p = products[i];
                       return PosProductCard(
                         product: p,
-                        onTap: () {
-                          ref.read(cartProvider.notifier).addProduct(p);
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(SnackBar(
-                              content: Text('${p.name} added',
-                                  style: const TextStyle(fontSize: 13)),
-                              duration: const Duration(milliseconds: 600),
-                              behavior: SnackBarBehavior.floating,
-                              margin:
-                                  const EdgeInsets.fromLTRB(10, 0, 10, 72),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                            ));
+                        onTap: () async {
+                          if (p.unitType == 'kg') {
+                            await _showKgInputDialog(context, ref, p);
+                          } else {
+                            ref.read(cartProvider.notifier).addProduct(p);
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(SnackBar(
+                                content: Text('${p.name} added',
+                                    style: const TextStyle(fontSize: 13)),
+                                duration: const Duration(milliseconds: 600),
+                                behavior: SnackBarBehavior.floating,
+                                margin: const EdgeInsets.fromLTRB(10, 0, 10, 72),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                              ));
+                          }
                         },
                       );
                     },
