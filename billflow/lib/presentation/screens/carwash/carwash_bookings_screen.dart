@@ -198,7 +198,9 @@ class _BookingCard extends StatelessWidget {
 
   String _formatDate(String dateStr) {
     try {
-      final d = DateTime.parse(dateStr);
+      // DB may return full ISO timestamp — take only YYYY-MM-DD part
+      final datePart = dateStr.length > 10 ? dateStr.substring(0, 10) : dateStr;
+      final d = DateTime.parse(datePart);
       const months = [
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'

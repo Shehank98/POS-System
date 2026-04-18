@@ -11,6 +11,13 @@ const STATUS_BADGE = {
   completed:   { label: 'Completed',   cls: 'bg-green-100 text-green-700'  },
 };
 
+function fmtDate(raw, opts) {
+  if (!raw) return '—';
+  const datePart = String(raw).slice(0, 10);
+  const d = new Date(datePart + 'T00:00:00');
+  return isNaN(d) ? '—' : d.toLocaleDateString('en-US', opts);
+}
+
 export default function CarWashStaffView() {
   const user = useAuthStore((s) => s.user);
   const [data,    setData]    = useState(null);
@@ -129,7 +136,7 @@ export default function CarWashStaffView() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900">
-                    {b.booking_date ? new Date(b.booking_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                    {fmtDate(b.booking_date, { month: 'short', day: 'numeric' })}
                     {' at '}{b.time_slot}
                   </p>
                   <p className="text-xs text-gray-500 truncate">

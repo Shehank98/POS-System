@@ -13,6 +13,15 @@ const STATUS_BADGE = {
   cancelled:        { label: 'Cancelled', cls: 'bg-gray-100   text-gray-400'   },
 };
 
+// DB may return a full ISO timestamp — slice to YYYY-MM-DD before appending time so
+// "2024-01-15T00:00:00.000Z" + "T00:00:00" doesn't produce an Invalid Date.
+function fmtBookingDate(raw, opts) {
+  if (!raw) return '';
+  const datePart = String(raw).slice(0, 10);
+  const d = new Date(datePart + 'T00:00:00');
+  return isNaN(d) ? '' : d.toLocaleDateString('en-US', opts);
+}
+
 // ── Booking Form ─────────────────────────────────────────────
 function BookingForm({ initial, services, staff, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
@@ -138,11 +147,9 @@ function SlipModal({ booking, shopId, shopName, onClose }) {
     document.head.removeChild(style);
   }
 
-  const formattedDate = booking.booking_date
-    ? new Date(booking.booking_date + 'T00:00:00').toLocaleDateString('en-US', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-      })
-    : '';
+  const formattedDate = fmtBookingDate(booking.booking_date, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
 
   return (
     <div id="slip-print-root" className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
@@ -310,7 +317,7 @@ export default function CarWashBookings() {
   }
 
   const headerLabel = date
-    ? `Pre-Bookings — ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+    ? `Pre-Bookings — ${fmtBookingDate(date, { month: 'long', day: 'numeric' })}`
     : 'Upcoming Pre-Bookings';
 
   return (
@@ -371,11 +378,9 @@ export default function CarWashBookings() {
         <div className="space-y-2">
           {bookings.map((b) => {
             const badge = STATUS_BADGE[b.status] || { label: b.status, cls: 'bg-gray-100 text-gray-500' };
-            const bookingDateFmt = b.booking_date
-              ? new Date(b.booking_date + 'T00:00:00').toLocaleDateString('en-US', {
-                  weekday: 'short', month: 'short', day: 'numeric',
-                })
-              : '';
+            const bookingDateFmt = fmtBookingDate(b.booking_date, {
+              weekday: 'short', month: 'short', day: 'numeric',
+            });
             return (
               <div key={b.id} className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
                 <div className="flex items-start justify-between">
