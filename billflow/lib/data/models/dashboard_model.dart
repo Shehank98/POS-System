@@ -104,7 +104,7 @@ class DailyPoint {
   factory DailyPoint.fromJson(Map<String, dynamic> json) {
     return DailyPoint(
       day: json['day'] as String? ?? json['date'] as String? ?? '',
-      sales: toDouble(json['sales']),
+      sales: toDouble(json['sales'] ?? json['revenue']),
       transactions: toInt(json['transactions']),
     );
   }
@@ -150,21 +150,38 @@ class AnalyticsResult {
     required this.daily,
   });
 
-  factory AnalyticsResult.fromJson(Map<String, dynamic> json) =>
-      AnalyticsResult(
-        summary: json['summary'] != null
-            ? DashboardSummary.fromJson(
-                json['summary'] as Map<String, dynamic>)
-            : DashboardSummary.empty(),
-        topProducts: (json['top_products'] as List<dynamic>?)
-                ?.map((e) => TopProduct.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            [],
-        daily: (json['daily'] as List<dynamic>?)
-                ?.map((e) => DailyPoint.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            [],
+  factory AnalyticsResult.fromJson(Map<String, dynamic> json) {
+    // Analytics endpoint returns flat format; dashboard today uses nested 'summary'
+    DashboardSummary summary;
+    if (json.containsKey('summary') && json['summary'] != null) {
+      summary = DashboardSummary.fromJson(json['summary'] as Map<String, dynamic>);
+    } else {
+      final pm = json['payment_methods'] as Map<String, dynamic>? ?? {};
+      summary = DashboardSummary(
+        transactionCount: toInt(json['transaction_count']),
+        totalSales: toDouble(json['total_revenue']),
+        totalTax: toDouble(json['total_tax']),
+        totalDiscounts: toDouble(json['total_discounts']),
+        totalRefunds: toDouble(json['total_refunds']),
+        netSales: toDouble(json['net_revenue']),
+        cashSales: toDouble(pm['cash']),
+        cardSales: toDouble(pm['card']),
+        mobileSales: toDouble(pm['mobile']),
       );
+    }
+    final rawDaily = json['daily_trend'] ?? json['daily'];
+    return AnalyticsResult(
+      summary: summary,
+      topProducts: (json['top_products'] as List<dynamic>?)
+              ?.map((e) => TopProduct.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      daily: (rawDaily as List<dynamic>?)
+              ?.map((e) => DailyPoint.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
 }
 
 class LowStockProduct {

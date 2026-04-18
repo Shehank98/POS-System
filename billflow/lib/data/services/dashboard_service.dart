@@ -50,8 +50,8 @@ class DashboardService {
     try {
       final response = await _dio.get(ApiConstants.dashboardAnalytics,
           queryParameters: {
-            if (from != null) 'from': from,
-            if (to != null) 'to': to,
+            if (from != null) 'start_date': from,
+            if (to != null) 'end_date': to,
           });
       return AnalyticsResult.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {

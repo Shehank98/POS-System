@@ -55,6 +55,15 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final cart = ref.watch(cartProvider);
     final shopType = ref.watch(shopTypeProvider);
     final isClothing = shopType == 'clothing';
+    final isCarwash = shopType == 'car_wash';
+
+    // Carwash shops don't use product-based POS — redirect to carwash screen
+    if (isCarwash) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/carwash');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(
