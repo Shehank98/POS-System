@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/biometric_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../presentation/screens/auth/login_screen.dart';
-import '../../presentation/screens/auth/biometric_screen.dart';
 import '../../presentation/screens/dashboard/dashboard_screen.dart';
 import '../../presentation/screens/sales/sales_screen.dart';
 import '../../presentation/screens/sales/payment_screen.dart';
@@ -25,7 +23,6 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
-  final needsBiometric = ref.watch(biometricGateProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -37,13 +34,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';
-      if (isLoggedIn && needsBiometric && loc != '/biometric') {
-        return '/biometric';
-      }
-      if (isLoggedIn && !needsBiometric &&
-          (loc == '/login' || loc == '/' || loc == '/biometric')) {
-        return '/dashboard';
-      }
+      if (isLoggedIn && (loc == '/login' || loc == '/')) return '/dashboard';
       return null;
     },
     routes: [
@@ -56,10 +47,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/biometric',
-        builder: (context, state) => const BiometricScreen(),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
