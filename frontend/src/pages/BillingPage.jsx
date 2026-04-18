@@ -1,11 +1,50 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   CreditCard, CheckCircle2, AlertTriangle, XCircle,
-  Clock, Upload, RefreshCw, ExternalLink, QrCode,
+  Upload, RefreshCw, QrCode, ShieldCheck, Zap, Clock,
+  Calendar, Star, Trophy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import { paymentsApi } from '../api/client';
+
+const PLANS = [
+  {
+    months: 1,
+    label: '1 Month',
+    price: 2500,
+    badge: null,
+    icon: null,
+    highlight: false,
+  },
+  {
+    months: 3,
+    label: '3 Months',
+    price: 6900,
+    badge: 'Save 10%',
+    badgeCls: 'bg-blue-100 text-blue-700',
+    icon: null,
+    highlight: false,
+  },
+  {
+    months: 6,
+    label: '6 Months',
+    price: 12000,
+    badge: 'Recommended',
+    badgeCls: 'bg-primary-100 text-primary-700',
+    icon: <Star className="w-3.5 h-3.5" />,
+    highlight: true,
+  },
+  {
+    months: 12,
+    label: '12 Months',
+    price: 22000,
+    badge: 'Best Value',
+    badgeCls: 'bg-amber-100 text-amber-700',
+    icon: <Trophy className="w-3.5 h-3.5" />,
+    highlight: false,
+  },
+];
 
 const STATUS_BADGE = {
   pending:  { label: 'Pending Review', cls: 'bg-yellow-100 text-yellow-700' },
@@ -21,83 +60,136 @@ function daysUntil(dateStr) {
   return Math.ceil((new Date(dateStr) - Date.now()) / 86400000);
 }
 
-function SubscriptionBanner({ user }) {
+function StatusCard({ user }) {
   const days = daysUntil(user?.subscription_end_date);
   const status = user?.subscription_status;
+  const planLabel = user?.subscription_plan || 'Standard';
 
-  if (status === 'suspended') {
-    return (
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-        <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-red-800">Account Suspended</p>
-          <p className="text-sm text-red-600">Your account has been suspended. Please contact support.</p>
-        </div>
-      </div>
-    );
+  const isSuspended = status === 'suspended';
+  const isExpired   = days !== null && days < 0;
+  const isExpiring  = days !== null && days >= 0 && days <= 7;
+  const isActive    = status === 'active' || status === 'trial';
+
+  let cardCls   = 'border-gray-200 bg-white';
+  let iconColor = 'text-gray-400';
+  let iconEl    = <Calendar className="w-5 h-5" />;
+  let statusLabel = 'No Active Plan';
+  let statusCls = 'bg-gray-100 text-gray-600';
+
+  if (isSuspended) {
+    cardCls = 'border-red-200 bg-red-50'; iconColor = 'text-red-500';
+    iconEl = <XCircle className="w-5 h-5" />;
+    statusLabel = 'Suspended'; statusCls = 'bg-red-100 text-red-700';
+  } else if (isExpired) {
+    cardCls = 'border-red-200 bg-red-50'; iconColor = 'text-red-500';
+    iconEl = <XCircle className="w-5 h-5" />;
+    statusLabel = 'Expired'; statusCls = 'bg-red-100 text-red-700';
+  } else if (isExpiring) {
+    cardCls = 'border-yellow-200 bg-yellow-50'; iconColor = 'text-yellow-500';
+    iconEl = <AlertTriangle className="w-5 h-5" />;
+    statusLabel = 'Expiring Soon'; statusCls = 'bg-yellow-100 text-yellow-700';
+  } else if (isActive) {
+    cardCls = 'border-green-200 bg-green-50'; iconColor = 'text-green-500';
+    iconEl = <CheckCircle2 className="w-5 h-5" />;
+    statusLabel = status === 'trial' ? 'Trial Active' : 'Active';
+    statusCls = 'bg-green-100 text-green-700';
   }
 
-  if (days !== null && days < 0) {
-    return (
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-        <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-red-800">Subscription Expired</p>
-          <p className="text-sm text-red-600">
-            Expired on {fmtDate(user.subscription_end_date)}. You are in read-only mode.
-            Submit a payment below to renew.
-          </p>
+  return (
+    <div className={`rounded-2xl border-2 p-5 ${cardCls}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={iconColor}>{iconEl}</div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Current Plan</p>
+            <p className="font-bold text-gray-900 text-lg leading-tight">{planLabel}</p>
+          </div>
         </div>
+        <span className={`text-xs font-semibold px-3 py-1 rounded-full shrink-0 ${statusCls}`}>
+          {statusLabel}
+        </span>
       </div>
-    );
-  }
 
-  if (days !== null && days <= 5) {
-    return (
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-yellow-50 border border-yellow-200">
-        <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-yellow-800">Subscription Expiring Soon</p>
-          <p className="text-sm text-yellow-700">
-            Expires in <strong>{days} day{days !== 1 ? 's' : ''}</strong> ({fmtDate(user.subscription_end_date)}).
-            Renew now to avoid interruption.
-          </p>
+      {user?.subscription_end_date && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="bg-white/70 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Expiry Date</p>
+            <p className="font-semibold text-gray-800 text-sm">{fmtDate(user.subscription_end_date)}</p>
+          </div>
+          <div className="bg-white/70 rounded-xl p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Days Remaining</p>
+            <p className={`font-semibold text-sm ${days !== null && days <= 7 ? 'text-red-600' : 'text-gray-800'}`}>
+              {days !== null ? (days < 0 ? 'Expired' : `${days} day${days !== 1 ? 's' : ''}`) : '—'}
+            </p>
+          </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  if (status === 'active' || status === 'trial') {
-    return (
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
-        <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-green-800">
-            Subscription {status === 'trial' ? '(Trial)' : 'Active'}
-          </p>
-          <p className="text-sm text-green-700">
-            {days !== null
-              ? `Expires in ${days} day${days !== 1 ? 's' : ''} - ${fmtDate(user.subscription_end_date)}`
-              : 'No expiry date set'}
-          </p>
+      {(isExpiring || isExpired) && (
+        <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${isExpired ? 'text-red-700' : 'text-yellow-700'}`}>
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {isExpired
+            ? 'Your subscription has expired. Renew below to continue using all features.'
+            : `Renew now to avoid interruption — only ${days} day${days !== 1 ? 's' : ''} left.`}
         </div>
-      </div>
-    );
-  }
+      )}
+      {isSuspended && (
+        <p className="mt-3 text-sm text-red-700 font-medium">
+          Your account has been suspended. Please contact support.
+        </p>
+      )}
+    </div>
+  );
+}
 
-  return null;
+function PlanCard({ plan, selected, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(plan)}
+      className={`relative w-full text-left rounded-2xl border-2 p-4 transition-all duration-150 focus:outline-none ${
+        selected
+          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200'
+          : plan.highlight
+            ? 'border-primary-200 bg-white hover:border-primary-400'
+            : 'border-gray-200 bg-white hover:border-gray-300'
+      }`}
+    >
+      {plan.badge && (
+        <span className={`absolute -top-2.5 right-3 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${plan.badgeCls}`}>
+          {plan.icon}{plan.badge}
+        </span>
+      )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+            selected ? 'border-primary-500' : 'border-gray-300'
+          }`}>
+            {selected && <div className="w-2 h-2 rounded-full bg-primary-500" />}
+          </div>
+          <div>
+            <p className={`font-semibold ${selected ? 'text-primary-800' : 'text-gray-800'}`}>{plan.label}</p>
+            <p className="text-xs text-gray-400">
+              Rs. {fmtMoney(Math.round(plan.price / plan.months))} / month
+            </p>
+          </div>
+        </div>
+        <p className={`font-bold text-lg ${selected ? 'text-primary-700' : 'text-gray-900'}`}>
+          Rs. {plan.price.toLocaleString()}
+        </p>
+      </div>
+    </button>
+  );
 }
 
 export default function BillingPage() {
   const user = useAuthStore((s) => s.user);
 
-  const [bankInfo,   setBankInfo]   = useState(null);
-  const [payments,   setPayments]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const [bankInfo,    setBankInfo]    = useState(null);
+  const [payments,    setPayments]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
-  // Form state
-  const [amount,     setAmount]     = useState('');
-  const [months,     setMonths]     = useState('1');
   const [proofFile,  setProofFile]  = useState(null);
   const [proofB64,   setProofB64]   = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +204,7 @@ export default function BillingPage() {
         ]);
         setBankInfo(bankRes.data);
         setPayments(payRes.data);
-      } catch (err) {
+      } catch {
         toast.error('Failed to load billing info');
       } finally {
         setLoading(false);
@@ -136,20 +228,19 @@ export default function BillingPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!amount || Number(amount) <= 0) {
-      toast.error('Enter a valid amount');
+    if (!selectedPlan) {
+      toast.error('Please select a plan');
       return;
     }
     setSubmitting(true);
     try {
       const { data } = await paymentsApi.submit({
-        amount:              Number(amount),
-        subscription_months: Number(months),
+        amount:              selectedPlan.price,
+        subscription_months: selectedPlan.months,
         payment_proof:       proofB64 || null,
       });
       setPayments((prev) => [data, ...prev]);
-      setAmount('');
-      setMonths('1');
+      setSelectedPlan(null);
       setProofFile(null);
       setProofB64('');
       if (fileRef.current) fileRef.current.value = '';
@@ -163,9 +254,9 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-2xl">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-28 bg-gray-100 rounded-2xl animate-pulse" />
         ))}
       </div>
     );
@@ -174,141 +265,151 @@ export default function BillingPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Billing & Subscription</h1>
-        <p className="text-sm text-gray-500">Manage your subscription and submit payments</p>
+        <h1 className="text-xl font-bold text-gray-900">Billing &amp; Subscription</h1>
+        <p className="text-sm text-gray-500">Manage your plan and submit renewal payments</p>
       </div>
 
-      {/* Subscription status */}
-      <SubscriptionBanner user={user} />
+      {/* Section A — Subscription Overview */}
+      <StatusCard user={user} />
 
-      {/* Bank transfer details */}
-      {bankInfo && (bankInfo.bank_name || bankInfo.account_number || bankInfo.qr_url) && (
-        <div className="card p-5 space-y-4">
+      {/* Section B — Plan Selection */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <CreditCard className="w-4 h-4 text-primary-600" />
+          <h2 className="font-semibold text-gray-900">Choose Your Plan</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          {PLANS.map((plan) => (
+            <PlanCard
+              key={plan.months}
+              plan={plan}
+              selected={selectedPlan?.months === plan.months}
+              onSelect={setSelectedPlan}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Section C — Payment Details (shown only after plan selection) */}
+      {selectedPlan && (
+        <div className="rounded-2xl border-2 border-primary-100 bg-white p-5 space-y-5">
           <div className="flex items-center gap-2">
-            <QrCode className="w-5 h-5 text-primary-600" />
-            <h2 className="font-semibold text-gray-900">Bank Transfer Details</h2>
+            <QrCode className="w-4 h-4 text-primary-600" />
+            <h2 className="font-semibold text-gray-900">Payment Details</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Bank details */}
-            <div className="space-y-2 text-sm">
-              {bankInfo.bank_name && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Bank</p>
-                  <p className="font-semibold text-gray-800">{bankInfo.bank_name}</p>
+          {/* Amount summary */}
+          <div className="flex items-center justify-between bg-primary-50 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-xs text-gray-500">Amount to Pay</p>
+              <p className="font-bold text-primary-800 text-xl">Rs. {selectedPlan.price.toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Plan Duration</p>
+              <p className="font-semibold text-gray-700">{selectedPlan.label}</p>
+            </div>
+          </div>
+
+          {/* Bank transfer details */}
+          {bankInfo && (bankInfo.bank_name || bankInfo.account_number || bankInfo.qr_url) && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transfer To</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2 text-sm">
+                  {bankInfo.bank_name && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Bank</p>
+                      <p className="font-semibold text-gray-800">{bankInfo.bank_name}</p>
+                    </div>
+                  )}
+                  {bankInfo.account_name && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Account Name</p>
+                      <p className="font-semibold text-gray-800">{bankInfo.account_name}</p>
+                    </div>
+                  )}
+                  {bankInfo.account_number && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Account Number</p>
+                      <p className="font-mono font-bold text-gray-900 text-base">{bankInfo.account_number}</p>
+                    </div>
+                  )}
+                  {bankInfo.instructions && (
+                    <p className="text-xs text-gray-500 italic pt-1">{bankInfo.instructions}</p>
+                  )}
                 </div>
-              )}
-              {bankInfo.account_name && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Account Name</p>
-                  <p className="font-semibold text-gray-800">{bankInfo.account_name}</p>
-                </div>
-              )}
-              {bankInfo.account_number && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Account Number</p>
-                  <p className="font-mono font-bold text-gray-900 text-base">{bankInfo.account_number}</p>
-                </div>
-              )}
-              {bankInfo.instructions && (
-                <p className="text-xs text-gray-500 italic pt-1">{bankInfo.instructions}</p>
-              )}
+                {bankInfo.qr_url && (
+                  <div className="flex flex-col items-center justify-center">
+                    <img
+                      src={bankInfo.qr_url}
+                      alt="Bank QR code"
+                      className="w-36 h-36 object-contain border border-gray-200 rounded-lg bg-white"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Scan to pay</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Receipt upload */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Upload Payment Receipt</label>
+              <div
+                className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-primary-300 transition-colors"
+                onClick={() => fileRef.current?.click()}
+              >
+                {proofB64 ? (
+                  <div className="space-y-2">
+                    <img src={proofB64} alt="receipt" className="h-28 mx-auto object-contain rounded-lg" />
+                    <p className="text-xs text-gray-500">{proofFile?.name}</p>
+                    <p className="text-xs text-primary-500">Click to change</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="w-9 h-9 text-gray-300 mx-auto" />
+                    <p className="text-sm font-medium text-gray-500">Click to upload your receipt screenshot</p>
+                    <p className="text-xs text-gray-300">PNG, JPG up to 2 MB</p>
+                  </div>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
             </div>
 
-            {/* QR code */}
-            {bankInfo.qr_url && (
-              <div className="flex flex-col items-center justify-center">
-                <img
-                  src={bankInfo.qr_url}
-                  alt="Bank transfer QR code"
-                  className="w-40 h-40 object-contain border border-gray-200 rounded-lg"
-                />
-                <p className="text-xs text-gray-400 mt-1">Scan to transfer</p>
-              </div>
-            )}
-          </div>
+            {/* Trust badges */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { icon: <Clock className="w-3.5 h-3.5" />, text: 'Verified within 24 hours' },
+                { icon: <ShieldCheck className="w-3.5 h-3.5" />, text: 'Secure manual verification' },
+                { icon: <Zap className="w-3.5 h-3.5" />, text: 'Instant activation after approval' },
+              ].map((b) => (
+                <div key={b.text} className="flex flex-col items-center gap-1 text-center bg-gray-50 rounded-xl p-2">
+                  <span className="text-primary-500">{b.icon}</span>
+                  <p className="text-xs text-gray-500 leading-tight">{b.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary w-full justify-center py-3 text-base font-semibold"
+              disabled={submitting}
+            >
+              {submitting
+                ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Submitting…</>
+                : `Submit for Verification — Rs. ${selectedPlan.price.toLocaleString()}`
+              }
+            </button>
+          </form>
         </div>
       )}
-
-      {/* Payment submission form */}
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <CreditCard className="w-5 h-5 text-primary-600" />
-          <h2 className="font-semibold text-gray-900">Submit Payment</h2>
-        </div>
-        <p className="text-sm text-gray-500">
-          After transferring the amount, fill in the form below and attach your receipt screenshot.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Amount Paid</label>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Months to Renew</label>
-              <select
-                className="input"
-                value={months}
-                onChange={(e) => setMonths(e.target.value)}
-              >
-                {[1, 2, 3, 6, 12].map((m) => (
-                  <option key={m} value={m}>{m} month{m > 1 ? 's' : ''}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Payment Screenshot (optional)</label>
-            <div
-              className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center cursor-pointer hover:border-primary-300 transition-colors"
-              onClick={() => fileRef.current?.click()}
-            >
-              {proofB64 ? (
-                <div className="space-y-2">
-                  <img src={proofB64} alt="proof" className="h-24 mx-auto object-contain rounded" />
-                  <p className="text-xs text-gray-500">{proofFile?.name}</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <Upload className="w-8 h-8 text-gray-300 mx-auto" />
-                  <p className="text-sm text-gray-400">Click to upload screenshot</p>
-                  <p className="text-xs text-gray-300">PNG, JPG up to 2 MB</p>
-                </div>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="btn-primary w-full justify-center"
-            disabled={submitting}
-          >
-            {submitting
-              ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Submitting…</>
-              : 'Submit Payment for Review'
-            }
-          </button>
-        </form>
-      </div>
 
       {/* Payment history */}
       {payments.length > 0 && (
@@ -320,18 +421,18 @@ export default function BillingPage() {
               return (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm"
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-xl text-sm"
                 >
                   <div>
                     <p className="font-medium text-gray-800">
-                      {fmtMoney(p.amount)} - {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
+                      Rs. {fmtMoney(p.amount)} &mdash; {p.subscription_months} month{p.subscription_months > 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-gray-400">{fmtDate(p.payment_date)}</p>
                     {p.notes && (
                       <p className="text-xs text-red-500 mt-0.5">Note: {p.notes}</p>
                     )}
                   </div>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge.cls}`}>
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${badge.cls}`}>
                     {badge.label}
                   </span>
                 </div>
