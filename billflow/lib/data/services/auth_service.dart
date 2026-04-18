@@ -26,6 +26,7 @@ class AuthService {
           response.data['user'] as Map<String, dynamic>);
       await _storage.saveToken(token);
       await _storage.saveUser(jsonEncode(user.toJson()));
+      await _storage.saveLastLogin(shopId, username);
       return user;
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);

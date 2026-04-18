@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
+  bool _loadingCredentials = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final saved = await SecureStorage().readLastLogin();
+    if (mounted) {
+      _shopIdCtrl.text = saved['shopId'] ?? '';
+      _usernameCtrl.text = saved['username'] ?? '';
+      setState(() => _loadingCredentials = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -36,15 +53,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final error = ref.read(authProvider).error;
     if (error != null && mounted) {
       final msg = error is ApiException ? error.message : 'Login failed';
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = authState.isLoading || _loadingCredentials;
 
     return Scaffold(
       body: Container(
@@ -98,23 +116,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
+                            const Text(
                               'Sign In',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Enter your credentials to continue',
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 24),
                             TextFormField(
                               controller: _shopIdCtrl,
                               decoration: const InputDecoration(
                                 labelText: 'Shop ID',
                                 prefixIcon: Icon(Icons.store_outlined),
+                                helperText: 'Your unique shop number',
                               ),
                               keyboardType: TextInputType.number,
-                              validator: (v) =>
-                                  (v == null || v.isEmpty) ? 'Enter shop ID' : null,
+                              textInputAction: TextInputAction.next,
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter shop ID'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -124,8 +151,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 prefixIcon: Icon(Icons.person_outline),
                               ),
                               textInputAction: TextInputAction.next,
-                              validator: (v) =>
-                                  (v == null || v.isEmpty) ? 'Enter username' : null,
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter username'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -144,12 +172,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               obscureText: _obscure,
                               textInputAction: TextInputAction.done,
                               onFieldSubmitted: (_) => _submit(),
-                              validator: (v) =>
-                                  (v == null || v.isEmpty) ? 'Enter password' : null,
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter password'
+                                  : null,
                             ),
                             const SizedBox(height: 24),
                             FilledButton(
                               onPressed: isLoading ? null : _submit,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
                               child: isLoading
                                   ? const SizedBox(
                                       height: 20,
@@ -158,7 +192,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           strokeWidth: 2,
                                           color: Colors.white),
                                     )
-                                  : const Text('Sign In'),
+                                  : const Text('Sign In',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold)),
                             ),
                           ],
                         ),
@@ -167,7 +204,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'BillFlow © 2024',
+                    'BillFlow © 2026',
                     style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ],
