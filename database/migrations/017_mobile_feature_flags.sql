@@ -1,8 +1,9 @@
--- Migration 017: Additional feature flags for mobile app feature-gating
--- All columns DEFAULT TRUE so existing shops are unaffected on upgrade.
+-- Migration 017: Remove incorrectly added columns not managed by admin panel.
+-- The correct feature flags (migration 016) already cover everything the admin
+-- panel controls. These 4 columns were added in error and must be dropped.
 
 ALTER TABLE shops
-  ADD COLUMN IF NOT EXISTS pos_enabled            BOOLEAN NOT NULL DEFAULT TRUE,
-  ADD COLUMN IF NOT EXISTS products_enabled       BOOLEAN NOT NULL DEFAULT TRUE,
-  ADD COLUMN IF NOT EXISTS notifications_enabled  BOOLEAN NOT NULL DEFAULT TRUE,
-  ADD COLUMN IF NOT EXISTS inventory_enabled      BOOLEAN NOT NULL DEFAULT TRUE;
+  DROP COLUMN IF EXISTS pos_enabled,
+  DROP COLUMN IF EXISTS products_enabled,
+  DROP COLUMN IF EXISTS notifications_enabled,
+  DROP COLUMN IF EXISTS inventory_enabled;

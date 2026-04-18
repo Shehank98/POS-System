@@ -5,10 +5,11 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/feature_flag_provider.dart';
 import '../../../providers/notification_provider.dart';
 
+// ── Nav item descriptor ───────────────────────────────────────────────────────
 class _NavItem {
   final String route;
-  final Icon icon;
-  final Icon selectedIcon;
+  final IconData icon;
+  final IconData selectedIcon;
   final String label;
 
   const _NavItem({
@@ -19,6 +20,13 @@ class _NavItem {
   });
 }
 
+// ── App scaffold with feature-gated bottom nav ────────────────────────────────
+// Mirrors the web Layout.jsx navigation structure:
+//   Always visible : Dashboard · POS · Products · Transactions
+//   Feature-gated  : Reports (reports_enabled)
+//
+// Subscription-locked accounts (readOnly && !inGracePeriod) can only
+// access Billing — the full nav is hidden.
 class AppScaffold extends ConsumerWidget {
   final Widget child;
   const AppScaffold({super.key, required this.child});
@@ -27,57 +35,16 @@ class AppScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).valueOrNull;
     final unread = ref.watch(unreadNotificationCountProvider);
+    final reportsOn = ref.watch(reportsEnabledProvider);
 
-    // Build the nav item list based on live feature flags
-    final items = <_NavItem>[
-      const _NavItem(
-        route: '/dashboard',
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: 'Home',
-      ),
-      if (user?.posEnabled ?? true)
-        const _NavItem(
-          route: '/sales',
-          icon: Icon(Icons.point_of_sale_outlined),
-          selectedIcon: Icon(Icons.point_of_sale),
-          label: 'POS',
-        ),
-      const _NavItem(
-        route: '/transactions',
-        icon: Icon(Icons.receipt_long_outlined),
-        selectedIcon: Icon(Icons.receipt_long),
-        label: 'Sales',
-      ),
-      if (user?.productsEnabled ?? true)
-        const _NavItem(
-          route: '/products',
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2),
-          label: 'Products',
-        ),
-      if (user?.reportsEnabled ?? true)
-        const _NavItem(
-          route: '/reports',
-          icon: Icon(Icons.bar_chart_outlined),
-          selectedIcon: Icon(Icons.bar_chart),
-          label: 'Reports',
-        ),
-    ];
-
-    final routes = items.map((e) => e.route).toList();
-    final location = GoRouterState.of(context).matchedLocation;
-    final idx = routes.indexWhere((r) => location.startsWith(r));
-    final selectedIndex = idx < 0 ? 0 : idx;
-
-    // Subscription locked: show only billing & settings, skip full nav
+    // Subscription lock: fully expired → only billing allowed
     final isLocked = (user?.readOnly ?? false) && !(user?.inGracePeriod ?? false);
     if (isLocked) {
       return Scaffold(
         body: child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: 0,
-          onDestinationSelected: (_) {},
+          onDestinationSelected: (_) => context.go('/billing'),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.credit_card_outlined),
@@ -89,32 +56,74 @@ class AppScaffold extends ConsumerWidget {
       );
     }
 
+    // Build nav items — base 4 always present, Reports appended when enabled
+    final items = <_NavItem>[
+      const _NavItem(
+        route: '/dashboard',
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        label: 'Home',
+      ),
+      const _NavItem(
+        route: '/sales',
+        icon: Icons.point_of_sale_outlined,
+        selectedIcon: Icons.point_of_sale,
+        label: 'POS',
+      ),
+      const _NavItem(
+        route: '/transactions',
+        icon: Icons.receipt_long_outlined,
+        selectedIcon: Icons.receipt_long,
+        label: 'Sales',
+      ),
+      const _NavItem(
+        route: '/products',
+        icon: Icons.inventory_2_outlined,
+        selectedIcon: Icons.inventory_2,
+        label: 'Products',
+      ),
+      if (reportsOn)
+        const _NavItem(
+          route: '/reports',
+          icon: Icons.bar_chart_outlined,
+          selectedIcon: Icons.bar_chart,
+          label: 'Reports',
+        ),
+    ];
+
+    final routes = items.map((e) => e.route).toList();
+    final location = GoRouterState.of(context).matchedLocation;
+    final idx = routes.indexWhere((r) => location.startsWith(r));
+    final selectedIndex = idx < 0 ? 0 : idx;
+
     return Scaffold(
       body: child,
-      // Grace period banner shown above nav bar
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Grace-period warning banner — taps to /billing
           if (user?.inGracePeriod ?? false)
-            _GracePeriodBanner(graceDays: user!.graceDaysRemaining, ref: ref),
+            _GracePeriodBanner(graceDays: user!.graceDaysRemaining),
           NavigationBar(
             selectedIndex: selectedIndex,
             onDestinationSelected: (i) => context.go(routes[i]),
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: items.map((item) {
-              // Notifications badge on reports item if notifications are in nav
-              final isNotifRoute = item.route == '/reports' &&
-                  unread > 0 &&
-                  !(user?.notificationsEnabled ?? true);
+              // Notification badge on Reports when there are unread alerts
+              if (item.route == '/reports' && unread > 0) {
+                return NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: unread > 0,
+                    label: Text('$unread'),
+                    child: Icon(item.icon),
+                  ),
+                  selectedIcon: Icon(item.selectedIcon),
+                  label: item.label,
+                );
+              }
               return NavigationDestination(
-                icon: isNotifRoute
-                    ? Badge(
-                        isLabelVisible: unread > 0,
-                        label: Text('$unread'),
-                        child: item.icon,
-                      )
-                    : item.icon,
-                selectedIcon: item.selectedIcon,
+                icon: Icon(item.icon),
+                selectedIcon: Icon(item.selectedIcon),
                 label: item.label,
               );
             }).toList(),
@@ -127,9 +136,7 @@ class AppScaffold extends ConsumerWidget {
 
 class _GracePeriodBanner extends StatelessWidget {
   final int graceDays;
-  final WidgetRef ref;
-
-  const _GracePeriodBanner({required this.graceDays, required this.ref});
+  const _GracePeriodBanner({required this.graceDays});
 
   @override
   Widget build(BuildContext context) {

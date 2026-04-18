@@ -14,21 +14,25 @@ class UserModel {
   final int graceDaysRemaining;
   final double? daysUntilExpiry;
 
-  // Feature flags
-  final bool preOrdersEnabled;
-  final bool customersEnabled;
-  final bool reportsEnabled;
-  final bool analyticsEnabled;
-  final bool loyaltyEnabled;
-  final bool refundsEnabled;
-  final bool voidEnabled;
-  final bool offlineEnabled;
-  final bool exchangesEnabled;
-  final bool branchesEnabled;
-  final bool posEnabled;
-  final bool productsEnabled;
-  final bool notificationsEnabled;
-  final bool inventoryEnabled;
+  // ── Feature flags — exact match to admin panel ───────────────
+  // Barcode Scanner (Hardware/camera barcode at POS)
+  // (barcodeEnabled is already a top-level field above)
+
+  // POS Core
+  final bool refundsEnabled;   // Allow Refunds
+  final bool voidEnabled;      // Allow Void
+  final bool offlineEnabled;   // Offline Mode
+
+  // Modules
+  final bool preOrdersEnabled;  // Pre-Orders
+  final bool customersEnabled;  // Customers Tab
+  final bool loyaltyEnabled;    // Loyalty Points
+  final bool reportsEnabled;    // Reports
+  final bool analyticsEnabled;  // Analytics
+
+  // Clothing Shops Only
+  final bool exchangesEnabled;  // Exchanges / Returns
+  final bool branchesEnabled;   // Multi-Branch
 
   const UserModel({
     required this.id,
@@ -45,24 +49,21 @@ class UserModel {
     required this.inGracePeriod,
     required this.graceDaysRemaining,
     this.daysUntilExpiry,
-    required this.preOrdersEnabled,
-    required this.customersEnabled,
-    required this.reportsEnabled,
-    required this.analyticsEnabled,
-    required this.loyaltyEnabled,
     required this.refundsEnabled,
     required this.voidEnabled,
     required this.offlineEnabled,
+    required this.preOrdersEnabled,
+    required this.customersEnabled,
+    required this.loyaltyEnabled,
+    required this.reportsEnabled,
+    required this.analyticsEnabled,
     required this.exchangesEnabled,
     required this.branchesEnabled,
-    required this.posEnabled,
-    required this.productsEnabled,
-    required this.notificationsEnabled,
-    required this.inventoryEnabled,
   });
 
   bool get isOwner => role == 'owner';
   bool get isManagerOrAbove => role == 'owner' || role == 'manager';
+  bool get isClothingShop => shopType == 'clothing';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -80,20 +81,19 @@ class UserModel {
       inGracePeriod: json['in_grace_period'] as bool? ?? false,
       graceDaysRemaining: json['grace_days_remaining'] as int? ?? 0,
       daysUntilExpiry: (json['days_until_expiry'] as num?)?.toDouble(),
-      preOrdersEnabled: json['pre_orders_enabled'] as bool? ?? false,
-      customersEnabled: json['customers_enabled'] as bool? ?? false,
-      reportsEnabled: json['reports_enabled'] as bool? ?? false,
-      analyticsEnabled: json['analytics_enabled'] as bool? ?? false,
-      loyaltyEnabled: json['loyalty_enabled'] as bool? ?? false,
-      refundsEnabled: json['refunds_enabled'] as bool? ?? false,
-      voidEnabled: json['void_enabled'] as bool? ?? false,
-      offlineEnabled: json['offline_enabled'] as bool? ?? false,
-      exchangesEnabled: json['exchanges_enabled'] as bool? ?? false,
-      branchesEnabled: json['branches_enabled'] as bool? ?? false,
-      posEnabled: json['pos_enabled'] as bool? ?? true,
-      productsEnabled: json['products_enabled'] as bool? ?? true,
-      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
-      inventoryEnabled: json['inventory_enabled'] as bool? ?? true,
+      // POS Core
+      refundsEnabled: json['refunds_enabled'] as bool? ?? true,
+      voidEnabled: json['void_enabled'] as bool? ?? true,
+      offlineEnabled: json['offline_enabled'] as bool? ?? true,
+      // Modules
+      preOrdersEnabled: json['pre_orders_enabled'] as bool? ?? true,
+      customersEnabled: json['customers_enabled'] as bool? ?? true,
+      loyaltyEnabled: json['loyalty_enabled'] as bool? ?? true,
+      reportsEnabled: json['reports_enabled'] as bool? ?? true,
+      analyticsEnabled: json['analytics_enabled'] as bool? ?? true,
+      // Clothing Only
+      exchangesEnabled: json['exchanges_enabled'] as bool? ?? true,
+      branchesEnabled: json['branches_enabled'] as bool? ?? true,
     );
   }
 
@@ -112,19 +112,18 @@ class UserModel {
         'in_grace_period': inGracePeriod,
         'grace_days_remaining': graceDaysRemaining,
         'days_until_expiry': daysUntilExpiry,
-        'pre_orders_enabled': preOrdersEnabled,
-        'customers_enabled': customersEnabled,
-        'reports_enabled': reportsEnabled,
-        'analytics_enabled': analyticsEnabled,
-        'loyalty_enabled': loyaltyEnabled,
+        // POS Core
         'refunds_enabled': refundsEnabled,
         'void_enabled': voidEnabled,
         'offline_enabled': offlineEnabled,
+        // Modules
+        'pre_orders_enabled': preOrdersEnabled,
+        'customers_enabled': customersEnabled,
+        'loyalty_enabled': loyaltyEnabled,
+        'reports_enabled': reportsEnabled,
+        'analytics_enabled': analyticsEnabled,
+        // Clothing Only
         'exchanges_enabled': exchangesEnabled,
         'branches_enabled': branchesEnabled,
-        'pos_enabled': posEnabled,
-        'products_enabled': productsEnabled,
-        'notifications_enabled': notificationsEnabled,
-        'inventory_enabled': inventoryEnabled,
       };
 }

@@ -15,11 +15,10 @@ class BillingScreen extends ConsumerWidget {
 
     if (user == null) return const SizedBox.shrink();
 
-    final status = user.subscriptionStatus;
-    final endDate = user.subscriptionEndDate;
     final inGrace = user.inGracePeriod;
     final graceDays = user.graceDaysRemaining;
     final daysLeft = user.daysUntilExpiry;
+    final endDate = user.subscriptionEndDate;
 
     Color statusColor;
     String statusLabel;
@@ -31,7 +30,7 @@ class BillingScreen extends ConsumerWidget {
       statusIcon = Icons.check_circle;
     } else if (inGrace) {
       statusColor = Colors.orange;
-      statusLabel = 'Grace Period ($graceDays days left)';
+      statusLabel = 'Grace Period ($graceDays day${graceDays == 1 ? '' : 's'} left)';
       statusIcon = Icons.warning_amber_rounded;
     } else {
       statusColor = AppColors.danger;
@@ -47,208 +46,204 @@ class BillingScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Status card
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          // ── Status card ─────────────────────────────────────────
+          _SectionCard(
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(statusIcon, color: statusColor, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Subscription Status',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurfaceVariant)),
-                            const SizedBox(height: 2),
-                            Text(statusLabel,
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: statusColor)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (endDate != null) ...[
-                    const SizedBox(height: 16),
-                    const Divider(height: 1),
-                    const SizedBox(height: 16),
-                    _InfoRow(
-                      label: 'Expiry Date',
-                      value: _formatDate(endDate),
-                      icon: Icons.calendar_today_outlined,
-                    ),
-                    if (daysLeft != null) ...[
-                      const SizedBox(height: 12),
-                      _InfoRow(
-                        label: daysLeft >= 0
-                            ? 'Days Remaining'
-                            : 'Days Overdue',
-                        value: '${daysLeft.abs().toStringAsFixed(0)} days',
-                        icon: Icons.timer_outlined,
-                        valueColor:
-                            daysLeft >= 0 ? AppColors.success : AppColors.danger,
-                      ),
-                    ],
-                  ],
-                  const SizedBox(height: 16),
-                  const Divider(height: 1),
-                  const SizedBox(height: 16),
-                  _InfoRow(
-                    label: 'Shop',
-                    value: user.shopName,
-                    icon: Icons.store_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoRow(
-                    label: 'Shop Type',
-                    value: user.shopType.toUpperCase(),
-                    icon: Icons.category_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoRow(
-                    label: 'Account',
-                    value: user.username,
-                    icon: Icons.person_outline,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Restricted banner
-          if (!isActive || inGrace)
-            Card(
-              color: inGrace
-                  ? Colors.orange.shade50
-                  : Colors.red.shade50,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                      color: inGrace ? Colors.orange : Colors.red,
-                      width: 1)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  Icon(statusIcon, color: statusColor, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          inGrace
-                              ? Icons.warning_amber_rounded
-                              : Icons.lock_outline,
-                          color: inGrace ? Colors.orange : Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          inGrace ? 'Grace Period Active' : 'Access Restricted',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: inGrace ? Colors.orange : Colors.red),
-                        ),
+                        Text('Subscription Status',
+                            style: TextStyle(
+                                fontSize: 12, color: cs.onSurfaceVariant)),
+                        const SizedBox(height: 2),
+                        Text(statusLabel,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor)),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      inGrace
-                          ? 'Your subscription has expired but you are in the grace period. Renew now to avoid losing access.'
-                          : 'Your subscription has expired. All features except this billing page are locked. Please renew to restore access.',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: inGrace
-                              ? Colors.orange.shade900
-                              : Colors.red.shade900),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
+              if (endDate != null) ...[
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                _InfoRow(
+                  label: 'Expiry Date',
+                  value: _formatDate(endDate),
+                  icon: Icons.calendar_today_outlined,
+                ),
+                if (daysLeft != null) ...[
+                  const SizedBox(height: 12),
+                  _InfoRow(
+                    label: daysLeft >= 0 ? 'Days Remaining' : 'Days Overdue',
+                    value: '${daysLeft.abs().toStringAsFixed(0)} days',
+                    icon: Icons.timer_outlined,
+                    valueColor: daysLeft >= 0 ? AppColors.success : AppColors.danger,
+                  ),
+                ],
+              ],
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _InfoRow(
+                label: 'Shop',
+                value: user.shopName,
+                icon: Icons.store_outlined,
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                label: 'Shop Type',
+                value: _shopTypeLabel(user.shopType),
+                icon: Icons.category_outlined,
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                label: 'Account',
+                value: '${user.username} (${user.role})',
+                icon: Icons.person_outline,
+              ),
+            ],
+          ),
 
-          const SizedBox(height: 16),
-
-          // Renewal instructions
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+          // ── Restriction / grace banner ──────────────────────────
+          if (!isActive || inGrace) ...[
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: inGrace ? Colors.orange.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: inGrace ? Colors.orange : Colors.red),
+              ),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.payments_outlined, color: cs.primary),
+                      Icon(
+                        inGrace
+                            ? Icons.warning_amber_rounded
+                            : Icons.lock_outline,
+                        color: inGrace ? Colors.orange : Colors.red,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
-                      Text('How to Renew',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: cs.onSurface)),
+                      Text(
+                        inGrace ? 'Grace Period Active' : 'Access Restricted',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: inGrace ? Colors.orange : Colors.red),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _RenewalStep(
-                    step: '1',
-                    text: 'Contact your service provider or admin to renew.',
-                  ),
-                  _RenewalStep(
-                    step: '2',
-                    text:
-                        'Once payment is confirmed, your subscription will be activated in the admin panel.',
-                  ),
-                  _RenewalStep(
-                    step: '3',
-                    text:
-                        'Log out and log back in — your access will be restored automatically.',
+                  const SizedBox(height: 8),
+                  Text(
+                    inGrace
+                        ? 'Your subscription has expired but you have $graceDays day${graceDays == 1 ? '' : 's'} remaining. Renew now to avoid losing access.'
+                        : 'Your subscription has expired. All features are locked. Please renew to restore access.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: inGrace
+                            ? Colors.orange.shade900
+                            : Colors.red.shade900),
                   ),
                 ],
               ),
             ),
+          ],
+
+          // ── Renewal instructions ────────────────────────────────
+          const SizedBox(height: 12),
+          _SectionCard(
+            header: Row(
+              children: [
+                Icon(Icons.payments_outlined, color: cs.primary, size: 20),
+                const SizedBox(width: 8),
+                Text('How to Renew',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: cs.onSurface)),
+              ],
+            ),
+            children: [
+              const SizedBox(height: 4),
+              _RenewalStep(
+                  step: '1',
+                  text: 'Contact your service provider or admin to renew your plan.'),
+              _RenewalStep(
+                  step: '2',
+                  text:
+                      'Once payment is confirmed the subscription is activated in the admin panel.'),
+              _RenewalStep(
+                  step: '3',
+                  text:
+                      'Log out and log back in — full access restores automatically.'),
+            ],
           ),
 
-          const SizedBox(height: 16),
+          // ── Enabled features (mirrors admin-panel groups) ───────
+          const SizedBox(height: 12),
+          _SectionCard(
+            header: Text('Enabled Features',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: cs.onSurface)),
+            children: [
+              const SizedBox(height: 4),
 
-          // Active features summary
-          Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Enabled Features',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: cs.onSurface)),
-                  const SizedBox(height: 12),
-                  _FeatureRow('POS / Sales', user.posEnabled),
-                  _FeatureRow('Product Management', user.productsEnabled),
-                  _FeatureRow('Reports', user.reportsEnabled),
-                  _FeatureRow('Analytics', user.analyticsEnabled),
-                  _FeatureRow('Customers', user.customersEnabled),
-                  _FeatureRow('Pre-Orders', user.preOrdersEnabled),
-                  _FeatureRow('Notifications', user.notificationsEnabled),
-                  _FeatureRow('Inventory', user.inventoryEnabled),
-                  _FeatureRow('Loyalty', user.loyaltyEnabled),
-                  _FeatureRow('Refunds', user.refundsEnabled),
-                ],
-              ),
-            ),
+              // Barcode Scanner
+              _FeatureGroup(label: 'Shop Configuration', children: [
+                _FeatureRow(
+                  'Barcode Scanner',
+                  user.barcodeEnabled,
+                  note: 'Hardware/camera barcode at POS',
+                ),
+              ]),
+
+              // POS Core
+              _FeatureGroup(label: 'POS Core', children: [
+                _FeatureRow('Allow Refunds', user.refundsEnabled,
+                    note: 'Partial/full refund in Transactions'),
+                _FeatureRow('Allow Void', user.voidEnabled,
+                    note: 'Void completed transactions'),
+                _FeatureRow('Offline Mode', user.offlineEnabled,
+                    note: 'Accept sales offline and sync later'),
+              ]),
+
+              // Modules
+              _FeatureGroup(label: 'Modules', children: [
+                _FeatureRow('Pre-Orders', user.preOrdersEnabled,
+                    note: 'Customer online ordering portal'),
+                _FeatureRow('Customers Tab', user.customersEnabled,
+                    note: 'Customer insights dashboard'),
+                _FeatureRow('Loyalty Points', user.loyaltyEnabled,
+                    note: 'Earn & redeem points at checkout'),
+                _FeatureRow('Reports', user.reportsEnabled,
+                    note: 'Sales & inventory report exports'),
+                _FeatureRow('Analytics', user.analyticsEnabled,
+                    note: 'Analytics charts and trends'),
+              ]),
+
+              // Clothing Shops Only
+              if (user.isClothingShop)
+                _FeatureGroup(label: 'Clothing Shops Only', children: [
+                  _FeatureRow('Exchanges / Returns', user.exchangesEnabled,
+                      note: 'Single-transaction exchange module'),
+                  _FeatureRow('Multi-Branch', user.branchesEnabled,
+                      note: 'Branch inventory management'),
+                ]),
+            ],
           ),
 
           const SizedBox(height: 32),
@@ -270,6 +265,47 @@ class BillingScreen extends ConsumerWidget {
         '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ][m];
+
+  String _shopTypeLabel(String type) {
+    switch (type) {
+      case 'clothing':
+        return 'Clothing Shop';
+      case 'grocery':
+        return 'Grocery / Supermarket';
+      case 'restaurant':
+        return 'Restaurant / Cafe';
+      case 'carwash':
+        return 'Car Wash';
+      default:
+        return 'Retail';
+    }
+  }
+}
+
+// ── Shared widgets ─────────────────────────────────────────────────────────────
+
+class _SectionCard extends StatelessWidget {
+  final List<Widget> children;
+  final Widget? header;
+
+  const _SectionCard({required this.children, this.header});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (header != null) ...[header!, const SizedBox(height: 12)],
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -314,7 +350,6 @@ class _InfoRow extends StatelessWidget {
 class _RenewalStep extends StatelessWidget {
   final String step;
   final String text;
-
   const _RenewalStep({required this.step, required this.text});
 
   @override
@@ -337,8 +372,35 @@ class _RenewalStep extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                style:
+                    TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureGroup extends StatelessWidget {
+  final String label;
+  final List<Widget> children;
+  const _FeatureGroup({required this.label, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  letterSpacing: 0.8)),
+          const SizedBox(height: 6),
+          ...children,
         ],
       ),
     );
@@ -348,27 +410,37 @@ class _RenewalStep extends StatelessWidget {
 class _FeatureRow extends StatelessWidget {
   final String name;
   final bool enabled;
-
-  const _FeatureRow(this.name, this.enabled);
+  final String? note;
+  const _FeatureRow(this.name, this.enabled, {this.note});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
           Icon(
             enabled ? Icons.check_circle : Icons.cancel_outlined,
-            size: 18,
-            color: enabled ? AppColors.success : Colors.grey,
+            size: 16,
+            color: enabled ? AppColors.success : Colors.grey.shade400,
           ),
           const SizedBox(width: 8),
-          Text(name,
-              style: TextStyle(
-                  fontSize: 13,
-                  color: enabled
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Colors.grey)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: enabled ? cs.onSurface : Colors.grey)),
+                if (note != null)
+                  Text(note!,
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
         ],
       ),
     );

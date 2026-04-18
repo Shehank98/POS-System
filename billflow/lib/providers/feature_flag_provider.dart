@@ -4,8 +4,8 @@ import '../data/services/auth_service.dart';
 import 'auth_provider.dart';
 
 // ── Periodic feature-flag refresh ────────────────────────────────────────────
-// Calls /auth/me every 5 minutes so that admin-panel flag changes propagate
-// to the mobile app without requiring a reinstall or manual re-login.
+// Calls /auth/me every 5 minutes so admin-panel ON/OFF changes propagate
+// to the mobile app instantly, without reinstall or re-login.
 class FeatureFlagRefresher extends AsyncNotifier<void> {
   Timer? _timer;
 
@@ -31,54 +31,56 @@ class FeatureFlagRefresher extends AsyncNotifier<void> {
 final featureFlagRefresherProvider =
     AsyncNotifierProvider<FeatureFlagRefresher, void>(FeatureFlagRefresher.new);
 
-// ── Convenience selectors (read-only, derived from authProvider) ──────────────
-extension FeatureFlags on UserModelFeatureAccessor {
-  static bool posEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.posEnabled ?? true;
-  static bool productsEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.productsEnabled ?? true;
-  static bool reportsEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.reportsEnabled ?? true;
-  static bool notificationsEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.notificationsEnabled ?? true;
-  static bool inventoryEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.inventoryEnabled ?? true;
-  static bool preOrdersEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.preOrdersEnabled ?? true;
-  static bool customersEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.customersEnabled ?? true;
-  static bool analyticsEnabled(WidgetRef ref) =>
-      ref.watch(authProvider).valueOrNull?.analyticsEnabled ?? true;
-}
+// ── Feature flag providers — one per admin-panel flag ─────────────────────────
+// These are read-only derived views of the user object in authProvider.
+// The admin panel maps exactly to these field names in the shops table.
 
-// Dummy class required for the extension receiver
-class UserModelFeatureAccessor {}
+// Barcode Scanner — Hardware/camera barcode at POS
+final barcodeEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.barcodeEnabled ?? false);
 
-// Simple provider-based selectors for use in ConsumerWidget/ConsumerState
-final posEnabledProvider = Provider<bool>((ref) =>
-    ref.watch(authProvider).valueOrNull?.posEnabled ?? true);
+// POS Core
+final refundsEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.refundsEnabled ?? true);
 
-final productsEnabledProvider = Provider<bool>((ref) =>
-    ref.watch(authProvider).valueOrNull?.productsEnabled ?? true);
+final voidEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.voidEnabled ?? true);
 
-final reportsEnabledProvider = Provider<bool>((ref) =>
-    ref.watch(authProvider).valueOrNull?.reportsEnabled ?? true);
+final offlineEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.offlineEnabled ?? true);
 
-final notificationsEnabledProvider = Provider<bool>((ref) =>
-    ref.watch(authProvider).valueOrNull?.notificationsEnabled ?? true);
-
-final inventoryEnabledProvider = Provider<bool>((ref) =>
-    ref.watch(authProvider).valueOrNull?.inventoryEnabled ?? true);
-
+// Modules
 final preOrdersEnabledProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.preOrdersEnabled ?? true);
 
 final customersEnabledProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.customersEnabled ?? true);
 
+final loyaltyEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.loyaltyEnabled ?? true);
+
+final reportsEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.reportsEnabled ?? true);
+
 final analyticsEnabledProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.analyticsEnabled ?? true);
 
+// Clothing Shops Only
+final exchangesEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.exchangesEnabled ?? true);
+
+final branchesEnabledProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.branchesEnabled ?? true);
+
+// ── Shop-type helpers ─────────────────────────────────────────────────────────
+final shopTypeProvider = Provider<String>((ref) =>
+    ref.watch(authProvider).valueOrNull?.shopType ?? 'retail');
+
+final isClothingShopProvider = Provider<bool>((ref) =>
+    ref.watch(authProvider).valueOrNull?.isClothingShop ?? false);
+
+// ── Subscription gate ─────────────────────────────────────────────────────────
+// true = account has full access; false = locked (expired beyond grace period)
 final isSubscriptionActiveProvider = Provider<bool>((ref) {
   final user = ref.watch(authProvider).valueOrNull;
   if (user == null) return false;
