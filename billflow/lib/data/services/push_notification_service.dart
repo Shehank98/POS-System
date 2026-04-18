@@ -83,13 +83,17 @@ class PushNotificationService {
     final title = message.data['title'] ?? message.notification?.title;
     final body = message.data['body'] ?? message.notification?.body;
     if (title == null && body == null) return;
-
     await _localNotifications.show(
-      message.hashCode,
-      title,
-      body,
-      _kNotificationDetails,
-    );
+        message.hashCode, title, body, _kNotificationDetails);
+  }
+
+  static Future<void> showInAppNotification({
+    required String title,
+    required String body,
+    int? id,
+  }) async {
+    await _localNotifications.show(
+        id ?? title.hashCode, title, body, _kNotificationDetails);
   }
 
   static Future<String?> getToken() async {

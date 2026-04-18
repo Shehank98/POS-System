@@ -229,11 +229,10 @@ export default function DashboardPage() {
     fetchSummary(activePeriod);
   }
 
-  // Chart data
+  // Chart data — parse date as local noon to avoid UTC-offset day shift
   const chartData = weekData?.daily?.map((d) => ({
-    day:   new Date(d.day).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
+    day:   new Date(`${d.day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
     Sales: parseFloat(d.sales) || 0,
-    Txns:  parseInt(d.transactions, 10) || 0,
   })) || [];
 
   const hourlyData = todayData?.hourly?.map((h) => ({
@@ -422,7 +421,11 @@ export default function DashboardPage() {
             <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                width={58}
+                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))}
+              />
               <Tooltip content={<ChartTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="Sales" stroke="#2563eb"

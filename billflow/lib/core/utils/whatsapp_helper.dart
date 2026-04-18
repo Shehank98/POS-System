@@ -12,6 +12,24 @@ import 'currency_formatter.dart';
 import 'date_formatter.dart';
 
 class WhatsAppHelper {
+  // Normalise Sri Lankan (and other) numbers to E.164 format.
+  // 07xxxxxxxx (10 digits, starts with 0)  → +947xxxxxxxx
+  // 7xxxxxxxx  (9 digits, starts with 7/6) → +947xxxxxxxx
+  // +94xxxxxxxx                            → unchanged
+  static String _formatPhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (raw.trimLeft().startsWith('+')) {
+      return raw.replaceAll(RegExp(r'[\s\-()]'), '');
+    }
+    if (digits.length == 10 && digits.startsWith('0')) {
+      return '+94${digits.substring(1)}';
+    }
+    if (digits.length == 9) {
+      return '+94$digits';
+    }
+    return '+94$digits'; // best-effort fallback
+  }
+
   static Future<void> shareReceiptImage(
       BuildContext context, TransactionModel txn, UserModel user,
       {String? phoneNumber}) async {
@@ -34,13 +52,13 @@ class WhatsAppHelper {
 
       String? shareText = 'Receipt from ${user.shopName}';
       if (phoneNumber != null && phoneNumber.isNotEmpty) {
-        final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
-        final whatsappUri = Uri.parse('whatsapp://send?phone=$cleaned');
+        final formatted = _formatPhone(phoneNumber);
+        final whatsappUri = Uri.parse('whatsapp://send?phone=$formatted');
         if (await canLaunchUrl(whatsappUri)) {
           await launchUrl(whatsappUri);
           await Future.delayed(const Duration(milliseconds: 600));
         } else {
-          final webUri = Uri.parse('https://wa.me/$cleaned');
+          final webUri = Uri.parse('https://wa.me/$formatted');
           if (await canLaunchUrl(webUri)) {
             await launchUrl(webUri, mode: LaunchMode.externalApplication);
             await Future.delayed(const Duration(milliseconds: 600));
@@ -64,8 +82,8 @@ class WhatsAppHelper {
     final encoded = Uri.encodeComponent(message);
     Uri url;
     if (phoneNumber != null && phoneNumber.isNotEmpty) {
-      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
-      url = Uri.parse('https://wa.me/$cleaned?text=$encoded');
+      final formatted = _formatPhone(phoneNumber);
+      url = Uri.parse('https://wa.me/$formatted?text=$encoded');
     } else {
       url = Uri.parse('https://wa.me/?text=$encoded');
     }

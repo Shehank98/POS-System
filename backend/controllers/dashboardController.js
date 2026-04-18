@@ -60,11 +60,14 @@ async function getToday(req, res) {
       ),
     ]);
 
-    // Items sold today
+    // Items sold today — kg products count as 1 per line (not by weight)
     const itemsRes = await db.query(
-      `SELECT COALESCE(SUM(ti.quantity), 0) AS items_sold
+      `SELECT COALESCE(SUM(
+          CASE WHEN COALESCE(p.unit_type, 'unit') = 'kg' THEN 1 ELSE ti.quantity END
+        ), 0) AS items_sold
          FROM transaction_items ti
          JOIN transactions t ON t.id = ti.transaction_id
+         LEFT JOIN products p ON p.id = ti.product_id
         WHERE t.shop_id = $1
           AND t.status  = 'completed'
           AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE`,
@@ -120,9 +123,12 @@ async function getYesterday(req, res) {
     ]);
 
     const itemsRes = await db.query(
-      `SELECT COALESCE(SUM(ti.quantity), 0) AS items_sold
+      `SELECT COALESCE(SUM(
+          CASE WHEN COALESCE(p.unit_type, 'unit') = 'kg' THEN 1 ELSE ti.quantity END
+        ), 0) AS items_sold
          FROM transaction_items ti
          JOIN transactions t ON t.id = ti.transaction_id
+         LEFT JOIN products p ON p.id = ti.product_id
         WHERE t.shop_id = $1 AND t.status = 'completed'
           AND DATE(t.transaction_date AT TIME ZONE 'UTC') = CURRENT_DATE - 1`,
       [req.shopId]
@@ -311,11 +317,13 @@ async function getAnalytics(req, res) {
         WHERE shop_id = $1 ${txDateWhere}
       `, txParams),
 
-      // Cost of goods sold + items sold
+      // Cost of goods sold + items sold (kg items count as 1, not by weight)
       db.query(`
         SELECT
           COALESCE(SUM(ti.quantity * COALESCE(p.cost_price, 0)), 0) AS total_cost,
-          COALESCE(SUM(ti.quantity), 0)                              AS items_sold
+          COALESCE(SUM(
+            CASE WHEN COALESCE(p.unit_type, 'unit') = 'kg' THEN 1 ELSE ti.quantity END
+          ), 0) AS items_sold
         FROM transaction_items ti
         JOIN  transactions t ON t.id = ti.transaction_id
         LEFT JOIN products  p ON p.id = ti.product_id

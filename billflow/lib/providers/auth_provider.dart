@@ -32,6 +32,18 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     state = await AsyncValue.guard(
         () => ref.read(authServiceProvider).login(username, password, shopId));
     _subscribeToShopTopics();
+    _showWelcomeNotification();
+  }
+
+  Future<void> _showWelcomeNotification() async {
+    final user = state.valueOrNull;
+    if (user == null) return;
+    try {
+      await PushNotificationService.showInAppNotification(
+        title: 'Welcome back, ${user.shopName}! 👋',
+        body: 'BillFlow is ready. Have a great day!',
+      );
+    } catch (_) {}
   }
 
   void _subscribeToShopTopics() {

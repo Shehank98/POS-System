@@ -413,9 +413,25 @@ async function updateStatus(req, res) {
     if (rows.length === 0) return res.status(404).json({ error: 'Pre-order not found' });
 
     const order = rows[0];
+    const newStatus = status.toUpperCase();
+
+    // Notify all shop staff devices about actionable status changes
+    const statusTitles = {
+      PREPARING: '🍳 Order Being Prepared',
+      READY:     '✅ Order Ready for Pickup',
+      CANCELLED: '❌ Order Cancelled',
+    };
+    if (statusTitles[newStatus]) {
+      sendToTopic(
+        `shop_${req.shopId}_preorders`,
+        statusTitles[newStatus],
+        `Token #${order.token_number}${order.customer_name ? ` · ${order.customer_name}` : ''}`,
+        { orderId: String(order.id), type: 'order_status', status: newStatus }
+      ).catch(() => {});
+    }
 
     // Track cancellations (best effort — don't fail status update)
-    if (status.toUpperCase() === 'CANCELLED' && order.customer_phone) {
+    if (newStatus === 'CANCELLED' && order.customer_phone) {
       upsertCancellationTracking(req.shopId, order.customer_phone, { incrementCancellations: true })
         .then((record) => {
           if (record && record.total_cancellations === 2) {

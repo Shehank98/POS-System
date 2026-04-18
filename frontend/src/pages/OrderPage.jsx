@@ -14,6 +14,38 @@ function timeAgo(dateStr) {
 }
 
 // ── Product Card ──────────────────────────────────────────────
+function KgInput({ qty, productId, onSetKg }) {
+  const kgPart    = Math.floor(qty || 0);
+  const gramsPart = Math.round(((qty || 0) - kgPart) * 1000);
+  return (
+    <div>
+      <p className="text-[10px] text-gray-400 text-center mb-1">Enter weight</p>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 relative">
+          <input
+            type="number" min="0" step="1"
+            value={kgPart || ''}
+            placeholder="0"
+            onChange={(e) => onSetKg(productId, (parseInt(e.target.value) || 0) + gramsPart / 1000)}
+            className="w-full border border-gray-300 rounded-lg px-2 pr-6 py-1.5 text-sm text-center focus:outline-none focus:border-primary-500"
+          />
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kg</span>
+        </div>
+        <div className="flex-1 relative">
+          <input
+            type="number" min="0" max="999" step="1"
+            value={gramsPart || ''}
+            placeholder="0"
+            onChange={(e) => onSetKg(productId, kgPart + (Math.min(parseInt(e.target.value) || 0, 999)) / 1000)}
+            className="w-full border border-gray-300 rounded-lg px-2 pr-5 py-1.5 text-sm text-center focus:outline-none focus:border-primary-500"
+          />
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">g</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductCard({ product, qty, onAdd, onRemove, onSetKg }) {
   const outOfStock = product.has_inventory && product.stock_quantity <= 0;
   const isKg = product.unit_type === 'kg';
@@ -35,18 +67,7 @@ function ProductCard({ product, qty, onAdd, onRemove, onSetKg }) {
           Unavailable
         </button>
       ) : isKg ? (
-        <div className="flex items-center gap-1">
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={qty || ''}
-            placeholder="0.0"
-            onChange={(e) => onSetKg(product.id, parseFloat(e.target.value) || 0)}
-            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-primary-500"
-          />
-          <span className="text-xs text-gray-500 whitespace-nowrap">kg</span>
-        </div>
+        <KgInput qty={qty} productId={product.id} onSetKg={onSetKg} />
       ) : qty > 0 ? (
         <div className="flex items-center justify-between bg-primary-50 rounded-lg px-2 py-1">
           <button onClick={onRemove} className="p-1 rounded-full hover:bg-primary-100 text-primary-700">
@@ -478,19 +499,15 @@ export default function OrderPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                           <p className="text-xs text-gray-500">
-                            Rs {Number(p.price).toFixed(2)}{isKg ? '/kg' : ''} × {isKg ? `${qty}kg` : qty}
+                            {isKg ? (() => {
+                              const kg = Math.floor(qty); const g = Math.round((qty - kg) * 1000);
+                              return `Rs ${Number(p.price).toFixed(2)}/kg × ${kg > 0 ? `${kg}kg` : ''}${g > 0 ? ` ${g}g` : ''}`.trim();
+                            })() : `Rs ${Number(p.price).toFixed(2)} × ${qty}`}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 ml-3">
                           {isKg ? (
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.1"
-                              value={qty}
-                              onChange={(e) => setKgQty(p.id, parseFloat(e.target.value) || 0)}
-                              className="w-16 border border-gray-300 rounded px-1 py-0.5 text-sm text-center"
-                            />
+                            <KgInput qty={qty} productId={p.id} onSetKg={setKgQty} />
                           ) : (
                             <>
                               <button onClick={() => removeItem(p.id)} className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">
