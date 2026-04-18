@@ -15,7 +15,7 @@ function getBankInfo(_req, res) {
 
 // ── POST /api/payments ────────────────────────────────────────
 async function submitPayment(req, res) {
-  const { amount, subscription_months = 1, payment_proof } = req.body;
+  const { amount, subscription_months = 1, payment_proof, plan_name } = req.body;
 
   if (!amount || Number(amount) <= 0) {
     return res.status(400).json({ error: 'A valid amount is required' });
@@ -30,10 +30,10 @@ async function submitPayment(req, res) {
 
   try {
     const { rows } = await db.query(
-      `INSERT INTO payments (shop_id, amount, subscription_months, payment_proof, status)
-       VALUES ($1, $2, $3, $4, 'pending')
-       RETURNING id, shop_id, amount, payment_date, status, subscription_months`,
-      [req.shopId, Number(amount), months, payment_proof || null]
+      `INSERT INTO payments (shop_id, amount, subscription_months, payment_proof, plan_name, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
+       RETURNING id, shop_id, amount, payment_date, status, subscription_months, plan_name`,
+      [req.shopId, Number(amount), months, payment_proof || null, plan_name || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -46,7 +46,7 @@ async function submitPayment(req, res) {
 async function getMyPayments(req, res) {
   try {
     const { rows } = await db.query(
-      `SELECT id, amount, payment_date, status, subscription_months, notes
+      `SELECT id, amount, payment_date, status, subscription_months, plan_name, notes
        FROM payments
        WHERE shop_id = $1
        ORDER BY payment_date DESC`,
