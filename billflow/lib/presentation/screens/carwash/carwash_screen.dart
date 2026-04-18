@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/carwash_model.dart';
 import '../../../providers/carwash_provider.dart';
+import '../../../data/services/carwash_service.dart';
 
 class CarwashScreen extends ConsumerStatefulWidget {
   const CarwashScreen({super.key});
