@@ -7,6 +7,7 @@ import '../../../providers/pre_order_provider.dart';
 import '../../../providers/feature_flag_provider.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/common/loading_overlay.dart';
+import '../sales/qr_payment_screen.dart';
 
 const _tabs = ['ALL', 'PENDING', 'PREPARING', 'READY', 'COMPLETED'];
 
@@ -279,11 +280,44 @@ class _ActionButtons extends ConsumerWidget {
           child: const Text('Mark Ready', style: TextStyle(fontSize: 12)),
         );
       case 'READY':
-        return FilledButton(
-          onPressed: () => notifier.markAsPaid(order.id),
-          style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 36)),
-          child: const Text('Mark Paid', style: TextStyle(fontSize: 12)),
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton(
+              onPressed: () => notifier.markAsPaid(order.id),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+              child: const Text('Mark Paid', style: TextStyle(fontSize: 12)),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => QrPaymentScreen(
+                      amount: order.totalAmount,
+                      preOrderId: order.id,
+                      sessionType: 'preorder',
+                      onSuccess: (_) async {
+                        Navigator.of(context).pop();
+                        await notifier.markAsPaid(order.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('QR payment confirmed — order marked paid'), backgroundColor: Color(0xFF00C853)),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.qr_code, size: 14),
+              label: const Text('Charge QR', style: TextStyle(fontSize: 12)),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF3949AB),
+                minimumSize: const Size(0, 36),
+              ),
+            ),
+          ],
         );
       default:
         return const SizedBox.shrink();

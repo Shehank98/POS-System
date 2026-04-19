@@ -29,6 +29,9 @@ import ClothingExchangesPage from './pages/ClothingExchangesPage';
 import ClothingAnalyticsPage from './pages/ClothingAnalyticsPage';
 import BranchManagementPage from './pages/BranchManagementPage';
 
+// QR Display (public — customer-facing mobile page)
+import QRDisplayPage from './pages/QRDisplayPage';
+
 // Car Wash module
 import CarWashLayout from './components/CarWashLayout';
 import CarWashDashboard from './pages/carwash/CarWashDashboard';
@@ -85,11 +88,12 @@ export default function App() {
       />
       <Routes>
         {/* ── Public routes ─────────────────────────────────── */}
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/scanner"  element={<ScannerPage />} />
-        <Route path="/order"    element={<OrderPage />} />
-        <Route path="/track"    element={<TrackOrderPage />} />
-        <Route path="/cw-portal" element={<CarWashPortal />} />
+        <Route path="/login"      element={<LoginPage />} />
+        <Route path="/scanner"    element={<ScannerPage />} />
+        <Route path="/order"      element={<OrderPage />} />
+        <Route path="/track"      element={<TrackOrderPage />} />
+        <Route path="/cw-portal"  element={<CarWashPortal />} />
+        <Route path="/qr-display" element={<QRDisplayPage />} />
 
         {/* ── Admin section ─────────────────────────────────── */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

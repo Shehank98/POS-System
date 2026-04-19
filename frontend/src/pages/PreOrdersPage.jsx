@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban, CreditCard, CheckCheck } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban, CreditCard, CheckCheck, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
+import QRPaymentModal from '../components/QRPaymentModal';
 
 // ── Constants ─────────────────────────────────────────────────
 const TABS = [
@@ -52,8 +53,9 @@ function PaymentBadge({ status }) {
 }
 
 // ── Order Card ────────────────────────────────────────────────
-function OrderCard({ order, onStatusChange, onMarkPaid, updating, markingPaid }) {
+function OrderCard({ order, onStatusChange, onMarkPaid, onQRSuccess, updating, markingPaid }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const items = Array.isArray(order.items) ? order.items : [];
   const actions = STATUS_ACTIONS[order.status] || [];
   const isPaid = order.payment_status === 'paid';
@@ -114,17 +116,35 @@ function OrderCard({ order, onStatusChange, onMarkPaid, updating, markingPaid })
             </button>
           ))}
 
-          {/* Mark as Paid button — shown when not yet paid and order is active */}
+          {/* Mark as Paid + Charge via QR — shown when not yet paid and order is active */}
           {!isPaid && order.status !== 'CANCELLED' && (
-            <button
-              disabled={markingPaid === order.id}
-              onClick={() => onMarkPaid(order.id)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
-              title="Mark as paid"
-            >
-              <CreditCard size={14} />
-              {markingPaid === order.id ? 'Marking...' : 'Mark Paid'}
-            </button>
+            <>
+              <button
+                disabled={markingPaid === order.id}
+                onClick={() => onMarkPaid(order.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                title="Mark as paid (cash/card)"
+              >
+                <CreditCard size={14} />
+                {markingPaid === order.id ? 'Marking...' : 'Mark Paid'}
+              </button>
+              <button
+                onClick={() => setShowQR(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+                title="Charge via LankaQR"
+              >
+                <QrCode size={14} /> Charge QR
+              </button>
+              {showQR && (
+                <QRPaymentModal
+                  amount={Number(order.total_amount)}
+                  sessionType="preorder"
+                  preOrderId={order.id}
+                  onClose={() => setShowQR(false)}
+                  onSuccess={() => { setShowQR(false); onQRSuccess(order.id); }}
+                />
+              )}
+            </>
           )}
 
           {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && (
@@ -337,6 +357,7 @@ export default function PreOrdersPage() {
               order={order}
               onStatusChange={handleStatusChange}
               onMarkPaid={handleMarkPaid}
+              onQRSuccess={(id) => { preOrdersApi.markAsPaid(id).then(() => { toast.success('QR payment confirmed — order marked paid'); fetchOrders(true); fetchCounts(); }).catch(() => toast.error('Payment received but failed to mark paid')); }}
               updating={updating}
               markingPaid={markingPaid}
             />

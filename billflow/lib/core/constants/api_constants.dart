@@ -99,4 +99,10 @@ class ApiConstants {
   static const String preOrders = '/pre-orders';
   static String preOrderById(int id) => '/pre-orders/$id';
   static String preOrderStatus(int id) => '/pre-orders/$id/status';
+  static String preOrderPay(int id) => '/pre-orders/$id/pay';
+
+  // ── QR Payments (HelaPOS / LankaQR) ──────────────────────────
+  static const String qrGenerate = '/qr/generate';
+  static String qrStatus(String ref) => '/qr/status/$ref';
+  static String qrDisplay(String ref) => '/qr/display/$ref';
 }

@@ -10,6 +10,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/utils/whatsapp_helper.dart';
 import '../../../data/models/user_model.dart';
 import '../../widgets/sales/payment_method_selector.dart';
+import 'qr_payment_screen.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({super.key});
@@ -31,6 +32,35 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Future<void> _processPayment() async {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
+
+    // QR / Mobile → open dedicated QR screen
+    if (cart.paymentMethod == 'mobile' || cart.paymentMethod == 'qr') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => QrPaymentScreen(
+            amount: cart.total,
+            onSuccess: (reference) async {
+              Navigator.of(context).pop(); // pop QR screen
+              // Submit sale with 'qr' payment method
+              ref.read(cartProvider.notifier).setPaymentMethod('qr');
+              setState(() => _isProcessing = true);
+              try {
+                final txn = await ref.read(transactionsProvider.notifier).submitSale(cart);
+                if (mounted) _showSuccessDialog(txn);
+              } on ApiException catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+              } finally {
+                if (mounted) setState(() => _isProcessing = false);
+              }
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
     try {
       final txn = await ref.read(transactionsProvider.notifier).submitSale(cart);

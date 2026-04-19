@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb, ChevronDown, ChevronUp, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsApi, authApi } from '../api/client';
+import { productsApi, authApi, qrPaymentsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 import { getReceiptSize, setReceiptSize, getAutoPrint, setAutoPrint } from '../utils/receipt';
 
@@ -291,6 +291,9 @@ export default function SettingsPage() {
 
       {/* ── Receipt Settings ─────────────────────────────────── */}
       <ReceiptSettings />
+
+      {/* ── QR Payments / HelaPOS (owner only) ───────────────── */}
+      {user?.role === 'owner' && <HelaPOSSettings />}
     </div>
   );
 }
@@ -472,6 +475,115 @@ function ReceiptSettings() {
           </div>
         </label>
       </div>
+    </div>
+  );
+}
+
+function HelaPOSSettings() {
+  const [open,    setOpen]    = useState(false);
+  const [config,  setConfig]  = useState({ app_id: '', app_secret: '', business_id: '' });
+  const [status,  setStatus]  = useState(null); // null | 'configured' | 'not_configured'
+  const [saving,  setSaving]  = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || status !== null) return;
+    setLoading(true);
+    qrPaymentsApi.getConfig()
+      .then(({ data }) => {
+        setStatus(data.configured ? 'configured' : 'not_configured');
+        if (data.configured) setConfig((c) => ({ ...c, app_id: data.app_id || '', business_id: data.business_id || '' }));
+      })
+      .catch(() => setStatus('not_configured'))
+      .finally(() => setLoading(false));
+  }, [open, status]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!config.app_id || !config.app_secret || !config.business_id) {
+      toast.error('All fields are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      await qrPaymentsApi.saveConfig(config);
+      toast.success('HelaPOS credentials saved');
+      setStatus('configured');
+      setConfig((c) => ({ ...c, app_secret: '' }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <QrCode className="w-4 h-4 text-gray-400" />
+          <h2 className="text-sm font-semibold text-gray-700">QR Payments (HelaPOS / LankaQR)</h2>
+          {status === 'configured' && (
+            <span className="text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Configured</span>
+          )}
+          {status === 'not_configured' && (
+            <span className="text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">Not configured</span>
+          )}
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+          ) : (
+            <form onSubmit={handleSave} className="space-y-3">
+              <p className="text-xs text-gray-500">
+                Enter your HelaPOS merchant credentials to enable LankaQR payments.
+                Contact <a href="mailto:support@helapay.lk" className="text-primary-600 underline">support@helapay.lk</a> to obtain credentials.
+              </p>
+              <div>
+                <label className="label">App ID</label>
+                <input
+                  className="input"
+                  placeholder="Your HelaPOS App ID"
+                  value={config.app_id}
+                  onChange={(e) => setConfig((c) => ({ ...c, app_id: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label">App Secret</label>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder={status === 'configured' ? '••••••••  (leave blank to keep existing)' : 'Your HelaPOS App Secret'}
+                  value={config.app_secret}
+                  onChange={(e) => setConfig((c) => ({ ...c, app_secret: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label">Business ID</label>
+                <input
+                  className="input"
+                  placeholder="Your HelaPOS Business ID"
+                  value={config.business_id}
+                  onChange={(e) => setConfig((c) => ({ ...c, business_id: e.target.value }))}
+                />
+              </div>
+              <button type="submit" className="btn-primary text-sm py-2 flex items-center gap-1.5" disabled={saving}>
+                {saving
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+                  : <><Save className="w-3.5 h-3.5" /> Save Credentials</>
+                }
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }

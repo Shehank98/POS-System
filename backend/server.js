@@ -31,6 +31,7 @@ const emailSummaryRoutes  = require('./routes/emailSummary');
 const carwashRoutes       = require('./routes/carwash');
 const carwashPublicRoutes = require('./routes/carwashPublic');
 const clothingRoutes      = require('./routes/clothing');
+const qrPaymentRoutes     = require('./routes/qrPayments');
 
 const { runDailyChecks }        = require('./controllers/notificationController');
 const { cancelStalePreOrders }  = require('./controllers/preOrderController');
@@ -66,6 +67,8 @@ app.use('/api/carwash/public', carwashPublicRoutes);
 app.use('/api/carwash',        carwashRoutes);
 // Clothing module
 app.use('/api/clothing',       clothingRoutes);
+// QR Payments (HelaPOS / LankaQR)
+app.use('/api/qr',             qrPaymentRoutes);
 
 // ── Serve React frontend in production ────────────────────────
 if (process.env.NODE_ENV === 'production') {

@@ -222,6 +222,15 @@ export const clothingApi = {
   upsertCustomer:     (data)         => client.post('/clothing/customers', data),
 };
 
+// ── QR Payments (HelaPOS / LankaQR) ──────────────────────────
+export const qrPaymentsApi = {
+  generate:    (data)      => client.post('/qr/generate', data),
+  checkStatus: (reference) => client.get(`/qr/status/${reference}`),
+  getConfig:   ()          => client.get('/qr/config'),
+  saveConfig:  (data)      => client.put('/qr/config', data),
+  getDisplay:  (reference) => publicClient.get(`/qr/display/${reference}`),
+};
+
 // ── Car Wash Public (no auth — customer portal) ───────────────
 export const carwashPublicApi = {
   lookup:        (shopId, phone, vehicle) =>
