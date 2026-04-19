@@ -57,6 +57,9 @@ app.use('/api/carwash/public', carwashPublicRoutes);
 app.use('/api/carwash',        carwashRoutes);
 // Clothing module
 app.use('/api/clothing',       clothingRoutes);
+// QR Payments (HelaPOS) — public webhook BEFORE auth guard inside the router
+const qrPaymentRoutes = require('./routes/qrPayments');
+app.use('/api/qr', qrPaymentRoutes);
 
 // ── Serve React frontend in production ────────────────────────
 if (process.env.NODE_ENV === 'production') {

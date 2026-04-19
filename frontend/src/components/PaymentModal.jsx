@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff } from 'lucide-react';
+import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff, QrCode } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
 import { openReceipt } from '../utils/receipt';
 import { queueTransaction, isOfflineAllowed } from '../utils/offlineDB';
 import useAuthStore from '../store/authStore';
+import QRPaymentModal from './QRPaymentModal';
 
 const METHODS = [
-  { id: 'cash',   label: 'Cash',  icon: Banknote            },
-  { id: 'card',   label: 'Card',  icon: CreditCard          },
-  { id: 'split',  label: 'Split', icon: SplitSquareVertical },
-  { id: 'mobile', label: 'Mobile', icon: CreditCard         },
+  { id: 'cash',   label: 'Cash',   icon: Banknote            },
+  { id: 'card',   label: 'Card',   icon: CreditCard          },
+  { id: 'split',  label: 'Split',  icon: SplitSquareVertical },
+  { id: 'mobile', label: 'Mobile', icon: CreditCard          },
+  { id: 'qr',     label: 'QR Pay', icon: QrCode              },
 ];
 
 const fmt  = (n) => Number(n || 0).toFixed(2);
@@ -25,11 +27,12 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
   const user    = useAuthStore((s) => s.user);
   const isOnline = navigator.onLine;
 
-  const [method,    setMethod]    = useState('cash');
-  const [cashGiven, setCashGiven] = useState('');
-  const [cardAmt,   setCardAmt]   = useState('');
-  const [saving,    setSaving]    = useState(false);
-  const [done,      setDone]      = useState(null);    // { offline?: bool, server_id?, transaction_number? }
+  const [method,     setMethod]     = useState('cash');
+  const [cashGiven,  setCashGiven]  = useState('');
+  const [cardAmt,    setCardAmt]    = useState('');
+  const [saving,     setSaving]     = useState(false);
+  const [done,       setDone]       = useState(null);    // { offline?: bool, server_id?, transaction_number? }
+  const [showQRModal, setShowQRModal] = useState(false);
 
   const grand    = Math.max(0, totals.grandTotal - voucherAmount - (loyaltyPointsUsed / 100));
   const cashNum  = parseFloat(cashGiven) || 0;
@@ -42,9 +45,44 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
     (method === 'cash'   && cashNum >= grand) ||
     (method === 'card')  ||
     (method === 'mobile') ||
+    (method === 'qr')    ||
     (method === 'split'  && cashNum + cardNum >= grand - 0.005);
 
+  // QR Payment: open QRPaymentModal, then on success create the transaction
+  async function handleQRSuccess() {
+    setShowQRModal(false);
+    setSaving(true);
+    const itemsPayload = items.map((i) => ({
+      product_id:          i.product_id          ?? null,
+      clothing_variant_id: i.clothing_variant_id ?? null,
+      quantity:            i.quantity,
+      unit_price:          i.unit_price,
+      discount:            i.discAmt,
+    }));
+    try {
+      const { data } = await transactionsApi.create({
+        payment_method:      'qr',
+        discount_amount:     totals.orderDiscount,
+        items:               itemsPayload,
+        customer_phone:      customerPhone || undefined,
+        loyalty_points_used: loyaltyPointsUsed || undefined,
+        voucher_code:        voucherCode   || undefined,
+      });
+      setDone({ server_id: data.id, transaction_number: data.transaction_number });
+      toast.success('QR payment successful!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to record transaction.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handlePay() {
+    if (method === 'qr') {
+      setShowQRModal(true);
+      return;
+    }
+
     setSaving(true);
 
     const itemsPayload = items.map((i) => ({
@@ -161,7 +199,16 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <>
+    {showQRModal && (
+      <QRPaymentModal
+        amount={grand}
+        sessionType="pos"
+        onClose={() => setShowQRModal(false)}
+        onSuccess={handleQRSuccess}
+      />
+    )}
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
       <div className="card w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -194,7 +241,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
           {/* Method selector */}
           <div>
             <label className="label">Payment Method</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {METHODS.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -311,5 +358,6 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
         </div>
       </div>
     </div>
+    </>
   );
 }

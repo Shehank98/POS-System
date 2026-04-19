@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Loader2, Package, ToggleLeft, ToggleRight, AlertTriangle, Printer, Percent, Barcode, Smartphone, Usb, ChevronDown, ChevronUp, QrCode, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsApi, authApi } from '../api/client';
+import { productsApi, authApi, qrPaymentsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
 import { getReceiptSize, setReceiptSize, getAutoPrint, setAutoPrint } from '../utils/receipt';
 
@@ -44,6 +44,39 @@ export default function SettingsPage() {
   const user        = useAuthStore((s) => s.user);
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const canEdit     = !user?.read_only && user?.role === 'owner';
+
+  // ── HelaPOS QR config ────────────────────────────────────────
+  const [qrOpen,        setQrOpen]        = useState(false);
+  const [qrConfigured,  setQrConfigured]  = useState(false);
+  const [qrAppId,       setQrAppId]       = useState('');
+  const [qrAppSecret,   setQrAppSecret]   = useState('');
+  const [qrBizId,       setQrBizId]       = useState('');
+  const [savingQR,      setSavingQR]      = useState(false);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    qrPaymentsApi.getConfig()
+      .then(({ data }) => { setQrConfigured(data.configured); if (data.app_id) setQrAppId(data.app_id); if (data.business_id) setQrBizId(data.business_id); })
+      .catch(() => {});
+  }, [canEdit]);
+
+  async function saveQRConfig() {
+    if (!qrAppId || !qrAppSecret || !qrBizId) {
+      toast.error('All three HelaPOS fields are required');
+      return;
+    }
+    setSavingQR(true);
+    try {
+      await qrPaymentsApi.saveConfig({ app_id: qrAppId, app_secret: qrAppSecret, business_id: qrBizId });
+      setQrConfigured(true);
+      setQrAppSecret('');
+      toast.success('HelaPOS QR configuration saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save configuration');
+    } finally {
+      setSavingQR(false);
+    }
+  }
 
   // ── Inventory toggle per product ────────────────────────────
   const [products, setProducts]           = useState([]);
@@ -472,6 +505,60 @@ function ReceiptSettings() {
           </div>
         </label>
       </div>
+
+      {/* ── HelaPOS QR Payments ─────────────────────────────── */}
+      {canEdit && (
+        <div className="card p-4 space-y-3">
+          <button
+            className="w-full flex items-center justify-between"
+            onClick={() => setQrOpen((v) => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-primary-600" />
+              <div className="text-left">
+                <p className="text-sm font-semibold text-gray-800">QR Payments (HelaPOS)</p>
+                <p className="text-xs text-gray-400">Accept LankaQR payments at checkout</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {qrConfigured
+                ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600"><CheckCircle2 size={13} /> Configured</span>
+                : <span className="text-xs text-gray-400">Not configured</span>
+              }
+              {qrOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+            </div>
+          </button>
+
+          {qrOpen && (
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
+                Obtain your App ID, App Secret and Business ID by emailing{' '}
+                <a href="mailto:support@helapay.lk" className="text-primary-600 underline">support@helapay.lk</a>.
+              </p>
+              <div>
+                <label className="label">App ID</label>
+                <input className="input" value={qrAppId} onChange={(e) => setQrAppId(e.target.value)} placeholder="e.g. 4OVx33RVOPg4DzdZ…" />
+              </div>
+              <div>
+                <label className="label">App Secret</label>
+                <input className="input" type="password" value={qrAppSecret} onChange={(e) => setQrAppSecret(e.target.value)} placeholder="Enter new secret to update" />
+              </div>
+              <div>
+                <label className="label">Business ID</label>
+                <input className="input" value={qrBizId} onChange={(e) => setQrBizId(e.target.value)} placeholder="Your HelaPOS merchant Business ID" />
+              </div>
+              <button
+                className="btn-primary w-full flex items-center justify-center gap-2"
+                onClick={saveQRConfig}
+                disabled={savingQR}
+              >
+                {savingQR ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {savingQR ? 'Saving…' : 'Save QR Configuration'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

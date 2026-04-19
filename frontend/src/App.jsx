@@ -40,6 +40,7 @@ import CarWashServices from './pages/carwash/CarWashServices';
 import CarWashProducts from './pages/carwash/CarWashProducts';
 import CarWashStaffView from './pages/carwash/CarWashStaffView';
 import CarWashPortal from './pages/CarWashPortal';
+import QRDisplayPage from './pages/QRDisplayPage';
 
 function PrivateRoute({ children }) {
   const user = useAuthStore((s) => s.user);
@@ -75,7 +76,8 @@ export default function App() {
         <Route path="/scanner"  element={<ScannerPage />} />
         <Route path="/order"    element={<OrderPage />} />
         <Route path="/track"    element={<TrackOrderPage />} />
-        <Route path="/cw-portal" element={<CarWashPortal />} />
+        <Route path="/cw-portal"   element={<CarWashPortal />} />
+        <Route path="/qr-display"  element={<QRDisplayPage />} />
 
         {/* ── Admin section ─────────────────────────────────── */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

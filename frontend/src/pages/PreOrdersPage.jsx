@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban, CreditCard, CheckCheck } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, PackageCheck, XCircle, MessageCircle, RefreshCw, Ban, CreditCard, CheckCheck, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { preOrdersApi } from '../api/client';
+import QRPaymentModal from '../components/QRPaymentModal';
 
 // ── Constants ─────────────────────────────────────────────────
 const TABS = [
@@ -52,7 +53,7 @@ function PaymentBadge({ status }) {
 }
 
 // ── Order Card ────────────────────────────────────────────────
-function OrderCard({ order, onStatusChange, onMarkPaid, updating, markingPaid }) {
+function OrderCard({ order, onStatusChange, onMarkPaid, onQRPay, updating, markingPaid }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const items = Array.isArray(order.items) ? order.items : [];
   const actions = STATUS_ACTIONS[order.status] || [];
@@ -114,17 +115,28 @@ function OrderCard({ order, onStatusChange, onMarkPaid, updating, markingPaid })
             </button>
           ))}
 
-          {/* Mark as Paid button — shown when not yet paid and order is active */}
+          {/* Payment buttons — shown when not yet paid and order is active */}
           {!isPaid && order.status !== 'CANCELLED' && (
-            <button
-              disabled={markingPaid === order.id}
-              onClick={() => onMarkPaid(order.id)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
-              title="Mark as paid"
-            >
-              <CreditCard size={14} />
-              {markingPaid === order.id ? 'Marking...' : 'Mark Paid'}
-            </button>
+            <>
+              <button
+                disabled={markingPaid === order.id}
+                onClick={() => onQRPay(order)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                title="Charge via QR (LankaQR)"
+              >
+                <QrCode size={14} />
+                QR Pay
+              </button>
+              <button
+                disabled={markingPaid === order.id}
+                onClick={() => onMarkPaid(order.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                title="Mark as paid manually"
+              >
+                <CreditCard size={14} />
+                {markingPaid === order.id ? 'Marking...' : 'Mark Paid'}
+              </button>
+            </>
           )}
 
           {order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && (
@@ -198,6 +210,7 @@ export default function PreOrdersPage() {
   const [updating,     setUpdating]    = useState(null);
   const [markingPaid,  setMarkingPaid] = useState(null);
   const [lastRefresh,  setLastRefresh] = useState(Date.now());
+  const [qrOrder,      setQROrder]     = useState(null); // order being charged via QR
   const pollRef   = useRef(null);
   const countRef  = useRef(null);
 
@@ -265,6 +278,24 @@ export default function PreOrdersPage() {
       toast.error('Failed to mark as paid');
     } finally {
       setMarkingPaid(null);
+    }
+  };
+
+  const handleQRPay = (order) => setQROrder(order);
+
+  const handleQRPaySuccess = async () => {
+    setQROrder(null);
+    if (qrOrder) {
+      setMarkingPaid(qrOrder.id);
+      try {
+        await preOrdersApi.markAsPaid(qrOrder.id);
+        toast.success('QR payment received — order marked as paid');
+        fetchOrders(true);
+      } catch {
+        toast.error('Payment received but failed to update order — please mark paid manually');
+      } finally {
+        setMarkingPaid(null);
+      }
     }
   };
 
@@ -337,11 +368,22 @@ export default function PreOrdersPage() {
               order={order}
               onStatusChange={handleStatusChange}
               onMarkPaid={handleMarkPaid}
+              onQRPay={handleQRPay}
               updating={updating}
               markingPaid={markingPaid}
             />
           ))}
         </div>
+      )}
+
+      {qrOrder && (
+        <QRPaymentModal
+          amount={Number(qrOrder.total_amount)}
+          sessionType="preorder"
+          preOrderId={qrOrder.id}
+          onClose={() => setQROrder(null)}
+          onSuccess={handleQRPaySuccess}
+        />
       )}
     </div>
   );

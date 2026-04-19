@@ -230,6 +230,15 @@ export const carwashPublicApi = {
   createBooking: (data)   => publicClient.post('/carwash/public/bookings', data),
 };
 
+// ── QR Payments (HelaPOS) ─────────────────────────────────────
+export const qrPaymentsApi = {
+  generate:      (data)      => client.post('/qr/generate', data),
+  checkStatus:   (reference) => client.get(`/qr/status/${reference}`),
+  displayStatus: (reference) => publicClient.get(`/qr/display/${reference}`),
+  getConfig:     ()          => client.get('/qr/config'),
+  saveConfig:    (data)      => client.put('/qr/config', data),
+};
+
 // ── Admin API (uses separate admin token) ────────────────────
 const adminClient = axios.create({ baseURL: BASE_URL });
 adminClient.interceptors.request.use((config) => {
