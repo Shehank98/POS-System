@@ -252,8 +252,8 @@ export default function ProductsPage() {
                         : 'text-gray-700'
                         }>
                           {p.unit_type === 'kg'
-                            ? `${parseFloat(p.stock_quantity).toFixed(2)} KG`
-                            : p.stock_quantity}
+                            ? `${parseFloat(p.stock_quantity)} KG`
+                            : Math.round(parseFloat(p.stock_quantity))}
                         </span>
                       : <span className="text-gray-400 text-xs">Unlimited</span>
                     }

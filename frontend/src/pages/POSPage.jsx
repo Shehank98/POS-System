@@ -72,7 +72,7 @@ function WeightInputModal({ product, onConfirm, onClose }) {
           {product.has_inventory && parseFloat(product.stock_quantity) > 0 &&
            parseFloat(product.stock_quantity) <= 10 && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-700 font-medium">
-              Low stock: Only {parseFloat(product.stock_quantity).toFixed(2)} KG remaining
+              Low stock: Only {parseFloat(product.stock_quantity)} KG remaining
             </div>
           )}
           {product.has_inventory && parseFloat(product.stock_quantity) <= 0 && (
@@ -178,8 +178,8 @@ function ProductCard({ product, onSelect, disabled }) {
         <span className="absolute top-1.5 right-1.5 text-[9px] bg-orange-100 text-orange-600
                          px-1.5 py-0.5 rounded font-semibold leading-tight">
           {product.unit_type === 'kg'
-            ? `${parseFloat(product.stock_quantity).toFixed(1)}kg`
-            : product.stock_quantity}
+            ? `${parseFloat(product.stock_quantity)}kg`
+            : Math.round(parseFloat(product.stock_quantity))}
         </span>
       )}
     </button>
