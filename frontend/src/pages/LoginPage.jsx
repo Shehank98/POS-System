@@ -81,7 +81,7 @@ export default function LoginPage() {
             alt="BillFlow"
             className="h-14 w-auto mb-3 object-contain"
           />
-          <h1 className="text-2xl font-bold text-primary-900">BillFlow</h1>
+          <h1 className="text-2xl font-bold text-primary-900"></h1>
         </div>
 
         <div className="w-full max-w-sm">
