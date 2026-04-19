@@ -1,7 +1,19 @@
-const axios = require('axios');
-const db    = require('../config/database');
+const db = require('../config/database');
 
 const BASE_URL = 'https://helapos.lk/merchant-api';
+
+async function helaPost(url, body, authHeader) {
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HelaPOS ${res.status}: ${text}`);
+  }
+  return res.json();
+}
 
 async function getOrRefreshToken(shopId) {
   const { rows } = await db.query(
@@ -20,28 +32,37 @@ async function getOrRefreshToken(shopId) {
 
   let tokenData;
   if (cfg.refresh_token && cfg.access_token) {
-    const res = await axios.post(
+    // API uses refreshToken (camelCase) per docs
+    const raw = await helaPost(
       `${BASE_URL}/merchant/api/v1/merchant/auth/refresh`,
-      { refresh_token: cfg.refresh_token },
-      { headers: { Authorization: `Bearer ${cfg.access_token}` } }
+      { refreshToken: cfg.refresh_token },
+      `Bearer ${cfg.access_token}`
     );
-    tokenData = res.data;
+    // Response nests tokens inside data[0]
+    const d = Array.isArray(raw.data) ? raw.data[0] : raw.data || raw;
+    tokenData = {
+      access_token:  d.accessToken  || d.access_token,
+      refresh_token: d.refreshToken || d.refresh_token || cfg.refresh_token,
+    };
   } else {
     const credentials = Buffer.from(`${cfg.app_id}:${cfg.app_secret}`).toString('base64');
-    const res = await axios.post(
+    const raw = await helaPost(
       `${BASE_URL}/merchant/api/v1/getToken`,
-      {},
-      { headers: { Authorization: `Basic ${credentials}` } }
+      { grant_type: 'client_credentials' },
+      `Basic ${credentials}`
     );
-    tokenData = res.data;
+    tokenData = {
+      access_token:  raw.accessToken  || raw.access_token,
+      refresh_token: raw.refreshToken || raw.refresh_token,
+    };
   }
 
-  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
+  const expiresAt = new Date(Date.now() + 3600 * 1000); // tokens valid ~1 hour
   await db.query(
     `UPDATE shop_helapos_config
      SET access_token = $1, refresh_token = $2, token_expires_at = $3, updated_at = NOW()
      WHERE shop_id = $4`,
-    [tokenData.access_token, tokenData.refresh_token || cfg.refresh_token, expiresAt, shopId]
+    [tokenData.access_token, tokenData.refresh_token, expiresAt, shopId]
   );
 
   return tokenData.access_token;
@@ -49,27 +70,27 @@ async function getOrRefreshToken(shopId) {
 
 async function generateQR(shopId, businessId, reference, amount) {
   const token = await getOrRefreshToken(shopId);
-  const res = await axios.post(
+  const raw = await helaPost(
     `${BASE_URL}/merchant/api/helapos/qr/generate`,
     { b: businessId, r: reference, am: amount },
-    { headers: { Authorization: `Bearer ${token}` } }
+    `Bearer ${token}`
   );
   return {
-    qr_data:      res.data.qr_data      || res.data.qrData,
-    qr_reference: res.data.qr_reference || res.data.qrReference || res.data.ref,
+    qr_data:      raw.qr_data      || raw.qrData,
+    qr_reference: raw.qr_reference || raw.qrReference || raw.reference,
   };
 }
 
 async function checkPaymentStatus(shopId, reference, qrReference) {
   const token = await getOrRefreshToken(shopId);
-  const res = await axios.post(
+  const raw = await helaPost(
     `${BASE_URL}/merchant/api/helapos/sales/getSaleStatus`,
     { reference, qr_reference: qrReference },
-    { headers: { Authorization: `Bearer ${token}` } }
+    `Bearer ${token}`
   );
   return {
-    payment_status: res.data.payment_status ?? res.data.paymentStatus ?? 0,
-    sale:           res.data.sale || null,
+    payment_status: raw.sale?.payment_status ?? raw.payment_status ?? 0,
+    sale:           raw.sale || null,
   };
 }
 

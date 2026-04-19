@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const db             = require('../config/database');
 const helapos        = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
@@ -56,7 +56,7 @@ async function generateQR(req, res) {
       return res.status(400).json({ error: 'HelaPOS not configured. Please set up credentials in Settings.' });
     }
     const { business_id } = cfgRows[0];
-    const reference = uuidv4();
+    const reference = randomUUID();
     await helapos.getOrRefreshToken(req.shopId);
     const { qr_data, qr_reference } = await helapos.generateQR(req.shopId, business_id, reference, Number(amount));
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
