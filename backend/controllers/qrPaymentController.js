@@ -1,4 +1,4 @@
-const { v4: uuidv4 }      = require('uuid');
+const { randomUUID }      = require('crypto');
 const db                  = require('../config/database');
 const helapos             = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
@@ -53,7 +53,7 @@ async function generateQR(req, res) {
     return res.status(400).json({ error: 'HelaPOS is not configured for this shop. Configure it in Settings.' });
   }
 
-  const reference = uuidv4();
+  const reference = randomUUID();
   const amt       = parseFloat(amount);
 
   try {
@@ -176,8 +176,6 @@ async function checkStatus(req, res) {
 async function getDisplayStatus(req, res) {
   const { reference } = req.params;
   try {
-    // We only store qr_data during generation; re-generate it here from DB is not possible.
-    // Instead we store qr_data in the session on creation.
     const { rows } = await db.query(
       `SELECT qr_data, amount, payment_status, expires_at FROM qr_payment_sessions WHERE reference = $1 LIMIT 1`,
       [reference]
