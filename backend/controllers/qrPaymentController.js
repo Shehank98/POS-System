@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 const db             = require('../config/database');
 const helapos        = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
+const { sendToTopic } = require('../utils/fcm');
 
 // GET /api/qr/config  (owner only)
 async function getConfig(req, res) {
@@ -98,6 +99,16 @@ async function handleWebhook(req, res) {
       reference:      session.reference,
       payment_status: payStatus,
     });
+
+    // Push notification to mobile app when payment succeeds
+    if (payStatus === 2) {
+      sendToTopic(
+        `shop_${session.shop_id}_alerts`,
+        'QR Payment Received',
+        `Payment confirmed for reference ${session.reference.slice(0, 8).toUpperCase()}`,
+        { type: 'qr_payment', reference: session.reference, payment_status: '2' }
+      ).catch(() => {});
+    }
 
     res.json({ received: true });
   } catch (err) {
