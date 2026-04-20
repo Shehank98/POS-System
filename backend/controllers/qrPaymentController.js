@@ -58,15 +58,21 @@ async function generateQR(req, res) {
     }
     const { business_id } = cfgRows[0];
     const reference = randomUUID();
-    await helapos.getOrRefreshToken(req.shopId);
-    const { qr_data, qr_reference } = await helapos.generateQR(req.shopId, business_id, reference, Number(amount));
+
+    const { qr_data, qr_reference } = await helapos.generateQR(
+      req.shopId, business_id, reference, Number(amount)
+    );
+
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Store qr_data so the mobile display page can render it
     await db.query(
       `INSERT INTO qr_payment_sessions
-         (shop_id, reference, qr_reference, amount, session_type, pre_order_id, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [req.shopId, reference, qr_reference, Number(amount), session_type, pre_order_id || null, expiresAt]
+         (shop_id, reference, qr_reference, qr_data, amount, session_type, pre_order_id, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [req.shopId, reference, qr_reference, qr_data, Number(amount), session_type, pre_order_id || null, expiresAt]
     );
+
     res.json({ reference, qr_data, qr_reference, expires_at: expiresAt });
   } catch (err) {
     console.error('[QR] generateQR error:', err.message);
@@ -75,23 +81,49 @@ async function generateQR(req, res) {
 }
 
 // POST /api/qr/webhook  (public — called by HelaPOS)
+//
+// HelaPOS webhook payload:
+// {
+//   "statusCode": "200",
+//   "reference": "<our UUID>",     ← field name is 'reference', not 'qr_reference'
+//   "sale": { "payment_status": 2, "amount": 1500, ... }
+// }
 async function handleWebhook(req, res) {
-  try {
-    const body         = req.body || {};
-    const qrRef        = body.qr_reference || body.qrReference || (body.sale && body.sale.qr_reference);
-    const payStatus    = body.payment_status ?? (body.sale && body.sale.payment_status) ?? 2;
+  // Always acknowledge immediately — HelaPOS expects 200 fast
+  res.json({ received: true });
 
-    if (!qrRef) return res.status(400).json({ error: 'qr_reference missing' });
+  try {
+    const body      = req.body || {};
+    // HelaPOS sends OUR reference (the UUID we passed as 'r' when generating the QR)
+    const ourRef    = body.reference;
+    const payStatus = body.sale?.payment_status ?? body.payment_status;
+
+    console.log('[QR] webhook received:', JSON.stringify({ ourRef, payStatus, body }));
+
+    if (!ourRef || payStatus === undefined || payStatus === null) {
+      console.warn('[QR] webhook missing reference or payment_status');
+      return;
+    }
 
     const { rows } = await db.query(
-      'SELECT id, shop_id, reference FROM qr_payment_sessions WHERE qr_reference = $1',
-      [qrRef]
+      'SELECT id, shop_id, reference, payment_status FROM qr_payment_sessions WHERE reference = $1',
+      [ourRef]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    if (!rows.length) {
+      console.warn('[QR] webhook: no session found for reference', ourRef);
+      return;
+    }
 
     const session = rows[0];
+
+    // Idempotent: only update if still pending (avoids double-webhook issues)
+    if (session.payment_status !== 0) {
+      console.log('[QR] webhook: session already settled, ignoring');
+      return;
+    }
+
     await db.query(
-      'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2 AND payment_status = 0',
       [payStatus, session.id]
     );
 
@@ -100,24 +132,20 @@ async function handleWebhook(req, res) {
       payment_status: payStatus,
     });
 
-    // Push notification to mobile app when payment succeeds
     if (payStatus === 2) {
       sendToTopic(
         `shop_${session.shop_id}_alerts`,
         'QR Payment Received',
-        `Payment confirmed for reference ${session.reference.slice(0, 8).toUpperCase()}`,
+        `Payment confirmed — Ref: ${session.reference.slice(0, 8).toUpperCase()}`,
         { type: 'qr_payment', reference: session.reference, payment_status: '2' }
       ).catch(() => {});
     }
-
-    res.json({ received: true });
   } catch (err) {
-    console.error('[QR] handleWebhook error:', err.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('[QR] handleWebhook processing error:', err.message);
   }
 }
 
-// GET /api/qr/status/:reference  (authenticated staff)
+// GET /api/qr/status/:reference  (authenticated staff — polled every 3s by frontend)
 async function checkStatus(req, res) {
   const { reference } = req.params;
   try {
@@ -128,6 +156,7 @@ async function checkStatus(req, res) {
     if (!rows.length) return res.status(404).json({ error: 'Session not found' });
     const session = rows[0];
 
+    // Already settled — return immediately without calling HelaPOS
     if (session.payment_status !== 0) {
       return res.json({
         payment_status: session.payment_status,
@@ -136,17 +165,21 @@ async function checkStatus(req, res) {
       });
     }
 
+    // Expired — no point calling HelaPOS
     if (new Date(session.expires_at) < new Date()) {
       return res.json({ payment_status: -2, amount: session.amount, expires_at: session.expires_at });
     }
 
+    // Still pending: call HelaPOS as fallback (webhook is primary)
+    // This handles cases where webhook delivery failed
     try {
       const { payment_status } = await helapos.checkPaymentStatus(
         req.shopId, reference, session.qr_reference
       );
       if (payment_status !== 0) {
+        // Atomic update — only if still pending to avoid race with webhook
         await db.query(
-          'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2',
+          'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2 AND payment_status = 0',
           [payment_status, session.id]
         );
         if (payment_status === 2) {
@@ -154,7 +187,9 @@ async function checkStatus(req, res) {
         }
       }
       return res.json({ payment_status, amount: session.amount, expires_at: session.expires_at });
-    } catch {
+    } catch (helaErr) {
+      console.error('[QR] checkPaymentStatus API error:', helaErr.message);
+      // Don't fail the poll — return pending so frontend keeps waiting
       return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
     }
   } catch (err) {
