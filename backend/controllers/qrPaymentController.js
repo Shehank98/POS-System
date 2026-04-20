@@ -173,8 +173,16 @@ async function checkStatus(req, res) {
     // Still pending: call HelaPOS as fallback (webhook is primary)
     // This handles cases where webhook delivery failed
     try {
+      const { rows: cfgRows } = await db.query(
+        'SELECT business_id FROM shop_helapos_config WHERE shop_id = $1',
+        [req.shopId]
+      );
+      const businessId = cfgRows[0]?.business_id;
+      if (!businessId) {
+        return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+      }
       const { payment_status } = await helapos.checkPaymentStatus(
-        req.shopId, reference, session.qr_reference
+        req.shopId, businessId, reference, session.qr_reference
       );
       if (payment_status !== 0) {
         // Atomic update — only if still pending to avoid race with webhook
@@ -188,8 +196,7 @@ async function checkStatus(req, res) {
       }
       return res.json({ payment_status, amount: session.amount, expires_at: session.expires_at });
     } catch (helaErr) {
-      console.error('[QR] checkPaymentStatus API error:', helaErr.message);
-      // Don't fail the poll — return pending so frontend keeps waiting
+      console.error('[QR] getSaleStatus error (reference:', reference, '):', helaErr.message);
       return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
     }
   } catch (err) {

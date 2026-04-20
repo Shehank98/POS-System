@@ -118,15 +118,20 @@ async function generateQR(shopId, businessId, reference, amount) {
   return { qr_data, qr_reference };
 }
 
-async function checkPaymentStatus(shopId, reference, qrReference) {
+async function checkPaymentStatus(shopId, businessId, reference, qrReference) {
   const token = await getOrRefreshToken(shopId);
+  const body = { b: businessId, r: reference };
+  if (qrReference) body.qr_reference = qrReference;
+  console.log('[HelaPOS] getSaleStatus body:', JSON.stringify(body));
   const raw = await helaPost(
     `${BASE_URL}/merchant/api/helapos/sales/getSaleStatus`,
-    { reference, qr_reference: qrReference },
+    body,
     `Bearer ${token}`
   );
+  console.log('[HelaPOS] getSaleStatus raw response:', JSON.stringify(raw));
+  const status = raw.sale?.payment_status ?? raw.payment_status ?? raw.statusCode ?? 0;
   return {
-    payment_status: raw.sale?.payment_status ?? raw.payment_status ?? 0,
+    payment_status: Number(status),
     sale:           raw.sale || null,
   };
 }
