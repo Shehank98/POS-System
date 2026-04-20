@@ -4,7 +4,7 @@
   "private": true,
   "description": "Multi-Tenant POS SaaS - monorepo root",
   "scripts": {
-    "build": "cd backend && npm install && cd ../frontend && npm install && npm run build",
+    "build": "cd backend && npm install && cd ../frontend && npm install --include=dev && npm run build",
     "start": "node backend/server.js"
   },
   "engines": {
