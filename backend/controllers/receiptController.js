@@ -1,5 +1,6 @@
 const db      = require('../config/database');
 const QRCode  = require('qrcode');
+const { generateThermalReceipt, toHtml } = require('../utils/thermalReceiptGenerator');
 
 // ── GET /api/transactions/:id/receipt ────────────────────────
 async function getReceipt(req, res) {
@@ -66,6 +67,50 @@ async function getReceipt(req, res) {
 
     const t = txnRows[0];
     const fmt = (n) => Number(n || 0).toFixed(2);
+
+    // ── Thermal plain-text format ─────────────────────────────
+    if (req.query.format === 'thermal') {
+      const size  = req.query.size === '32' ? 32 : 48;
+      const serverDate = new Date(t.transaction_date);
+      const dateStr    = serverDate.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+      const timeStr    = serverDate.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+
+      const grossTotal = items.reduce((s, i) => s + Number(i.subtotal) + Number(i.discount || 0), 0);
+      const discount   = Number(t.discount_amount || 0);
+      const netTotal   = Number(t.total_amount);
+
+      const receiptData = {
+        shopName:          t.shop_name,
+        address:           t.shop_address,
+        phone:             t.shop_phone,
+        email:             shopContactEmail,
+        date:              `${dateStr}  ${timeStr}`,
+        transactionNumber: t.transaction_number,
+        cashier:           t.cashier || '—',
+        isVoid:            t.status === 'void',
+        items: items.map((i) => ({
+          name:       i.clothing_product_name
+                        ? `${i.clothing_product_name} / ${i.variant_color} / ${i.variant_size}`
+                        : i.product_name,
+          quantity:   i.unit_type === 'kg' ? parseFloat(i.quantity).toFixed(3).replace(/\.?0+$/, '') : Number(i.quantity),
+          unit_price: i.unit_price,
+          subtotal:   i.subtotal,
+          discount:   i.discount,
+          unit_type:  i.unit_type,
+        })),
+        grossTotal,
+        discount,
+        netTotal,
+        tax:           t.tax_amount,
+        paymentMethod: t.payment_method,
+        cashPaid:      0, // cash amount not stored; balance shown only if cashPaid provided
+      };
+
+      const receiptLines = generateThermalReceipt(receiptData, { width: size });
+      const html         = toHtml(receiptLines, { width: size });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(html);
+    }
 
     // Generate QR code pointing to the pre-order page for this shop
     let qrBlock = '';
