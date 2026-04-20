@@ -63,7 +63,7 @@ async function generateQR(req, res) {
       req.shopId, business_id, reference, Number(amount)
     );
 
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     // Store qr_data so the mobile display page can render it
     await db.query(

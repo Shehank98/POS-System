@@ -67,7 +67,7 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
           setPhase('failed');
         }
       } catch {}
-    }, 3000);
+    }, 2000);
     return stopPolling;
   }, [phase, session, stopPolling, onSuccess]);
 

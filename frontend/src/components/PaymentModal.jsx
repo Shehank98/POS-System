@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff, QrCode } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
@@ -24,7 +25,8 @@ const CASH_PRESETS = [5, 10, 20, 50, 100];
 
 export default function PaymentModal({ totals, items, onClose, onComplete,
     customerPhone, loyaltyPointsUsed = 0, voucherCode, voucherAmount = 0 }) {
-  const user    = useAuthStore((s) => s.user);
+  const user     = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
   const isOnline = navigator.onLine;
 
   const [method,    setMethod]    = useState('cash');
@@ -69,9 +71,10 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
         qr_reference:        reference,
       });
       setShowQRModal(false);
-      setDone({ server_id: data.id, transaction_number: data.transaction_number });
       toast.success('QR payment confirmed!');
-      if (getAutoPrint()) openReceipt(data.id);
+      openReceipt(data.id);
+      onComplete();
+      navigate('/transactions');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record transaction');
     } finally {

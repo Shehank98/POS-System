@@ -547,6 +547,26 @@ function HelaPOSSettings() {
                 Enter your HelaPOS merchant credentials to enable LankaQR payments.
                 Contact <a href="mailto:support@helapay.lk" className="text-primary-600 underline">support@helapay.lk</a> to obtain credentials.
               </p>
+              {/* Webhook URL — must be registered with HelaPOS support */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+                <p className="text-xs font-semibold text-blue-700">Webhook URL (register with HelaPOS support)</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs text-blue-800 break-all flex-1">
+                    {`${window.location.origin.replace('localhost:5173', 'pos-system-production-74ed.up.railway.app')}/api/qr/webhook`}
+                  </code>
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 border border-blue-300 rounded px-2 py-1 hover:bg-blue-100 shrink-0"
+                    onClick={() => {
+                      const url = `${window.location.origin.replace('localhost:5173', 'pos-system-production-74ed.up.railway.app')}/api/qr/webhook`;
+                      navigator.clipboard.writeText(url).then(() => toast.success('Copied!')).catch(() => toast.error('Copy failed'));
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-xs text-blue-600">Send this URL to HelaPOS so they can notify you when payments complete.</p>
+              </div>
               <div>
                 <label className="label">App ID</label>
                 <input
