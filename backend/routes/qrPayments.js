@@ -12,6 +12,7 @@ router.use(authMiddleware, shopIsolation);
 
 router.get('/config',              requireRole('owner'), ctrl.getConfig);
 router.put('/config',              requireRole('owner'), ctrl.saveConfig);
+router.post('/test',               requireRole('owner'), ctrl.testConnection);
 router.post('/generate',           ctrl.generateQR);
 router.get('/status/:reference',   ctrl.checkStatus);
 

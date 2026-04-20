@@ -484,6 +484,7 @@ function HelaPOSSettings() {
   const [config,  setConfig]  = useState({ app_id: '', app_secret: '', business_id: '' });
   const [status,  setStatus]  = useState(null); // null | 'configured' | 'not_configured'
   const [saving,  setSaving]  = useState(false);
+  const [testing, setTesting] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -574,12 +575,37 @@ function HelaPOSSettings() {
                   onChange={(e) => setConfig((c) => ({ ...c, business_id: e.target.value }))}
                 />
               </div>
-              <button type="submit" className="btn-primary text-sm py-2 flex items-center gap-1.5" disabled={saving}>
-                {saving
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
-                  : <><Save className="w-3.5 h-3.5" /> Save Credentials</>
-                }
-              </button>
+              <div className="flex gap-2">
+                <button type="submit" className="btn-primary text-sm py-2 flex items-center gap-1.5" disabled={saving || testing}>
+                  {saving
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+                    : <><Save className="w-3.5 h-3.5" /> Save Credentials</>
+                  }
+                </button>
+                {status === 'configured' && (
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm py-2 flex items-center gap-1.5"
+                    disabled={saving || testing}
+                    onClick={async () => {
+                      setTesting(true);
+                      try {
+                        await qrPaymentsApi.testConnection();
+                        toast.success('HelaPOS connection OK — credentials are valid');
+                      } catch (err) {
+                        toast.error(err.response?.data?.error || 'Connection failed — check credentials');
+                      } finally {
+                        setTesting(false);
+                      }
+                    }}
+                  >
+                    {testing
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Testing…</>
+                      : 'Test Connection'
+                    }
+                  </button>
+                )}
+              </div>
             </form>
           )}
         </div>

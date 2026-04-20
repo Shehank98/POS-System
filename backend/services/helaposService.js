@@ -2,30 +2,42 @@ const db = require('../config/database');
 
 const BASE_URL = 'https://helapos.lk/merchant-api';
 
-// Per-shop promise locks — prevents concurrent token refreshes for the same shop
-// (multiple cashiers simultaneously). Node.js is single-threaded but async, so
-// without this all 3 cashiers would try to refresh the same token in parallel,
-// and HelaPOS refresh tokens are single-use.
+// Per-shop promise locks — prevents concurrent token refreshes (multiple cashiers)
 const refreshLocks = new Map();
 
 async function helaPost(url, body, authHeader) {
+  console.log(`[HelaPOS] POST ${url}`);
   const res = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', Authorization: authHeader },
     body:    JSON.stringify(body),
   });
+  const text = await res.text();
+  console.log(`[HelaPOS] ${res.status} ← ${url} : ${text.slice(0, 200)}`);
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`HelaPOS ${res.status}: ${text}`);
   }
-  return res.json();
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+async function fetchFreshToken(cfg) {
+  const credentials = Buffer.from(`${cfg.app_id}:${cfg.app_secret}`).toString('base64');
+  const raw = await helaPost(
+    `${BASE_URL}/merchant/api/v1/getToken`,
+    { grant_type: 'client_credentials' },
+    `Basic ${credentials}`
+  );
+  return {
+    access_token:  raw.accessToken  || raw.access_token,
+    refresh_token: raw.refreshToken || raw.refresh_token,
+  };
 }
 
 async function getOrRefreshToken(shopId) {
-  // If another async call is already refreshing this shop's token, wait for it
+  // Wait if another call is already refreshing this shop's token
   if (refreshLocks.has(shopId)) {
     await refreshLocks.get(shopId);
-    // After waiting, re-read DB — the other caller already stored the new token
+    // Re-read DB after waiting — other caller stored fresh token
   }
 
   const { rows } = await db.query(
@@ -42,35 +54,40 @@ async function getOrRefreshToken(shopId) {
 
   if (!needsRefresh) return cfg.access_token;
 
-  // Acquire lock: store a promise that resolves when refresh is done
+  // Acquire lock
   let resolveLock;
-  const lockPromise = new Promise((res) => { resolveLock = res; });
+  const lockPromise = new Promise((r) => { resolveLock = r; });
   refreshLocks.set(shopId, lockPromise);
 
   try {
     let tokenData;
+
     if (cfg.refresh_token && cfg.access_token) {
-      const raw = await helaPost(
-        `${BASE_URL}/merchant/api/v1/merchant/auth/refresh`,
-        { refreshToken: cfg.refresh_token },
-        `Bearer ${cfg.access_token}`
-      );
-      const d = Array.isArray(raw.data) ? raw.data[0] : raw.data || raw;
-      tokenData = {
-        access_token:  d.accessToken  || d.access_token,
-        refresh_token: d.refreshToken || d.refresh_token || cfg.refresh_token,
-      };
+      // Try refresh first; if it fails fall back to getToken with credentials
+      try {
+        const raw = await helaPost(
+          `${BASE_URL}/merchant/api/v1/merchant/auth/refresh`,
+          { refreshToken: cfg.refresh_token },
+          `Bearer ${cfg.access_token}`
+        );
+        const d = Array.isArray(raw.data) ? raw.data[0] : (raw.data || raw);
+        tokenData = {
+          access_token:  d.accessToken  || d.access_token,
+          refresh_token: d.refreshToken || d.refresh_token || cfg.refresh_token,
+        };
+        console.log('[HelaPOS] token refreshed via refresh_token');
+      } catch (refreshErr) {
+        console.warn('[HelaPOS] refresh failed, falling back to getToken:', refreshErr.message);
+        tokenData = await fetchFreshToken(cfg);
+        console.log('[HelaPOS] token obtained via getToken (fallback)');
+      }
     } else {
-      const credentials = Buffer.from(`${cfg.app_id}:${cfg.app_secret}`).toString('base64');
-      const raw = await helaPost(
-        `${BASE_URL}/merchant/api/v1/getToken`,
-        { grant_type: 'client_credentials' },
-        `Basic ${credentials}`
-      );
-      tokenData = {
-        access_token:  raw.accessToken  || raw.access_token,
-        refresh_token: raw.refreshToken || raw.refresh_token,
-      };
+      tokenData = await fetchFreshToken(cfg);
+      console.log('[HelaPOS] token obtained via getToken (first time)');
+    }
+
+    if (!tokenData.access_token) {
+      throw new Error('HelaPOS returned no access_token. Check your App ID and App Secret.');
     }
 
     const expiresAt = new Date(Date.now() + 3600 * 1000);
@@ -83,7 +100,6 @@ async function getOrRefreshToken(shopId) {
 
     return tokenData.access_token;
   } finally {
-    // Always release the lock so waiting callers can proceed
     refreshLocks.delete(shopId);
     resolveLock();
   }
@@ -96,10 +112,10 @@ async function generateQR(shopId, businessId, reference, amount) {
     { b: businessId, r: reference, am: amount },
     `Bearer ${token}`
   );
-  return {
-    qr_data:      raw.qr_data      || raw.qrData,
-    qr_reference: raw.qr_reference || raw.qrReference || raw.reference,
-  };
+  const qr_data      = raw.qr_data      || raw.qrData;
+  const qr_reference = raw.qr_reference || raw.qrReference || raw.reference;
+  if (!qr_data) throw new Error('HelaPOS did not return qr_data. Response: ' + JSON.stringify(raw));
+  return { qr_data, qr_reference };
 }
 
 async function checkPaymentStatus(shopId, reference, qrReference) {

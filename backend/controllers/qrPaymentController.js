@@ -220,4 +220,16 @@ async function getDisplayStatus(req, res) {
   }
 }
 
-module.exports = { getConfig, saveConfig, generateQR, handleWebhook, checkStatus, getDisplayStatus };
+// POST /api/qr/test  (owner only — verify HelaPOS credentials work)
+async function testConnection(req, res) {
+  try {
+    const token = await helapos.getOrRefreshToken(req.shopId);
+    if (!token) throw new Error('No token returned');
+    res.json({ success: true, message: 'Connected to HelaPOS successfully' });
+  } catch (err) {
+    console.error('[QR] testConnection error:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { getConfig, saveConfig, generateQR, handleWebhook, checkStatus, getDisplayStatus, testConnection };

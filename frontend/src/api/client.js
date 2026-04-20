@@ -224,11 +224,12 @@ export const clothingApi = {
 
 // ── QR Payments (HelaPOS / LankaQR) ──────────────────────────
 export const qrPaymentsApi = {
-  generate:    (data)      => client.post('/qr/generate', data),
-  checkStatus: (reference) => client.get(`/qr/status/${reference}`),
-  getConfig:   ()          => client.get('/qr/config'),
-  saveConfig:  (data)      => client.put('/qr/config', data),
-  getDisplay:  (reference) => publicClient.get(`/qr/display/${reference}`),
+  generate:       (data)      => client.post('/qr/generate', data),
+  checkStatus:    (reference) => client.get(`/qr/status/${reference}`),
+  getConfig:      ()          => client.get('/qr/config'),
+  saveConfig:     (data)      => client.put('/qr/config', data),
+  testConnection: ()          => client.post('/qr/test'),
+  getDisplay:     (reference) => publicClient.get(`/qr/display/${reference}`),
 };
 
 // ── Car Wash Public (no auth — customer portal) ───────────────
