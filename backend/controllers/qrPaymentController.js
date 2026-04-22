@@ -105,8 +105,12 @@ async function handleWebhook(req, res) {
       return;
     }
 
+    // HelaPOS sends their internal qr_reference as the webhook "reference" field,
+    // NOT the UUID we passed as "r". Match on either column.
     const { rows } = await db.query(
-      'SELECT id, shop_id, reference, payment_status FROM qr_payment_sessions WHERE reference = $1',
+      `SELECT id, shop_id, reference, payment_status
+         FROM qr_payment_sessions
+        WHERE reference = $1 OR qr_reference = $1`,
       [ourRef]
     );
     if (!rows.length) {

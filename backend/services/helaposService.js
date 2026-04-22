@@ -120,8 +120,9 @@ async function generateQR(shopId, businessId, reference, amount) {
 
 async function checkPaymentStatus(shopId, businessId, reference, qrReference) {
   const token = await getOrRefreshToken(shopId);
-  const body = { b: businessId, r: reference };
-  if (qrReference) body.qr_reference = qrReference;
+  // HelaPOS looks up sales by their own qr_reference, not our UUID.
+  // Sending our UUID as "r" causes a 404; use qr_reference when available.
+  const body = { b: businessId, r: qrReference || reference };
   console.log('[HelaPOS] getSaleStatus body:', JSON.stringify(body));
   const raw = await helaPost(
     `${BASE_URL}/merchant/api/helapos/sales/getSaleStatus`,
