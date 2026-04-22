@@ -15,6 +15,7 @@ class TransactionService {
     required String paymentMethod,
     double discountAmount = 0,
     String? customerPhone,
+    String? qrReference,
   }) async {
     try {
       final body = {
@@ -23,6 +24,7 @@ class TransactionService {
         'discount_amount': discountAmount,
         if (customerPhone != null && customerPhone.isNotEmpty)
           'customer_phone': customerPhone,
+        if (qrReference != null) 'qr_reference': qrReference,
       };
       final response = await _dio.post(ApiConstants.transactions, data: body);
       return TransactionModel.fromJson(response.data as Map<String, dynamic>);

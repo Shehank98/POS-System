@@ -32,6 +32,21 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
     return txn;
   }
 
+  Future<TransactionModel> submitQRSale(CartState cart, String qrReference) async {
+    final txn = await ref
+        .read(transactionServiceProvider)
+        .createTransaction(
+          items: cart.items,
+          paymentMethod: 'qr',
+          discountAmount: cart.orderDiscount,
+          customerPhone: cart.customerPhone,
+          qrReference: qrReference,
+        );
+    state = AsyncData([txn, ...state.valueOrNull ?? []]);
+    ref.read(cartProvider.notifier).clearCart();
+    return txn;
+  }
+
   Future<void> voidTransaction(int id) async {
     final updated =
         await ref.read(transactionServiceProvider).voidTransaction(id);

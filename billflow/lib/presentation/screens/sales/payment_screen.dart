@@ -41,11 +41,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             amount: cart.total,
             onSuccess: (reference) async {
               Navigator.of(context).pop(); // pop QR screen
-              // Submit sale with 'qr' payment method
-              ref.read(cartProvider.notifier).setPaymentMethod('qr');
               setState(() => _isProcessing = true);
               try {
-                final txn = await ref.read(transactionsProvider.notifier).submitSale(cart);
+                // Use submitQRSale so payment_method='qr' and qr_reference are sent.
+                // submitSale(cart) would use the closure-captured cart with paymentMethod='mobile'.
+                final txn = await ref.read(transactionsProvider.notifier).submitQRSale(cart, reference);
                 if (mounted) _showSuccessDialog(txn);
               } on ApiException catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
