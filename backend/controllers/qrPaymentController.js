@@ -4,6 +4,10 @@ const helapos        = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
 const { sendToTopic } = require('../utils/fcm');
 
+// Prevent hammering HelaPOS — at most one getSaleStatus call per session per 12 s.
+// Key: reference (our UUID), Value: timestamp of last HelaPOS call.
+const helaposCallCooldown = new Map();
+
 // GET /api/qr/config  (owner only)
 async function getConfig(req, res) {
   try {
@@ -131,6 +135,7 @@ async function handleWebhook(req, res) {
       [payStatus, session.id]
     );
 
+    helaposCallCooldown.delete(session.reference);
     notifyShopQRPayment(session.shop_id, {
       reference:      session.reference,
       payment_status: payStatus,
@@ -174,8 +179,14 @@ async function checkStatus(req, res) {
       return res.json({ payment_status: -2, amount: session.amount, expires_at: session.expires_at });
     }
 
-    // Still pending: call HelaPOS as fallback (webhook is primary)
-    // This handles cases where webhook delivery failed
+    // Still pending: call HelaPOS as fallback (webhook + WebSocket is primary).
+    // Cooldown: one HelaPOS call per session per 12 s to avoid rate-limiting.
+    const lastCall = helaposCallCooldown.get(reference) || 0;
+    if (Date.now() - lastCall < 12_000) {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+    helaposCallCooldown.set(reference, Date.now());
+
     try {
       const { rows: cfgRows } = await db.query(
         'SELECT business_id FROM shop_helapos_config WHERE shop_id = $1',
