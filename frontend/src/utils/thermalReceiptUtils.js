@@ -127,7 +127,8 @@ export function generateThermalLines(data, options = {}) {
 
   // ── FOOTER ────────────────────────────────────────────────────
   lines.push('');
-  lines.push(centerLine('[ QR CODE HERE ]'));
+  // ##QR## marks the line where ThermalReceiptPreview injects a real QR component
+  lines.push('##QR##' + centerLine('[ QR CODE HERE ]'));
   lines.push('');
   lines.push(sep);
   lines.push(centerLine('Thank you for your purchase!'));
@@ -139,18 +140,24 @@ export function generateThermalLines(data, options = {}) {
   return lines;
 }
 
-/** Strip ##BOLD## markers and join to plain text. */
+/** Strip all ## markers and join to plain text. */
 export function linesToText(lines) {
-  return lines.map((l) => l.replace(/^##BOLD##/, '')).join('\n');
+  return lines.map((l) => l.replace(/^##\w+##/, '')).join('\n');
 }
 
-/** Convert lines array to HTML spans for rendering in a <pre>. */
+/**
+ * Convert lines array to HTML for rendering in a <pre>.
+ * ##QR## lines are skipped here — ThermalReceiptPreview handles them separately.
+ */
 export function linesToHtml(lines) {
-  return lines.map((l) => {
-    const bold    = l.startsWith('##BOLD##');
-    const content = l.replace(/^##BOLD##/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return bold ? `<b>${content}</b>` : content;
-  }).join('\n');
+  return lines
+    .filter((l) => !l.startsWith('##QR##'))
+    .map((l) => {
+      const bold    = l.startsWith('##BOLD##');
+      const content = l.replace(/^##BOLD##/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return bold ? `<b>${content}</b>` : content;
+    })
+    .join('\n');
 }
 
 function capitalize(str) {

@@ -196,6 +196,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
         {showReceiptPreview && receiptData && (
           <ThermalReceiptPreview
             data={receiptData}
+            qrUrl={user?.shop_id ? `${window.location.origin}/order?shop_id=${user.shop_id}` : ''}
             onClose={() => setShowReceiptPreview(false)}
           />
         )}

@@ -6,7 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
 import useAuthStore from '../store/authStore';
-import { openReceipt } from '../utils/receipt';
+import { openThermalReceipt } from '../utils/receipt';
 import ConfirmDialog from '../components/ConfirmDialog';
 import RefundModal from '../components/RefundModal';
 
@@ -253,7 +253,7 @@ export default function TransactionsPage() {
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-400
                                      hover:text-primary-600"
                           title="Print receipt"
-                          onClick={() => openReceipt(t.id)}
+                          onClick={() => openThermalReceipt(t.id)}
                         >
                           <Printer className="w-4 h-4" />
                         </button>

@@ -138,7 +138,8 @@ function generateThermalReceipt(data, options = {}) {
 
   // ── FOOTER ────────────────────────────────────────────────────
   lines.push('');
-  lines.push(centerLine('[ QR CODE HERE ]'));
+  // ##QR## marks the line where a real QR code image is injected by the renderer
+  lines.push('##QR##' + centerLine('[ QR CODE HERE ]'));
   lines.push('');
   lines.push(sep);
   lines.push(centerLine('Thank you for your purchase!'));
@@ -150,25 +151,48 @@ function generateThermalReceipt(data, options = {}) {
   return lines;
 }
 
-/** Converts the lines array to a plain string (strips ##BOLD## markers). */
+/** Converts the lines array to a plain string (strips all ## markers). */
 function toPlainText(lines) {
-  return lines.map((l) => l.replace(/^##BOLD##/, '')).join('\n');
+  return lines.map((l) => l.replace(/^##\w+##/, '')).join('\n');
 }
+
+const renderLines = (ls) =>
+  ls.map((l) => {
+    const bold    = l.startsWith('##BOLD##');
+    const content = escHtml(l.replace(/^##BOLD##/, ''));
+    return bold ? `<b>${content}</b>` : content;
+  }).join('\n');
 
 /**
  * Wraps the receipt lines in a minimal print-ready HTML page.
- * Lines tagged ##BOLD## are rendered in bold.
+ * options.width    – 32 | 48
+ * options.qrDataUrl – base64 data URL for a real QR code image; omit to show placeholder text
+ * options.qrLabel  – caption under the QR image (default 'Scan to pre-order')
  */
 function toHtml(lines, options = {}) {
   const width    = options.width === 32 ? 32 : 48;
   const mmWidth  = width === 32 ? '58mm' : '80mm';
   const fontSize = width === 32 ? '11px' : '12px';
+  const qrDataUrl = options.qrDataUrl || '';
+  const qrLabel   = options.qrLabel   || 'Scan to pre-order';
 
-  const htmlLines = lines.map((line) => {
-    const isBold  = line.startsWith('##BOLD##');
-    const content = escHtml(line.replace(/^##BOLD##/, ''));
-    return isBold ? `<b>${content}</b>` : content;
-  }).join('\n');
+  // Split at ##QR## marker so we can inject a real image block
+  const qrIdx      = lines.findIndex((l) => l.startsWith('##QR##'));
+  const hasQR      = qrIdx >= 0;
+  const beforeLines = hasQR ? lines.slice(0, qrIdx)      : lines;
+  const afterLines  = hasQR ? lines.slice(qrIdx + 1)     : [];
+
+  const beforeHtml = renderLines(beforeLines);
+  const afterHtml  = renderLines(afterLines);
+
+  const qrSection = hasQR
+    ? qrDataUrl
+      ? `<div style="text-align:center;padding:4px 0 2px;">
+  <img src="${qrDataUrl}" width="90" height="90" alt="QR Code" style="display:block;margin:0 auto 2px;" />
+  <span style="font-size:0.8em;color:#555;">${escHtml(qrLabel)}</span>
+</div>`
+      : `<div style="text-align:center;padding:4px 0;font-family:'Courier New',Courier,monospace;">[ QR CODE HERE ]</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -192,6 +216,7 @@ function toHtml(lines, options = {}) {
     font-size: inherit;
     line-height: 1.4;
     overflow: hidden;
+    margin: 0;
   }
   .no-print { text-align:center; margin-bottom:4mm; }
   @media print {
@@ -204,13 +229,15 @@ function toHtml(lines, options = {}) {
 <div class="no-print">
   <button onclick="window.print()" style="padding:6px 18px;cursor:pointer;font-size:13px;">&#128438; Print</button>
 </div>
-<pre>${htmlLines}</pre>
+<pre>${beforeHtml}</pre>
+${qrSection}
+<pre>${afterHtml}</pre>
 <script>
   var size = localStorage.getItem('pos_receipt_size');
   if (size === '58mm') { document.body.style.width='58mm'; document.body.style.fontSize='11px'; }
   if (size === '80mm') { document.body.style.width='80mm'; document.body.style.fontSize='12px'; }
   if (localStorage.getItem('pos_auto_print') === 'true') window.print();
-</script>
+<\/script>
 </body>
 </html>`;
 }

@@ -106,8 +106,16 @@ async function getReceipt(req, res) {
         cashPaid:      0, // cash amount not stored; balance shown only if cashPaid provided
       };
 
+      // Generate real QR code pointing to the pre-order page
+      let qrDataUrl = '';
+      try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const orderUrl    = `${frontendUrl}/order?shop_id=${t.shop_id}`;
+        qrDataUrl = await QRCode.toDataURL(orderUrl, { width: 120, margin: 1 });
+      } catch { /* QR generation failed — receipt still usable */ }
+
       const receiptLines = generateThermalReceipt(receiptData, { width: size });
-      const html         = toHtml(receiptLines, { width: size });
+      const html         = toHtml(receiptLines, { width: size, qrDataUrl });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.send(html);
     }
