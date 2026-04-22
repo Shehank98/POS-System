@@ -5,51 +5,28 @@ const BASE = import.meta.env.VITE_API_URL
   : '';
 
 /**
- * Opens the receipt HTML page for a transaction in a new tab.
- * The backend renders the full HTML; localStorage settings are
- * applied by the receipt page's own script.
+ * Canonical receipt size key stored in localStorage.
+ * Settings page saves '80mm' | '58mm' | 'a4'.
+ * 'narrow' was the legacy key for 58mm — normalised transparently.
  */
-export function openReceipt(transactionId) {
-  const token = localStorage.getItem('pos_token');
-  if (!token) return;
-
-  // We can't set headers on window.open, so we pass the token as a query param.
-  // The receipt endpoint must accept ?token= as an alternative to Authorization header.
-  const url = `${BASE}/api/transactions/${transactionId}/receipt?token=${encodeURIComponent(token)}`;
-  window.open(url, '_blank', 'width=500,height=700,noopener');
+export function getReceiptSize() {
+  const raw = localStorage.getItem('pos_receipt_size');
+  if (!raw || raw === '') return '80mm';
+  if (raw === 'narrow')   return '58mm'; // normalise legacy value
+  return raw; // '80mm' | '58mm' | 'a4'
 }
 
-/**
- * Opens the thermal plain-text receipt for a transaction in a new tab.
- * Reads the saved paper-size preference from localStorage automatically.
- * @param {number|string} transactionId
- */
-export function openThermalReceipt(transactionId) {
-  const token = localStorage.getItem('pos_token');
-  if (!token) return;
-
-  const savedSize = localStorage.getItem('pos_receipt_size');
-  const size = savedSize === '58mm' ? '32' : '48';
-  const url  = `${BASE}/api/transactions/${transactionId}/receipt?format=thermal&size=${size}&token=${encodeURIComponent(token)}`;
-  window.open(url, '_blank', 'width=640,height=800,noopener');
-}
-
-/** Saves the preferred receipt size to localStorage */
 export function setReceiptSize(size) {
   localStorage.setItem('pos_receipt_size', size);
 }
 
-export function getReceiptSize() {
-  return localStorage.getItem('pos_receipt_size') || '80mm';
+export function isA4Receipt() {
+  return getReceiptSize() === 'a4';
 }
 
-/**
- * Returns the thermal char width preference (32 or 48) from localStorage.
- * Falls back to 48 (80mm) if not set.
- */
+/** Returns 32 (58mm) or 48 (80mm). Falls back to 48. */
 export function getThermalWidth() {
-  const size = localStorage.getItem('pos_receipt_size');
-  return size === '58mm' ? 32 : 48;
+  return getReceiptSize() === '58mm' ? 32 : 48;
 }
 
 export function setAutoPrint(enabled) {
@@ -58,4 +35,26 @@ export function setAutoPrint(enabled) {
 
 export function getAutoPrint() {
   return localStorage.getItem('pos_auto_print') === 'true';
+}
+
+/**
+ * Opens the server-rendered HTML receipt (used for A4 printing).
+ */
+export function openReceipt(transactionId) {
+  const token = localStorage.getItem('pos_token');
+  if (!token) return;
+  const url = `${BASE}/api/transactions/${transactionId}/receipt?token=${encodeURIComponent(token)}`;
+  window.open(url, '_blank', 'width=500,height=700,noopener');
+}
+
+/**
+ * Opens the thermal plain-text receipt for a transaction in a new tab.
+ * Honours the saved paper-size preference automatically.
+ */
+export function openThermalReceipt(transactionId) {
+  const token = localStorage.getItem('pos_token');
+  if (!token) return;
+  const size = getReceiptSize() === '58mm' ? '32' : '48';
+  const url  = `${BASE}/api/transactions/${transactionId}/receipt?format=thermal&size=${size}&token=${encodeURIComponent(token)}`;
+  window.open(url, '_blank', 'width=640,height=800,noopener');
 }

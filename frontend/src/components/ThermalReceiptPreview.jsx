@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Printer, X } from 'lucide-react';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { generateThermalLines, linesToHtml } from '../utils/thermalReceiptUtils';
@@ -9,19 +9,20 @@ import { generateThermalLines, linesToHtml } from '../utils/thermalReceiptUtils'
  * Props:
  *   data         – receipt data object
  *   onClose      – callback to close the modal
- *   defaultWidth – 32 | 48 (defaults to saved preference or 48)
- *   qrUrl        – URL to encode in the QR code
+ *   defaultWidth – 32 | 48 (from getThermalWidth())
+ *   qrUrl        – URL to encode in the footer QR code
+ *   autoPrint    – open the print dialog automatically on mount
  */
-export default function ThermalReceiptPreview({ data, onClose, defaultWidth = 48, qrUrl }) {
+export default function ThermalReceiptPreview({ data, onClose, defaultWidth = 48, qrUrl, autoPrint = false }) {
   const [charWidth, setCharWidth] = useState(defaultWidth);
 
-  // Hidden canvas used to generate a PNG data URL for the print window
+  // Hidden canvas — sole purpose is generating a PNG data URL for the print window
   const qrCanvasContainerRef = useRef(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const autoPrinted = useRef(false);
 
   useEffect(() => {
     if (!qrUrl) return;
-    // Small delay so QRCodeCanvas has time to render onto the canvas
     const id = setTimeout(() => {
       const canvas = qrCanvasContainerRef.current?.querySelector('canvas');
       if (canvas) setQrDataUrl(canvas.toDataURL('image/png'));
@@ -42,13 +43,16 @@ export default function ThermalReceiptPreview({ data, onClose, defaultWidth = 48
   }, [data, charWidth]);
 
   const fontSize   = charWidth === 32 ? '11px' : '12px';
-  const paperLabel = charWidth === 32 ? '58mm' : '80mm';
+  const mmWidth    = charWidth === 32 ? '58mm'  : '80mm';
+  const paperLabel = mmWidth;
 
-  // ── Print ────────────────────────────────────────────────────
-  const handlePrint = () => {
+  // ── Print ───────────────────────────────────────────────────
+  const handlePrint = useCallback((overrideDataUrl) => {
+    const qrDU = overrideDataUrl !== undefined ? overrideDataUrl : qrDataUrl;
+
     const qrBlock = hasQR
-      ? qrDataUrl
-        ? `<div style="text-align:center;padding:4px 0 2px;"><img src="${qrDataUrl}" width="90" height="90" alt="QR" style="display:block;margin:0 auto 2px;"/><span style="font-size:0.8em;color:#555;">Scan to pre-order</span></div>`
+      ? qrDU
+        ? `<div style="text-align:center;padding:4px 0 2px;"><img src="${qrDU}" width="90" height="90" alt="QR" style="display:block;margin:0 auto 2px;"/><span style="font-size:0.8em;color:#555;">Scan to pre-order</span></div>`
         : `<div style="text-align:center;padding:4px 0;font-family:'Courier New',Courier,monospace;">[ QR CODE HERE ]</div>`
       : '';
 
@@ -59,7 +63,7 @@ export default function ThermalReceiptPreview({ data, onClose, defaultWidth = 48
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Courier New',Courier,monospace;font-size:${fontSize};width:${charWidth}ch;margin:0 auto;padding:4mm 0;color:#000;}
   pre{white-space:pre;font-family:inherit;font-size:inherit;line-height:1.4;margin:0;}
-  @media print{body{margin:0;padding:2mm 0;}.no-print{display:none;}}
+  @media print{body{width:${mmWidth};margin:0;padding:2mm 0;}}
 </style>
 </head><body>
 <pre>${beforeHtml}</pre>
@@ -68,29 +72,35 @@ ${qrBlock}
 <script>window.onload=function(){window.focus();window.print();};<\/script>
 </body></html>`;
 
-    // Blob URL avoids cross-window document.write restrictions
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url  = URL.createObjectURL(blob);
     window.open(url, '_blank');
-    // Revoke after enough time for the window to load
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  };
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }, [hasQR, qrDataUrl, beforeHtml, afterHtml, charWidth, fontSize, mmWidth]);
+
+  // Auto-print: fire once QR data URL is ready (skip wait if no qrUrl needed)
+  useEffect(() => {
+    if (!autoPrint || autoPrinted.current) return;
+    if (qrUrl && !qrDataUrl) return; // wait for the canvas to be captured
+    autoPrinted.current = true;
+    handlePrint();
+  }, [autoPrint, qrUrl, qrDataUrl, handlePrint]);
 
   if (!data) return null;
 
   const preStyle = {
-    whiteSpace:  'pre',
-    fontFamily:  'inherit',
-    fontSize:    'inherit',
-    lineHeight:  '1.4',
-    margin:      0,
-    width:       `${charWidth}ch`,
+    whiteSpace: 'pre',
+    fontFamily: 'inherit',
+    fontSize:   'inherit',
+    lineHeight: '1.4',
+    margin:     0,
+    width:      `${charWidth}ch`,
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-6">
 
-      {/* Hidden QRCodeCanvas — used only to generate a PNG data URL for printing */}
+      {/* Off-screen canvas — only used to generate the PNG data URL for printing */}
       <div
         ref={qrCanvasContainerRef}
         style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none', opacity: 0 }}
@@ -105,6 +115,7 @@ ${qrBlock}
           <span className="font-semibold text-gray-800 text-sm">Receipt Preview</span>
 
           <div className="flex items-center gap-2">
+            {/* Width toggle */}
             <div className="flex rounded-lg overflow-hidden border border-gray-300 text-xs font-medium">
               {[48, 32].map((w) => (
                 <button
@@ -120,7 +131,7 @@ ${qrBlock}
             </div>
 
             <button
-              onClick={handlePrint}
+              onClick={() => handlePrint()}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
               <Printer size={14} />
@@ -138,7 +149,7 @@ ${qrBlock}
           </div>
         </div>
 
-        {/* Receipt paper — width driven by ch units so all characters fit */}
+        {/* Receipt paper — width driven by ch units so every character fits */}
         <div className="p-4 bg-gray-100 flex justify-center overflow-x-auto">
           <div
             className="bg-white shadow-md"
@@ -152,8 +163,15 @@ ${qrBlock}
           >
             <pre style={preStyle} dangerouslySetInnerHTML={{ __html: beforeHtml }} />
 
+            {/* QR section — flexbox centres the SVG correctly (textAlign won't work on SVG) */}
             {hasQR && (
-              <div style={{ width: `${charWidth}ch`, textAlign: 'center', padding: '6px 0 2px' }}>
+              <div style={{
+                width:         `${charWidth}ch`,
+                display:       'flex',
+                flexDirection: 'column',
+                alignItems:    'center',
+                padding:       '6px 0 2px',
+              }}>
                 {qrUrl
                   ? <>
                       <QRCodeSVG value={qrUrl} size={90} />

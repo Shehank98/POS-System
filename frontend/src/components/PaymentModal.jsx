@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff, QrCode } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
-import { getAutoPrint, getThermalWidth } from '../utils/receipt';
+import { getAutoPrint, getThermalWidth, isA4Receipt, openReceipt } from '../utils/receipt';
 import { queueTransaction, isOfflineAllowed } from '../utils/offlineDB';
 import useAuthStore from '../store/authStore';
 import QRPaymentModal from './QRPaymentModal';
@@ -186,8 +186,26 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
   }
 
   function handlePrintAndClose() {
-    setShowReceiptPreview(true);
+    if (isA4Receipt()) {
+      openReceipt(done.server_id);
+    } else {
+      setShowReceiptPreview(true);
+    }
   }
+
+  // Auto-print when a server-side transaction completes and the setting is on
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!done?.server_id) return;
+    if (!getAutoPrint()) return;
+    if (isA4Receipt()) {
+      openReceipt(done.server_id);
+    } else {
+      setShowReceiptPreview(true); // ThermalReceiptPreview will auto-print via autoPrint prop
+    }
+  }, [done?.server_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const qrUrl = user?.shop_id ? `${window.location.origin}/order?shop_id=${user.shop_id}` : '';
 
   // ── Success screen ──────────────────────────────────────────
   if (done) {
@@ -197,7 +215,8 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
           <ThermalReceiptPreview
             data={receiptData}
             defaultWidth={getThermalWidth()}
-            qrUrl={user?.shop_id ? `${window.location.origin}/order?shop_id=${user.shop_id}` : ''}
+            qrUrl={qrUrl}
+            autoPrint={getAutoPrint()}
             onClose={() => setShowReceiptPreview(false)}
           />
         )}

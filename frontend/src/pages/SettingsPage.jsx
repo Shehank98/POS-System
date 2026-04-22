@@ -442,9 +442,9 @@ function ReceiptSettings() {
           <label className="label">Receipt size</label>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { id: '',      label: '80mm Thermal' },
-              { id: 'narrow', label: '58mm Thermal' },
-              { id: 'a4',    label: 'A4 Paper' },
+              { id: '80mm', label: '80mm Thermal' },
+              { id: '58mm', label: '58mm Thermal' },
+              { id: 'a4',   label: 'A4 Paper' },
             ].map(({ id, label }) => (
               <button
                 key={id}
