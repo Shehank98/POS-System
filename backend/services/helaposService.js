@@ -7,9 +7,11 @@ const refreshLocks = new Map();
 
 async function helaPost(url, body, authHeader) {
   console.log(`[HelaPOS] POST ${url}`);
+  const headers = { 'Content-Type': 'application/json' };
+  if (authHeader) headers.Authorization = authHeader;
   const res = await fetch(url, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+    headers,
     body:    JSON.stringify(body),
   });
   const text = await res.text();
@@ -62,13 +64,13 @@ async function getOrRefreshToken(shopId) {
   try {
     let tokenData;
 
-    if (cfg.refresh_token && cfg.access_token) {
-      // Try refresh first; if it fails fall back to getToken with credentials
+    if (cfg.refresh_token) {
+      // Try refresh first; API docs show no Authorization header for this endpoint
       try {
         const raw = await helaPost(
           `${BASE_URL}/merchant/api/v1/merchant/auth/refresh`,
           { refreshToken: cfg.refresh_token },
-          `Bearer ${cfg.access_token}`
+          ''  // no Authorization header per HelaPOS API docs v1.2.0
         );
         const d = Array.isArray(raw.data) ? raw.data[0] : (raw.data || raw);
         tokenData = {
@@ -120,9 +122,11 @@ async function generateQR(shopId, businessId, reference, amount) {
 
 async function checkPaymentStatus(shopId, businessId, reference, qrReference) {
   const token = await getOrRefreshToken(shopId);
-  // HelaPOS looks up sales by their own qr_reference, not our UUID.
-  // Sending our UUID as "r" causes a 404; use qr_reference when available.
-  const body = { b: businessId, r: qrReference || reference };
+  // API docs: getSaleStatus requires "reference" and/or "qr_reference" (not "b"/"r").
+  // At least one is required. Send both when available for maximum compatibility.
+  const body = {};
+  if (reference)   body.reference    = reference;
+  if (qrReference) body.qr_reference = qrReference;
   console.log('[HelaPOS] getSaleStatus body:', JSON.stringify(body));
   const raw = await helaPost(
     `${BASE_URL}/merchant/api/helapos/sales/getSaleStatus`,
