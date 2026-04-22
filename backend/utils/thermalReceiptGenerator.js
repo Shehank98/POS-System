@@ -205,23 +205,25 @@ function toHtml(lines, options = {}) {
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: ${fontSize};
-    width: ${mmWidth};
+    /* ch units guarantee exactly ${width} characters fit per line */
+    width: ${width}ch;
     margin: 0 auto;
-    padding: 4mm 3mm;
+    padding: 4mm 0;
     color: #000;
+  }
+  @media print {
+    body { width: ${mmWidth}; margin: 0; padding: 2mm 0; }
   }
   pre {
     white-space: pre;
     font-family: inherit;
     font-size: inherit;
     line-height: 1.4;
-    overflow: hidden;
     margin: 0;
   }
   .no-print { text-align:center; margin-bottom:4mm; }
   @media print {
     .no-print { display:none; }
-    body { padding:0; margin:0; }
   }
 </style>
 </head>
@@ -233,9 +235,10 @@ function toHtml(lines, options = {}) {
 ${qrSection}
 <pre>${afterHtml}</pre>
 <script>
+  /* Apply saved paper size: override ch-based width with mm for print clarity */
   var size = localStorage.getItem('pos_receipt_size');
-  if (size === '58mm') { document.body.style.width='58mm'; document.body.style.fontSize='11px'; }
-  if (size === '80mm') { document.body.style.width='80mm'; document.body.style.fontSize='12px'; }
+  if (size === '58mm') { document.body.style.fontSize='11px'; }
+  if (size === '80mm') { document.body.style.fontSize='12px'; }
   if (localStorage.getItem('pos_auto_print') === 'true') window.print();
 <\/script>
 </body>

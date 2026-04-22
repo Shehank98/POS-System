@@ -21,16 +21,17 @@ export function openReceipt(transactionId) {
 
 /**
  * Opens the thermal plain-text receipt for a transaction in a new tab.
+ * Reads the saved paper-size preference from localStorage automatically.
  * @param {number|string} transactionId
- * @param {'32'|'48'} [charWidth] - '32' for 58mm, '48' for 80mm (default)
  */
-export function openThermalReceipt(transactionId, charWidth) {
+export function openThermalReceipt(transactionId) {
   const token = localStorage.getItem('pos_token');
   if (!token) return;
 
-  const size = charWidth === '32' ? '32' : '48';
+  const savedSize = localStorage.getItem('pos_receipt_size');
+  const size = savedSize === '58mm' ? '32' : '48';
   const url  = `${BASE}/api/transactions/${transactionId}/receipt?format=thermal&size=${size}&token=${encodeURIComponent(token)}`;
-  window.open(url, '_blank', 'width=500,height=700,noopener');
+  window.open(url, '_blank', 'width=640,height=800,noopener');
 }
 
 /** Saves the preferred receipt size to localStorage */

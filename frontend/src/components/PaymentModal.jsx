@@ -4,7 +4,7 @@ import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, Wi
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
-import { getAutoPrint } from '../utils/receipt';
+import { getAutoPrint, getThermalWidth } from '../utils/receipt';
 import { queueTransaction, isOfflineAllowed } from '../utils/offlineDB';
 import useAuthStore from '../store/authStore';
 import QRPaymentModal from './QRPaymentModal';
@@ -196,6 +196,7 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
         {showReceiptPreview && receiptData && (
           <ThermalReceiptPreview
             data={receiptData}
+            defaultWidth={getThermalWidth()}
             qrUrl={user?.shop_id ? `${window.location.origin}/order?shop_id=${user.shop_id}` : ''}
             onClose={() => setShowReceiptPreview(false)}
           />
