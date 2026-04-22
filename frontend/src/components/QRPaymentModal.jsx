@@ -3,6 +3,7 @@ import { X, Loader2, CheckCircle2, XCircle, RefreshCw, Smartphone } from 'lucide
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { qrPaymentsApi } from '../api/client';
+import useAuthStore from '../store/authStore';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 });
 
@@ -28,10 +29,16 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
   const [session,    setSession]    = useState(null);
   const [showMobile, setShowMobile] = useState(false);
   const pollRef = useRef(null);
+  const wsRef   = useRef(null);
+  const user    = useAuthStore((s) => s.user);
   const { secs, label: countdown } = useCountdown(session?.expires_at);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  const closeWs = useCallback(() => {
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
   }, []);
 
   // Generate QR on mount
@@ -71,16 +78,47 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
     return stopPolling;
   }, [phase, session, stopPolling, onSuccess]);
 
+  // WebSocket — instant payment confirmation without waiting for next poll cycle
+  useEffect(() => {
+    if (phase !== 'waiting' || !session?.reference || !user?.shop_id) return;
+    closeWs();
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    wsRef.current = ws;
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'subscribe_shop', shopId: user.shop_id }));
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== 'qr_payment_update' || msg.reference !== session.reference) return;
+        if (msg.payment_status === 2) {
+          stopPolling();
+          closeWs();
+          setPhase('success');
+          setTimeout(() => onSuccess({ reference: session.reference }), 1500);
+        } else if (msg.payment_status === -1) {
+          stopPolling();
+          closeWs();
+          setPhase('failed');
+        }
+      } catch {}
+    };
+    return closeWs;
+  }, [phase, session, user, stopPolling, closeWs, onSuccess]);
+
   // Handle expiry via countdown
   useEffect(() => {
     if (phase === 'waiting' && secs === 0 && session?.expires_at) {
       stopPolling();
+      closeWs();
       setPhase('expired');
     }
-  }, [phase, secs, session, stopPolling]);
+  }, [phase, secs, session, stopPolling, closeWs]);
 
   async function handleRetry() {
     stopPolling();
+    closeWs();
     setSession(null);
     setShowMobile(false);
     setPhase('generating');
