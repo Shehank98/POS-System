@@ -135,7 +135,9 @@ async function checkPaymentStatus(shopId, businessId, reference, qrReference) {
     `Bearer ${token}`
   );
   console.log('[HelaPOS] getSaleStatus raw response:', JSON.stringify(raw));
-  const status = raw.sale?.payment_status ?? raw.payment_status ?? raw.statusCode ?? 0;
+  // Do NOT fall back to raw.statusCode — that's HelaPOS's HTTP-style response code
+  // (e.g. "404" for "Cannot Find Sale"), not a payment status value.
+  const status = raw.sale?.payment_status ?? raw.payment_status ?? 0;
   return {
     payment_status: Number(status),
     sale:           raw.sale || null,

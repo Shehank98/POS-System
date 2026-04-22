@@ -188,7 +188,9 @@ async function checkStatus(req, res) {
       const { payment_status } = await helapos.checkPaymentStatus(
         req.shopId, businessId, reference, session.qr_reference
       );
-      if (payment_status !== 0) {
+      // Only persist terminal statuses — ignore 0 (pending) and anything unexpected
+      // (e.g. HelaPOS error codes that slipped through the parser).
+      if (payment_status === 2 || payment_status === -1) {
         // Atomic update — only if still pending to avoid race with webhook
         await db.query(
           'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2 AND payment_status = 0',
