@@ -51,9 +51,10 @@ async function getCancellationRecord(shop_id, phone) {
 async function upsertCancellationTracking(shop_id, phone, { incrementOrders = false, incrementCancellations = false } = {}) {
   const now = new Date();
 
-  // Build increment expressions
-  const orderInc  = incrementOrders       ? 'total_orders + 1'        : 'total_orders';
-  const cancelInc = incrementCancellations ? 'total_cancellations + 1' : 'total_cancellations';
+  // Qualify with table name to avoid "column reference is ambiguous" in ON CONFLICT DO UPDATE
+  const tbl       = 'customer_cancellation_tracking';
+  const orderInc  = incrementOrders       ? `${tbl}.total_orders + 1`        : `${tbl}.total_orders`;
+  const cancelInc = incrementCancellations ? `${tbl}.total_cancellations + 1` : `${tbl}.total_cancellations`;
 
   // Calculate cooldown: applied when total_cancellations reaches 3 after increment
   // We check after increment so if new count >= 3 we set cooldown

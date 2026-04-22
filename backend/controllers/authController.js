@@ -39,7 +39,9 @@ async function login(req, res) {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.password_hash, u.role, u.shop_id,
-              s.name AS shop_name, s.subscription_status, s.subscription_end_date,
+              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
+              COALESCE(s.contact_email, s.email, '') AS shop_email,
+              s.subscription_status, s.subscription_end_date,
               s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
               COALESCE(s.shop_type, 'retail') AS shop_type,
               COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,
@@ -100,6 +102,9 @@ async function login(req, res) {
         role:                  user.role,
         shop_id:               user.shop_id,
         shop_name:             user.shop_name,
+        shop_address:          user.shop_address || '',
+        shop_phone:            user.shop_phone   || '',
+        shop_email:            user.shop_email   || '',
         subscription_status:   user.subscription_status,
         subscription_end_date: user.subscription_end_date,
         barcode_enabled:       user.barcode_enabled,
@@ -194,7 +199,9 @@ async function getMe(req, res) {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.role, u.shop_id, u.created_at,
-              s.name AS shop_name, s.subscription_status, s.subscription_end_date,
+              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
+              COALESCE(s.contact_email, s.email, '') AS shop_email,
+              s.subscription_status, s.subscription_end_date,
               s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
               COALESCE(s.shop_type, 'retail') AS shop_type,
               COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,

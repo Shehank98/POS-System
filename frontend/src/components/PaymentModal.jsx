@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader2, Banknote, CreditCard, SplitSquareVertical, CheckCircle2, WifiOff, QrCode } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { transactionsApi } from '../api/client';
-import { openReceipt, getAutoPrint } from '../utils/receipt';
+import { getAutoPrint } from '../utils/receipt';
 import { queueTransaction, isOfflineAllowed } from '../utils/offlineDB';
 import useAuthStore from '../store/authStore';
 import QRPaymentModal from './QRPaymentModal';
+import ThermalReceiptPreview from './ThermalReceiptPreview';
 
 const METHODS = [
   { id: 'cash',   label: 'Cash',   icon: Banknote            },
@@ -42,7 +43,39 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
   const cashUsed = method === 'split' ? cashNum : grand;
   const cardUsed = method === 'split' ? Math.max(0, grand - cashNum) : 0;
 
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showQRModal,       setShowQRModal]       = useState(false);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+
+  const receiptData = useMemo(() => {
+    if (!done?.server_id) return null;
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const grossTotal = totals.itemsSubtotal + totals.itemsDiscount;
+    return {
+      shopName:          user?.shop_name    || '',
+      address:           user?.shop_address || '',
+      phone:             user?.shop_phone   || '',
+      email:             user?.shop_email   || '',
+      date:              `${dateStr}  ${timeStr}`,
+      transactionNumber: done.transaction_number || '',
+      cashier:           user?.username     || '',
+      items: items.map((i) => ({
+        name:       i.name,
+        quantity:   i.quantity,
+        unit_price: i.unit_price,
+        subtotal:   i.subtotal,
+        discount:   i.discAmt,
+        unit_type:  i.unit_type,
+      })),
+      grossTotal,
+      discount:      totals.totalDiscount,
+      netTotal:      grand,
+      tax:           totals.taxAmount,
+      paymentMethod: method,
+      cashPaid:      method === 'cash' ? cashNum : 0,
+    };
+  }, [done, user, items, totals, grand, method, cashNum]);
 
   const canPay =
     (method === 'cash'   && cashNum >= grand) ||
@@ -72,9 +105,8 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
       });
       setShowQRModal(false);
       toast.success('QR payment confirmed!');
-      openReceipt(data.id);
-      onComplete();
-      navigate('/transactions');
+      setDone({ server_id: data.id, transaction_number: data.transaction_number });
+      // Receipt shown on success screen; navigate after user closes it
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record transaction');
     } finally {
@@ -154,48 +186,55 @@ export default function PaymentModal({ totals, items, onClose, onComplete,
   }
 
   function handlePrintAndClose() {
-    if (done?.server_id) openReceipt(done.server_id);
-    onComplete();
+    setShowReceiptPreview(true);
   }
 
   // ── Success screen ──────────────────────────────────────────
   if (done) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="card w-full max-w-sm p-6 text-center space-y-4">
-          {done.offline
-            ? <>
-                <WifiOff className="w-16 h-16 text-yellow-400 mx-auto" />
-                <h2 className="text-xl font-bold text-gray-900">Saved Offline</h2>
-                <p className="text-sm text-gray-500">
-                  This sale has been stored on this device and will sync automatically
-                  when you reconnect to the internet.
-                </p>
-              </>
-            : <>
-                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
-                <h2 className="text-xl font-bold text-gray-900">Sale Complete!</h2>
-                <p className="text-sm text-gray-500">Txn #{done.transaction_number}</p>
-              </>
-          }
-          {method === 'cash' && (
-            <div className="bg-green-50 rounded-lg py-3 px-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">Change due</p>
-              <p className="text-3xl font-bold text-green-600">{fmt(change)}</p>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button className="btn-secondary flex-1" onClick={onComplete}>
-              New Sale
-            </button>
-            {!done.offline && (
-              <button className="btn-primary flex-1" onClick={handlePrintAndClose}>
-                🖨 Print Receipt
-              </button>
+      <>
+        {showReceiptPreview && receiptData && (
+          <ThermalReceiptPreview
+            data={receiptData}
+            onClose={() => setShowReceiptPreview(false)}
+          />
+        )}
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="card w-full max-w-sm p-6 text-center space-y-4">
+            {done.offline
+              ? <>
+                  <WifiOff className="w-16 h-16 text-yellow-400 mx-auto" />
+                  <h2 className="text-xl font-bold text-gray-900">Saved Offline</h2>
+                  <p className="text-sm text-gray-500">
+                    This sale has been stored on this device and will sync automatically
+                    when you reconnect to the internet.
+                  </p>
+                </>
+              : <>
+                  <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
+                  <h2 className="text-xl font-bold text-gray-900">Sale Complete!</h2>
+                  <p className="text-sm text-gray-500">Txn #{done.transaction_number}</p>
+                </>
+            }
+            {method === 'cash' && (
+              <div className="bg-green-50 rounded-lg py-3 px-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Change due</p>
+                <p className="text-3xl font-bold text-green-600">{fmt(change)}</p>
+              </div>
             )}
+            <div className="flex gap-2">
+              <button className="btn-secondary flex-1" onClick={onComplete}>
+                New Sale
+              </button>
+              {!done.offline && (
+                <button className="btn-primary flex-1" onClick={handlePrintAndClose}>
+                  🖨 Print Receipt
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
