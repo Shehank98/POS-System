@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/dashboard_model.dart';
@@ -597,7 +598,10 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
                       .entries
                       .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
                       .toList();
-                  final labels = week.map((d) => d.day).toList();
+                  final labels = week.map((d) {
+                    final dt = DateTime.tryParse(d.day);
+                    return dt != null ? DateFormat('EEE').format(dt) : d.day;
+                  }).toList();
                   return _buildLineChart(spots, labels, 1, cs);
                 },
               )
@@ -618,7 +622,10 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
                       .entries
                       .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
                       .toList();
-                  final labels = month.map((d) => d.day).toList();
+                  final labels = month.map((d) {
+                    final dt = DateTime.tryParse(d.day);
+                    return dt != null ? DateFormat('d').format(dt) : d.day;
+                  }).toList();
                   return _buildLineChart(spots, labels, 7, cs);
                 },
               ),

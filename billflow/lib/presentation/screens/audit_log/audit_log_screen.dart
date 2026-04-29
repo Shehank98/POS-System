@@ -28,13 +28,15 @@ class AuditLogEntry {
   });
 
   factory AuditLogEntry.fromJson(Map<String, dynamic> json) => AuditLogEntry(
-        id:          json['id'] as int,
+        id:          (json['id'] as num?)?.toInt() ?? 0,
         action:      json['action'] as String? ?? '',
         description: json['description'] as String?,
         targetType:  json['target_type'] as String?,
-        targetId:    json['target_id'] as int?,
+        targetId:    (json['target_id'] as num?)?.toInt(),
         performedBy: json['performed_by'] as String?,
-        createdAt:   DateTime.parse(json['created_at'] as String),
+        createdAt:   json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }
 

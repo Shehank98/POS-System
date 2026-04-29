@@ -88,7 +88,7 @@ class AdminShop {
   });
 
   factory AdminShop.fromJson(Map<String, dynamic> json) => AdminShop(
-        id:                   json['id'] as int,
+        id:                   (json['id'] as num?)?.toInt() ?? 0,
         name:                 json['name'] as String,
         ownerName:            json['owner_name'] as String? ?? '',
         email:                json['email'] as String,
@@ -101,8 +101,10 @@ class AdminShop {
         planName:             json['plan_name'] as String?,
         shopType:             json['shop_type'] as String? ?? 'retail',
         isCarServiceShop:     json['is_car_service_shop'] as bool? ?? false,
-        createdAt:            DateTime.parse(json['created_at'] as String),
-        onboardedByAgentId:   json['onboarded_by_agent_id'] as int?,
+        createdAt:            json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        onboardedByAgentId:   (json['onboarded_by_agent_id'] as num?)?.toInt(),
         agentName:            json['agent_name'] as String?,
         userCount:            (json['user_count'] as num?)?.toInt() ?? 0,
         productCount:         (json['product_count'] as num?)?.toInt() ?? 0,
@@ -151,18 +153,22 @@ class AdminPaymentSubmission {
 
   factory AdminPaymentSubmission.fromJson(Map<String, dynamic> json) =>
       AdminPaymentSubmission(
-        id:            json['id'] as int,
-        shopId:        json['shop_id'] as int,
+        id:            (json['id'] as num?)?.toInt() ?? 0,
+        shopId:        (json['shop_id'] as num?)?.toInt() ?? 0,
         shopName:      json['shop_name'] as String? ?? '',
-        agentId:       json['agent_id'] as int,
+        agentId:       (json['agent_id'] as num?)?.toInt() ?? 0,
         agentName:     json['agent_name'] as String? ?? '',
         amount:        double.parse(json['amount'].toString()),
-        paymentMethod: json['payment_method'] as String,
-        paymentDate:   DateTime.parse(json['payment_date'] as String),
+        paymentMethod: json['payment_method'] as String? ?? '',
+        paymentDate:   json['payment_date'] != null
+            ? DateTime.tryParse(json['payment_date'].toString()) ?? DateTime.now()
+            : DateTime.now(),
         notes:         json['notes'] as String?,
-        status:        json['status'] as String,
+        status:        json['status'] as String? ?? 'pending',
         adminNote:     json['admin_note'] as String?,
-        createdAt:     DateTime.parse(json['created_at'] as String),
+        createdAt:     json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }
 
@@ -195,7 +201,7 @@ class AdminAgent {
   });
 
   factory AdminAgent.fromJson(Map<String, dynamic> json) => AdminAgent(
-        id:               json['id'] as int,
+        id:               (json['id'] as num?)?.toInt() ?? 0,
         name:             json['name'] as String,
         email:            json['email'] as String,
         phone:            json['phone'] as String?,

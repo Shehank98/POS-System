@@ -108,7 +108,7 @@ class ReportsScreen extends ConsumerWidget {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             crossAxisCount: 2,
-                            childAspectRatio: 1.5,
+                            childAspectRatio: 1.3,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
                             children: [

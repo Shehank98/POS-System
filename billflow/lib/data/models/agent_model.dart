@@ -24,7 +24,7 @@ class AgentModel {
   });
 
   factory AgentModel.fromJson(Map<String, dynamic> json) => AgentModel(
-        id:             json['id'] as int,
+        id:             (json['id'] as num?)?.toInt() ?? 0,
         name:           json['name'] as String,
         email:          json['email'] as String,
         phone:          json['phone'] as String?,
@@ -85,17 +85,19 @@ class AgentCustomer {
   });
 
   factory AgentCustomer.fromJson(Map<String, dynamic> json) => AgentCustomer(
-        id:                   json['id'] as int,
-        name:                 json['name'] as String,
-        ownerName:            json['owner_name'] as String,
-        email:                json['email'] as String,
+        id:                   (json['id'] as num?)?.toInt() ?? 0,
+        name:                 json['name'] as String? ?? '',
+        ownerName:            json['owner_name'] as String? ?? '',
+        email:                json['email'] as String? ?? '',
         phone:                json['phone'] as String?,
         address:              json['address'] as String?,
-        subscriptionStatus:   json['subscription_status'] as String,
+        subscriptionStatus:   json['subscription_status'] as String? ?? 'trial',
         subscriptionEndDate:  json['subscription_end_date'] != null
-            ? DateTime.tryParse(json['subscription_end_date'] as String)
+            ? DateTime.tryParse(json['subscription_end_date'].toString())
             : null,
-        createdAt: DateTime.parse(json['created_at'] as String),
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 
   bool get isActive   => subscriptionStatus == 'active';
@@ -132,16 +134,20 @@ class AgentPaymentSubmission {
 
   factory AgentPaymentSubmission.fromJson(Map<String, dynamic> json) =>
       AgentPaymentSubmission(
-        id:            json['id'] as int,
-        shopId:        json['shop_id'] as int,
+        id:            (json['id'] as num?)?.toInt() ?? 0,
+        shopId:        (json['shop_id'] as num?)?.toInt() ?? 0,
         shopName:      json['shop_name'] as String? ?? '',
         amount:        double.parse(json['amount'].toString()),
-        paymentMethod: json['payment_method'] as String,
-        paymentDate:   DateTime.parse(json['payment_date'] as String),
+        paymentMethod: json['payment_method'] as String? ?? '',
+        paymentDate:   json['payment_date'] != null
+            ? DateTime.tryParse(json['payment_date'].toString()) ?? DateTime.now()
+            : DateTime.now(),
         notes:         json['notes'] as String?,
-        status:        json['status'] as String,
+        status:        json['status'] as String? ?? 'pending',
         adminNote:     json['admin_note'] as String?,
-        createdAt:     DateTime.parse(json['created_at'] as String),
+        createdAt:     json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }
 
@@ -167,14 +173,16 @@ class AgentCommission {
   });
 
   factory AgentCommission.fromJson(Map<String, dynamic> json) => AgentCommission(
-        id:             json['id'] as int,
-        shopId:         json['shop_id'] as int,
+        id:             (json['id'] as num?)?.toInt() ?? 0,
+        shopId:         (json['shop_id'] as num?)?.toInt() ?? 0,
         shopName:       json['shop_name'] as String? ?? '',
-        commissionType: json['commission_type'] as String,
-        amount:         double.parse(json['amount'].toString()),
-        month:          json['month'] != null ? DateTime.tryParse(json['month'] as String) : null,
-        status:         json['status'] as String,
-        createdAt:      DateTime.parse(json['created_at'] as String),
+        commissionType: json['commission_type'] as String? ?? '',
+        amount:         double.parse((json['amount'] ?? 0).toString()),
+        month:          json['month'] != null ? DateTime.tryParse(json['month'].toString()) : null,
+        status:         json['status'] as String? ?? 'locked',
+        createdAt:      json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }
 

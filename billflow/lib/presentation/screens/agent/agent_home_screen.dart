@@ -840,14 +840,14 @@ class AgentHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
+  // 0=Dashboard, 1=Shops, 2=Payments, 3=Commissions, 4=Profile
   int _tab = 0;
 
-  static const _tabs = [
-    (icon: Icons.dashboard_outlined,    label: 'Dashboard'),
-    (icon: Icons.store_outlined,        label: 'Customers'),
-    (icon: Icons.payments_outlined,     label: 'Payments'),
-    (icon: Icons.account_balance_wallet_outlined, label: 'Commissions'),
-    (icon: Icons.person_outline,        label: 'Profile'),
+  static const _navItems = [
+    (icon: Icons.dashboard_outlined,   label: 'Dashboard'),
+    (icon: Icons.store_outlined,       label: 'Shops'),
+    (icon: Icons.payments_outlined,    label: 'Payments'),
+    (icon: Icons.more_horiz,           label: 'More'),
   ];
 
   static const _bodies = [
@@ -858,6 +858,76 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
     _ProfileTab(),
   ];
 
+  static const _tabLabels = [
+    'Dashboard', 'Shops', 'Payments', 'Commissions', 'Profile',
+  ];
+
+  // Nav bar selected index: tabs 3+ map to "More" (nav index 3)
+  int get _navIndex => _tab > 2 ? 3 : _tab;
+
+  void _onNavTap(int i) {
+    if (i == 3) {
+      _showMoreSheet();
+    } else {
+      setState(() => _tab = i);
+    }
+  }
+
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F5E9),
+                child: Icon(Icons.account_balance_wallet_outlined,
+                    color: Color(0xFF2E7D32)),
+              ),
+              title: const Text('Commissions',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('View earnings & commission history'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _tab = 3);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE3F2FD),
+                child: Icon(Icons.person_outline, color: Color(0xFF1565C0)),
+              ),
+              title: const Text('Profile',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Bank details & account settings'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _tab = 4);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final agent = ref.watch(agentAuthProvider).valueOrNull;
@@ -866,28 +936,40 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
-        title: Text(_tabs[_tab].label,
+        title: Text(_tabLabels[_tab],
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         actions: [
           if (agent != null)
             Padding(
               padding: const EdgeInsets.only(right: 14),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(agent.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                if (agent.district != null)
-                  Text(agent.district!, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-              ]),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(agent.name,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
+                  if (agent.district != null)
+                    Text(agent.district!,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white70)),
+                ],
+              ),
             ),
         ],
       ),
       body: _bodies[_tab],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: _tabs.map((t) => NavigationDestination(
-          icon: Icon(t.icon),
-          label: t.label,
-        )).toList(),
+        selectedIndex: _navIndex,
+        onDestinationSelected: _onNavTap,
+        destinations: _navItems
+            .map((t) => NavigationDestination(
+                  icon: Icon(t.icon),
+                  label: t.label,
+                ))
+            .toList(),
       ),
     );
   }

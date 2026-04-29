@@ -16,7 +16,7 @@ async function getCustomerInsights(req, res) {
   const trimPhone = phone.trim();
 
   try {
-    // Pre-order stats
+    // Pre-order stats (also grab name as fallback when customers table has no record)
     const { rows: poStats } = await db.query(
       `SELECT
          COUNT(*)                                                  AS total_orders,
@@ -24,7 +24,8 @@ async function getCustomerInsights(req, res) {
          COUNT(*) FILTER (WHERE status = 'COMPLETED')             AS total_completed,
          COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('CANCELLED')), 0) AS total_spent,
          MAX(created_at)                                           AS last_order_date,
-         MIN(created_at)                                           AS first_order_date
+         MIN(created_at)                                           AS first_order_date,
+         MAX(NULLIF(TRIM(customer_name), ''))                     AS pre_order_name
        FROM pre_orders
        WHERE shop_id = $1 AND customer_phone = $2`,
       [req.shopId, trimPhone]
@@ -55,6 +56,11 @@ async function getCustomerInsights(req, res) {
       );
       if (cRows.length) { loyaltyPoints = cRows[0].loyalty_points; customerName = cRows[0].name || ''; }
     } catch { /* customers table may not exist pre-migration */ }
+
+    // Fallback: use pre_orders customer_name when customers table has no name
+    if (!customerName && poStats[0].pre_order_name) {
+      customerName = poStats[0].pre_order_name;
+    }
 
     const totalOrders = parseInt(poStats[0].total_orders, 10) + parseInt(txnStats.total_orders, 10);
     const totalSpent  = parseFloat(poStats[0].total_spent) + parseFloat(txnStats.total_spent);

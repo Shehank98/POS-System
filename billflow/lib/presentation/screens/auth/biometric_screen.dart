@@ -27,7 +27,15 @@ class _BiometricScreenState extends ConsumerState<BiometricScreen> {
       _authenticating = true;
       _failed = false;
     });
-    final ok = await ref.read(biometricServiceProvider).authenticate();
+    final svc = ref.read(biometricServiceProvider);
+    final available = await svc.isAvailable();
+    if (!mounted) return;
+    if (!available) {
+      // Device has no enrolled biometrics — bypass gate silently
+      ref.read(biometricGateProvider.notifier).state = false;
+      return;
+    }
+    final ok = await svc.authenticate();
     if (!mounted) return;
     if (ok) {
       ref.read(biometricGateProvider.notifier).state = false;
