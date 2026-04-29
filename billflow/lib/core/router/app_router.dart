@@ -88,6 +88,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return agent != null ? '/agent' : '/login?mode=agent';
       }
 
+      // ── Redirect logged-in agent / admin away from splash & login ─────
+      if (agentState.isLoading || adminState.isLoading) {
+        return loc == '/' ? null : '/';
+      }
+      if (agent != null && (loc == '/' || loc == '/login')) return '/agent';
+      if (admin != null && (loc == '/' || loc == '/login')) return '/admin';
+
       // ── Shop auth ─────────────────────────────────────────────────────
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';

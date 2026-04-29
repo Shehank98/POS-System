@@ -364,8 +364,11 @@ class _AgentLoginFormState extends ConsumerState<_AgentLoginForm> {
       final msg = error is ApiException ? error.message : 'Login failed';
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      return;
     }
-    // Success navigation handled by router redirect
+    if (ref.read(agentAuthProvider).valueOrNull != null && mounted) {
+      context.go('/agent');
+    }
   }
 
   @override

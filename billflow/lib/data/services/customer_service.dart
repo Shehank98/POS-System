@@ -13,7 +13,8 @@ class CustomerService {
     try {
       final res = await _dio.get(ApiConstants.customersTop,
           queryParameters: {'limit': limit});
-      final list = (res.data as List<dynamic>?) ?? [];
+      final raw = res.data;
+      final list = (raw is List ? raw : (raw['customers'] as List<dynamic>?)) ?? [];
       return list
           .map((e) => TopCustomer.fromJson(e as Map<String, dynamic>))
           .toList();
