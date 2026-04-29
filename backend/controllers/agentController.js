@@ -10,11 +10,14 @@ async function getDashboard(req, res) {
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1)                              AS total_customers,
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'active')  AS active_customers,
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status != 'active') AS inactive_customers,
+        (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'pending_payment') AS pending_payment_shops,
         (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'approved')                    AS approved_earnings,
         (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'locked')                     AS pending_earnings,
         (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'paid')                       AS total_paid,
         (SELECT COUNT(*)                FROM agent_payment_submissions WHERE agent_id = $1 AND status = 'pending_verification') AS pending_submissions,
-        (SELECT monthly_target          FROM sales_agents      WHERE id = $1)                                                  AS monthly_target
+        (SELECT monthly_target          FROM sales_agents      WHERE id = $1)                                                  AS monthly_target,
+        (SELECT total_collected         FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_collected,
+        (SELECT total_verified          FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_verified
     `, [agentId]);
 
     const { rows: expiring } = await db.query(`
@@ -38,11 +41,15 @@ async function listCustomers(req, res) {
   const agentId = req.agent.id;
   try {
     const { rows } = await db.query(`
-      SELECT id, name, owner_name, email, phone, address,
-             subscription_status, subscription_end_date, created_at
-        FROM shops
-       WHERE onboarded_by_agent_id = $1
-       ORDER BY created_at DESC
+      SELECT s.id, s.name, s.owner_name, s.email, s.phone, s.address,
+             s.subscription_status, s.subscription_end_date,
+             s.plan_id, s.subscription_months, s.expected_amount,
+             sp.name AS plan_name,
+             s.created_at
+        FROM shops s
+        LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
+       WHERE s.onboarded_by_agent_id = $1
+       ORDER BY s.created_at DESC
     `, [agentId]);
     res.json(rows);
   } catch (err) {
@@ -54,7 +61,13 @@ async function listCustomers(req, res) {
 // ── POST /api/agents/me/customers ─────────────────────────────
 async function onboardCustomer(req, res) {
   const agentId = req.agent.id;
-  const { name, owner_name, email, phone, address, username, password } = req.body;
+  const {
+    name, owner_name, email, phone, address,
+    username, password,
+    plan_id, subscription_months = 1,
+    barcode_enabled = false, shop_type = 'retail',
+  } = req.body;
+
   if (!name || !owner_name || !email) {
     return res.status(400).json({ error: 'name, owner_name and email are required' });
   }
@@ -65,19 +78,50 @@ async function onboardCustomer(req, res) {
     return res.status(400).json({ error: 'password must be at least 6 characters' });
   }
 
+  const months = Math.max(1, parseInt(subscription_months, 10) || 1);
+
+  // Calculate expected amount from plan
+  let expectedAmount = null;
+  if (plan_id) {
+    try {
+      const { rows: planRows } = await db.query(
+        `SELECT base_monthly_price, discount_3m, discount_6m, discount_12m
+           FROM subscription_plans WHERE id = $1 AND is_active = TRUE`,
+        [plan_id]
+      );
+      if (planRows.length > 0) {
+        const p = planRows[0];
+        let discount = 0;
+        if (months >= 12) discount = parseFloat(p.discount_12m);
+        else if (months >= 6) discount = parseFloat(p.discount_6m);
+        else if (months >= 3) discount = parseFloat(p.discount_3m);
+        expectedAmount = parseFloat(p.base_monthly_price) * months * (1 - discount);
+      }
+    } catch (_) { /* non-fatal */ }
+  }
+
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
     const { rows: shopRows } = await client.query(
-      `INSERT INTO shops (name, owner_name, email, phone, address, subscription_status, onboarded_by_agent_id)
-       VALUES ($1, $2, $3, $4, $5, 'trial', $6)
-       RETURNING id, name, owner_name, email, subscription_status, created_at`,
-      [name, owner_name, email.toLowerCase().trim(), phone || null, address || null, agentId]
+      `INSERT INTO shops
+         (name, owner_name, email, phone, address,
+          subscription_status, onboarded_by_agent_id,
+          plan_id, subscription_months, expected_amount,
+          barcode_enabled, shop_type)
+       VALUES ($1, $2, $3, $4, $5, 'pending_payment', $6, $7, $8, $9, $10, $11)
+       RETURNING id, name, owner_name, email, subscription_status, created_at,
+                 plan_id, subscription_months, expected_amount`,
+      [
+        name, owner_name, email.toLowerCase().trim(),
+        phone || null, address || null, agentId,
+        plan_id || null, months, expectedAmount,
+        Boolean(barcode_enabled), shop_type,
+      ]
     );
     const shop = shopRows[0];
 
-    // Create the owner login account for this shop
     const passwordHash = await bcrypt.hash(password, 10);
     await client.query(
       `INSERT INTO users (shop_id, username, password_hash, role)
@@ -85,11 +129,17 @@ async function onboardCustomer(req, res) {
       [shop.id, username.trim(), passwordHash]
     );
 
-    // Signup commission is locked until admin verifies first payment
+    // Signup commission locked until first payment verified
     await client.query(
       `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status)
        VALUES ($1, $2, 'signup', 500, 'locked')`,
       [agentId, shop.id]
+    );
+
+    // Ensure wallet row exists for this agent
+    await client.query(
+      `INSERT INTO agent_wallet (agent_id) VALUES ($1) ON CONFLICT (agent_id) DO NOTHING`,
+      [agentId]
     );
 
     await client.query('COMMIT');
@@ -146,21 +196,51 @@ async function submitPayment(req, res) {
   }
   if (Number(amount) <= 0) return res.status(400).json({ error: 'Amount must be positive' });
 
+  const submittedAmt = Number(amount);
+
   try {
+    // Fetch shop to get expected_amount
     const check = await db.query(
-      `SELECT id FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2`,
+      `SELECT id, expected_amount FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2`,
       [shop_id, agentId]
     );
     if (check.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
+    const shopExpected = check.rows[0].expected_amount ? parseFloat(check.rows[0].expected_amount) : null;
 
-    const { rows } = await db.query(
-      `INSERT INTO agent_payment_submissions
-         (agent_id, shop_id, amount, payment_method, payment_date, notes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending_verification')
-       RETURNING *`,
-      [agentId, shop_id, Number(amount), payment_method, payment_date, notes || null]
-    );
-    res.status(201).json(rows[0]);
+    // Flag as suspicious if submitted is more than 5% below expected
+    const isSuspicious = shopExpected !== null && submittedAmt < shopExpected * 0.95;
+
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      const { rows } = await client.query(
+        `INSERT INTO agent_payment_submissions
+           (agent_id, shop_id, amount, submitted_amount, expected_amount,
+            payment_method, payment_date, notes, status, is_suspicious)
+         VALUES ($1, $2, $3, $3, $4, $5, $6, $7, 'pending_verification', $8)
+         RETURNING *`,
+        [agentId, shop_id, submittedAmt, shopExpected, payment_method, payment_date, notes || null, isSuspicious]
+      );
+
+      // Update wallet: increment total_collected
+      await client.query(
+        `INSERT INTO agent_wallet (agent_id, total_collected)
+           VALUES ($1, $2)
+           ON CONFLICT (agent_id) DO UPDATE
+           SET total_collected = agent_wallet.total_collected + $2,
+               updated_at      = NOW()`,
+        [agentId, submittedAmt]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error('agent submitPayment error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -243,7 +323,24 @@ async function getRenewals(req, res) {
   }
 }
 
+// ── GET /api/agents/me/plans ──────────────────────────────────
+async function listPlans(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, base_monthly_price, discount_3m, discount_6m, discount_12m, features, limits
+         FROM subscription_plans
+        WHERE is_active = TRUE
+        ORDER BY sort_order`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('agent listPlans error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
+  listPlans,
 };

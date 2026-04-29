@@ -116,6 +116,7 @@ class ApiConstants {
   static const String agentCommissions   = '/agents/me/commissions';
   static const String agentBankDetails   = '/agents/me/bank-details';
   static const String agentRenewals      = '/agents/me/renewals';
+  static const String agentPlans         = '/agents/me/plans';
   static const String agentNotifications = '/agents/me/notifications';
   static const String agentNotificationsReadAll = '/agents/me/notifications/read-all';
   static String agentNotificationRead(int id) => '/agents/me/notifications/$id/read';

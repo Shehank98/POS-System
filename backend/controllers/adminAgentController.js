@@ -78,8 +78,12 @@ async function getAgentCustomers(req, res) {
   try {
     const { rows } = await db.query(`
       SELECT s.id, s.name, s.owner_name, s.email, s.phone,
-             s.subscription_status, s.subscription_end_date, s.created_at
+             s.subscription_status, s.subscription_end_date,
+             s.plan_id, s.subscription_months, s.expected_amount,
+             sp.name AS plan_name,
+             s.created_at
         FROM shops s
+        LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
        WHERE s.onboarded_by_agent_id = $1
        ORDER BY s.created_at DESC
     `, [req.params.id]);
@@ -95,12 +99,12 @@ async function listPendingPayments(req, res) {
   try {
     const { rows } = await db.query(`
       SELECT aps.*, sa.name AS agent_name, sa.phone AS agent_phone,
-             s.name AS shop_name, s.owner_name
+             s.name AS shop_name, s.owner_name, s.subscription_status
         FROM agent_payment_submissions aps
         JOIN sales_agents sa ON sa.id = aps.agent_id
         JOIN shops s ON s.id = aps.shop_id
        WHERE aps.status = 'pending_verification'
-       ORDER BY aps.created_at ASC
+       ORDER BY aps.is_suspicious DESC, aps.created_at ASC
     `);
     res.json(rows);
   } catch (err) {
@@ -118,12 +122,12 @@ async function listAllPayments(req, res) {
     if (status) { params.push(status); where = `WHERE aps.status = $1`; }
 
     const { rows } = await db.query(`
-      SELECT aps.*, sa.name AS agent_name, s.name AS shop_name
+      SELECT aps.*, sa.name AS agent_name, s.name AS shop_name, s.subscription_status
         FROM agent_payment_submissions aps
         JOIN sales_agents sa ON sa.id = aps.agent_id
         JOIN shops s ON s.id = aps.shop_id
        ${where}
-       ORDER BY aps.created_at DESC
+       ORDER BY aps.is_suspicious DESC NULLS LAST, aps.created_at DESC
        LIMIT 500
     `, params);
     res.json(rows);
@@ -179,6 +183,16 @@ async function verifyPayment(req, res) {
          (agent_id, shop_id, commission_type, amount, month, status, payment_submission_id)
        VALUES ($1, $2, 'recurring', 500, DATE_TRUNC('month', NOW()), 'approved', $3)`,
       [sub.agent_id, sub.shop_id, submissionId]
+    );
+
+    // Update agent wallet: increment total_verified
+    await client.query(
+      `INSERT INTO agent_wallet (agent_id, total_verified)
+         VALUES ($1, $2)
+         ON CONFLICT (agent_id) DO UPDATE
+         SET total_verified = agent_wallet.total_verified + $2,
+             updated_at     = NOW()`,
+      [sub.agent_id, parseFloat(sub.amount)]
     );
 
     await client.query('COMMIT');

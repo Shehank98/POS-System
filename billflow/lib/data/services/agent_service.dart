@@ -102,6 +102,11 @@ class AgentService {
     final res = await _dio.get(ApiConstants.agentRenewals, options: await _authOpts());
     return (res.data as List).map((e) => AgentCustomer.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  Future<List<Map<String, dynamic>>> getPlans() async {
+    final res = await _dio.get(ApiConstants.agentPlans, options: await _authOpts());
+    return (res.data as List).cast<Map<String, dynamic>>();
+  }
 }
 
 final agentServiceProvider = Provider<AgentService>((ref) => AgentService(

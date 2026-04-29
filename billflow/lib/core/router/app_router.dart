@@ -30,6 +30,7 @@ import '../../presentation/widgets/common/app_scaffold.dart';
 import '../../presentation/screens/agent/agent_home_screen.dart';
 import '../../presentation/screens/admin/admin_home_screen.dart';
 import '../../presentation/screens/audit_log/audit_log_screen.dart';
+import '../../presentation/screens/auth/waiting_activation_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -103,11 +104,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggedIn && !needsBiometric) {
+        // Shop awaiting first payment — show holding screen, no POS access
+        if (user.isPendingPayment && loc != '/waiting-activation') {
+          return '/waiting-activation';
+        }
+
         final isLocked = user.readOnly && !user.inGracePeriod;
         const allowedWhenLocked = {'/billing', '/settings'};
         if (isLocked && !allowedWhenLocked.contains(loc)) return '/billing';
 
-        if (loc == '/login' || loc == '/' || loc == '/biometric') {
+        if (loc == '/login' || loc == '/' || loc == '/biometric' || loc == '/waiting-activation') {
+          if (user.isPendingPayment) return '/waiting-activation';
           return user.isCarServiceShop ? '/carwash' : '/dashboard';
         }
       }
@@ -142,6 +149,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/biometric',
         pageBuilder: (_, s) => _fadeSlidePage(const BiometricScreen(), s),
+      ),
+      GoRoute(
+        path: '/waiting-activation',
+        pageBuilder: (_, s) => _fadeSlidePage(const WaitingActivationScreen(), s),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,

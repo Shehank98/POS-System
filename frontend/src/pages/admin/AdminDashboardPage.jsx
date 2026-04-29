@@ -26,10 +26,11 @@ const PAY_STATUS = {
 };
 
 const SUB_STATUS = {
-  active:    { label: 'Active',    cls: 'bg-green-100  text-green-700'  },
-  trial:     { label: 'Trial',     cls: 'bg-blue-100   text-blue-700'   },
-  expired:   { label: 'Expired',   cls: 'bg-red-100    text-red-700'    },
-  suspended: { label: 'Suspended', cls: 'bg-gray-100   text-gray-700'   },
+  active:          { label: 'Active',          cls: 'bg-green-100  text-green-700'  },
+  trial:           { label: 'Trial',           cls: 'bg-blue-100   text-blue-700'   },
+  expired:         { label: 'Expired',         cls: 'bg-red-100    text-red-700'    },
+  suspended:       { label: 'Suspended',       cls: 'bg-gray-100   text-gray-700'   },
+  pending_payment: { label: 'Pending Payment', cls: 'bg-orange-100 text-orange-700' },
 };
 
 function StatCard({ label, value, icon: Icon, color }) {
@@ -1745,15 +1746,34 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
       <p className="text-sm text-gray-400">
         {payments.length} pending submission{payments.length !== 1 ? 's' : ''} — verifying activates the shop subscription
       </p>
-      {payments.map((p) => (
-        <div key={p.id} className="bg-gray-800 rounded-xl p-4 space-y-3">
+      {payments.map((p) => {
+        const submitted = Number(p.submitted_amount || p.amount || 0);
+        const expected  = p.expected_amount ? Number(p.expected_amount) : null;
+        const mismatch  = expected && submitted < expected * 0.95;
+        return (
+        <div key={p.id} className={`bg-gray-800 rounded-xl p-4 space-y-3 ${p.is_suspicious ? 'ring-2 ring-red-500' : ''}`}>
+          {p.is_suspicious && (
+            <div className="flex items-center gap-2 bg-red-900/40 border border-red-700 rounded-lg px-3 py-1.5 text-xs text-red-300">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              Suspicious: submitted amount is significantly below expected
+            </div>
+          )}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-white truncate">{p.shop_name}</p>
               <p className="text-xs text-gray-400">Owner: {p.owner_name}</p>
-              <p className="text-sm text-green-400 font-bold mt-0.5">
-                LKR {Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className={`text-sm font-bold ${mismatch ? 'text-red-400' : 'text-green-400'}`}>
+                  LKR {submitted.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+                {expected && (
+                  <p className="text-xs text-gray-500">
+                    Expected: <span className={mismatch ? 'text-red-400' : 'text-gray-400'}>
+                      LKR {expected.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </p>
+                )}
+              </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 via {p.payment_method?.toUpperCase()} · {fmtDate(p.payment_date)}
                 <span className="mx-1.5 text-gray-600">·</span>
@@ -1807,7 +1827,8 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

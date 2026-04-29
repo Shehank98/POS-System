@@ -269,6 +269,7 @@ export const agentApi = {
   submitPayment: (data) => agentClient.post('/agents/me/payments', data),
   commissions:   ()     => agentClient.get('/agents/me/commissions'),
   bankDetails:   (data) => agentClient.put('/agents/me/bank-details', data),
+  plans:         ()     => agentClient.get('/agents/me/plans'),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────

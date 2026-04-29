@@ -18,10 +18,11 @@ String fmtDate(DateTime? d) =>
 // ── Status helpers ────────────────────────────────────────────
 Color _subColor(String status) {
   switch (status) {
-    case 'active':    return AppColors.success;
-    case 'trial':     return AppColors.primaryLight;
-    case 'expired':   return AppColors.danger;
-    default:          return Colors.grey;
+    case 'active':          return AppColors.success;
+    case 'trial':           return AppColors.primaryLight;
+    case 'expired':         return AppColors.danger;
+    case 'pending_payment': return Colors.orange;
+    default:                return Colors.grey;
   }
 }
 
@@ -183,6 +184,419 @@ class _DashboardTab extends ConsumerWidget {
   }
 }
 
+// ── Onboard wizard sheet ──────────────────────────────────────
+class _OnboardWizardSheet extends ConsumerStatefulWidget {
+  final VoidCallback onSuccess;
+  const _OnboardWizardSheet({required this.onSuccess});
+  @override
+  ConsumerState<_OnboardWizardSheet> createState() => _OnboardWizardSheetState();
+}
+
+class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
+    with SingleTickerProviderStateMixin {
+  final _page = PageController();
+  int _step = 0;
+  bool _saving = false;
+
+  // Step 1 — shop info
+  final _nameCtrl    = TextEditingController();
+  final _ownerCtrl   = TextEditingController();
+  final _emailCtrl   = TextEditingController();
+  final _phoneCtrl   = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  // Step 2 — login
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _obscurePw = true;
+  // Step 3 — plan
+  List<Map<String, dynamic>> _plans = [];
+  int? _selectedPlanId;
+  int _months = 1;
+
+  static const _monthOpts = [
+    (v: 1, label: '1 Month'),
+    (v: 3, label: '3 Months  −10%'),
+    (v: 6, label: '6 Months  −15%'),
+    (v: 12, label: '1 Year  −20%'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlans();
+  }
+
+  @override
+  void dispose() {
+    _page.dispose();
+    for (final c in [_nameCtrl, _ownerCtrl, _emailCtrl, _phoneCtrl, _addressCtrl,
+                     _usernameCtrl, _passwordCtrl]) { c.dispose(); }
+    super.dispose();
+  }
+
+  Future<void> _loadPlans() async {
+    try {
+      final plans = await ref.read(agentServiceProvider).getPlans();
+      if (mounted) setState(() => _plans = plans);
+    } catch (_) {}
+  }
+
+  double? _calcPrice() {
+    if (_selectedPlanId == null) return null;
+    final plan = _plans.firstWhere((p) => p['id'] == _selectedPlanId, orElse: () => {});
+    if (plan.isEmpty) return null;
+    final base = double.tryParse(plan['base_monthly_price'].toString()) ?? 0;
+    double disc = 0;
+    if (_months >= 12) disc = double.tryParse(plan['discount_12m'].toString()) ?? 0.20;
+    else if (_months >= 6)  disc = double.tryParse(plan['discount_6m'].toString()) ?? 0.15;
+    else if (_months >= 3)  disc = double.tryParse(plan['discount_3m'].toString()) ?? 0.10;
+    return base * _months * (1 - disc);
+  }
+
+  void _goTo(int step) {
+    _page.animateToPage(step,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+    setState(() => _step = step);
+  }
+
+  bool get _step1Valid =>
+      _nameCtrl.text.isNotEmpty && _ownerCtrl.text.isNotEmpty && _emailCtrl.text.isNotEmpty;
+  bool get _step2Valid =>
+      _usernameCtrl.text.isNotEmpty && _passwordCtrl.text.length >= 6;
+
+  Future<void> _submit() async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(agentServiceProvider).onboardCustomer({
+        'name':               _nameCtrl.text.trim(),
+        'owner_name':         _ownerCtrl.text.trim(),
+        'email':              _emailCtrl.text.trim(),
+        'phone':              _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+        'address':            _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+        'username':           _usernameCtrl.text.trim(),
+        'password':           _passwordCtrl.text,
+        if (_selectedPlanId != null) 'plan_id': _selectedPlanId,
+        'subscription_months': _months,
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onSuccess();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final price = _calcPrice();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.88,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(children: [
+        // Handle
+        const SizedBox(height: 10),
+        Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 12),
+
+        // Step indicator
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(children: List.generate(4, (i) {
+            final done    = i < _step;
+            final current = i == _step;
+            final labels  = ['Shop Info', 'Login', 'Plan', 'Review'];
+            return Expanded(child: Row(children: [
+              if (i > 0) Expanded(child: Container(
+                height: 2,
+                color: done ? const Color(0xFF2E7D32) : Colors.grey[200],
+              )),
+              Column(mainAxisSize: MainAxisSize.min, children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: current ? 32 : 24,
+                  height: current ? 32 : 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: done ? const Color(0xFF2E7D32)
+                         : current ? const Color(0xFF1B5E20)
+                         : Colors.grey[200],
+                  ),
+                  child: Center(child: done
+                    ? const Icon(Icons.check, color: Colors.white, size: 14)
+                    : Text('${i + 1}', style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold,
+                        color: current ? Colors.white : Colors.grey[500]))),
+                ),
+                const SizedBox(height: 4),
+                Text(labels[i], style: TextStyle(
+                    fontSize: 10,
+                    color: current ? const Color(0xFF1B5E20)
+                         : done ? const Color(0xFF2E7D32)
+                         : Colors.grey[400],
+                    fontWeight: current ? FontWeight.bold : FontWeight.normal)),
+              ]),
+            ]));
+          })),
+        ),
+
+        const SizedBox(height: 16),
+        const Divider(height: 1),
+
+        // Pages
+        Expanded(child: PageView(
+          controller: _page,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            // ── Step 1: Shop Info ──────────────────────────────
+            _WizardPage(children: [
+              const Text('Shop Information',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _field(_nameCtrl,    'Shop Name *',   TextInputType.text),
+              _field(_ownerCtrl,   'Owner Name *',  TextInputType.text),
+              _field(_emailCtrl,   'Email *',       TextInputType.emailAddress),
+              _field(_phoneCtrl,   'Phone',         TextInputType.phone),
+              _field(_addressCtrl, 'Address',       TextInputType.streetAddress),
+            ]),
+
+            // ── Step 2: Login Account ──────────────────────────
+            _WizardPage(children: [
+              const Text('Owner Login Account',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              const Text('The shop owner will use these credentials to log into the POS.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54)),
+              const SizedBox(height: 16),
+              _field(_usernameCtrl, 'Username *', TextInputType.text),
+              StatefulBuilder(builder: (_, ss) => TextField(
+                controller: _passwordCtrl,
+                obscureText: _obscurePw,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Password * (min 6 characters)',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePw ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscurePw = !_obscurePw),
+                  ),
+                ),
+              )),
+            ]),
+
+            // ── Step 3: Subscription Plan ──────────────────────
+            _WizardPage(children: [
+              const Text('Subscription Plan',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              if (_plans.isEmpty)
+                const Text('No plans available — shop will be created without a plan.',
+                    style: TextStyle(color: Colors.black45, fontSize: 13))
+              else ...[
+                ..._plans.map((p) {
+                  final id       = p['id'] as int?;
+                  final selected = id == _selectedPlanId;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedPlanId = id),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selected ? const Color(0xFF2E7D32) : Colors.grey[300]!,
+                          width: selected ? 2 : 1,
+                        ),
+                        color: selected ? const Color(0xFFE8F5E9) : Colors.white,
+                      ),
+                      child: Row(children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 20, height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected ? const Color(0xFF2E7D32) : Colors.grey[400]!,
+                              width: 2,
+                            ),
+                            color: selected ? const Color(0xFF2E7D32) : Colors.transparent,
+                          ),
+                          child: selected
+                              ? const Icon(Icons.check, color: Colors.white, size: 12)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(p['name']?.toString() ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.w600))),
+                        Text('LKR ${NumberFormat('#,##0').format(double.tryParse(p['base_monthly_price'].toString()) ?? 0)}/mo',
+                            style: const TextStyle(fontWeight: FontWeight.bold,
+                                color: Color(0xFF2E7D32), fontSize: 13)),
+                      ]),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+                const Text('Duration', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: _monthOpts.map((o) {
+                  final sel = _months == o.v;
+                  return GestureDetector(
+                    onTap: () => setState(() => _months = o.v),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: sel ? const Color(0xFF1B5E20) : Colors.grey[100],
+                        border: Border.all(
+                          color: sel ? const Color(0xFF1B5E20) : Colors.grey[300]!),
+                      ),
+                      child: Text(o.label, style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: sel ? Colors.white : Colors.black87)),
+                    ),
+                  );
+                }).toList()),
+              ],
+              if (price != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.calculate_outlined, color: Color(0xFF2E7D32), size: 18),
+                    const SizedBox(width: 8),
+                    Text('Expected payment: ',
+                        style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                    Text(fmtMoney(price),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                            color: Color(0xFF1B5E20))),
+                  ]),
+                ),
+              ],
+            ]),
+
+            // ── Step 4: Review ────────────────────────────────
+            _WizardPage(children: [
+              const Text('Review & Confirm',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ...[
+                ['Shop Name',  _nameCtrl.text],
+                ['Owner',      _ownerCtrl.text],
+                ['Email',      _emailCtrl.text],
+                if (_phoneCtrl.text.isNotEmpty) ['Phone', _phoneCtrl.text],
+                ['Username',   _usernameCtrl.text],
+                ['Plan',       _plans.firstWhere((p) => p['id'] == _selectedPlanId, orElse: () => {'name': '— no plan'})['name'].toString()],
+                ['Duration',   '$_months month${_months > 1 ? 's' : ''}'],
+                if (price != null) ['Expected Amt', fmtMoney(price)],
+              ].map((row) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(children: [
+                  SizedBox(width: 110,
+                      child: Text(row[0], style: const TextStyle(color: Colors.black45, fontSize: 13))),
+                  Expanded(child: Text(row[1],
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                ]),
+              )),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(child: Text(
+                    'Shop will be Pending Payment. You must submit cash payment after collecting from the owner.',
+                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                  )),
+                ]),
+              ),
+            ]),
+          ],
+        )),
+
+        // Bottom nav buttons
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          child: Row(children: [
+            Expanded(child: OutlinedButton(
+              onPressed: _saving ? null : () {
+                if (_step == 0) Navigator.pop(context);
+                else _goTo(_step - 1);
+              },
+              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+              child: Text(_step == 0 ? 'Cancel' : 'Back'),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: FilledButton(
+              onPressed: _saving ? null : () {
+                if (_step == 0 && !_step1Valid) return;
+                if (_step == 1 && !_step2Valid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password must be at least 6 characters')));
+                  return;
+                }
+                if (_step < 3) _goTo(_step + 1);
+                else _submit();
+              },
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                backgroundColor: const Color(0xFF1B5E20),
+              ),
+              child: _saving
+                  ? const SizedBox(height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(_step < 3 ? 'Next' : 'Onboard Shop'),
+            )),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _field(TextEditingController ctrl, String label, TextInputType type) =>
+    Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: type,
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      ),
+    );
+}
+
+class _WizardPage extends StatelessWidget {
+  final List<Widget> children;
+  const _WizardPage({required this.children});
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+  );
+}
+
 // ── Customers tab ─────────────────────────────────────────────
 class _CustomersTab extends ConsumerStatefulWidget {
   const _CustomersTab();
@@ -198,123 +612,22 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
   void dispose() { _search.dispose(); super.dispose(); }
 
   void _showOnboardSheet() {
-    final nameCtrl     = TextEditingController();
-    final ownerCtrl    = TextEditingController();
-    final emailCtrl    = TextEditingController();
-    final phoneCtrl    = TextEditingController();
-    final addressCtrl  = TextEditingController();
-    final usernameCtrl = TextEditingController();
-    final passwordCtrl = TextEditingController();
-    bool saving = false;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(builder: (ctx, setSt) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: EdgeInsets.only(
-          top: 20, left: 20, right: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('Onboard New Shop',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            const SizedBox(height: 4),
-            Text('Shop Details',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-            const SizedBox(height: 8),
-            for (final cfg in [
-              {'ctrl': nameCtrl,    'label': 'Shop Name',   'required': true,  'type': TextInputType.text},
-              {'ctrl': ownerCtrl,   'label': 'Owner Name',  'required': true,  'type': TextInputType.text},
-              {'ctrl': emailCtrl,   'label': 'Email',       'required': true,  'type': TextInputType.emailAddress},
-              {'ctrl': phoneCtrl,   'label': 'Phone',       'required': false, 'type': TextInputType.phone},
-              {'ctrl': addressCtrl, 'label': 'Address',     'required': false, 'type': TextInputType.streetAddress},
-            ]) ...[
-              TextField(
-                controller: cfg['ctrl'] as TextEditingController,
-                keyboardType: cfg['type'] as TextInputType,
-                decoration: InputDecoration(
-                  labelText: cfg['label'] as String,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            const SizedBox(height: 4),
-            Text('Login Account (for the shop owner)',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-            const SizedBox(height: 8),
-            TextField(
-              controller: usernameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Username *',
-                border: OutlineInputBorder(),
-                helperText: 'The owner will use this to log in to the POS',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: passwordCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password * (min 6 chars)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: saving ? null : () async {
-                if (nameCtrl.text.isEmpty || ownerCtrl.text.isEmpty || emailCtrl.text.isEmpty) return;
-                if (usernameCtrl.text.isEmpty || passwordCtrl.text.isEmpty) return;
-                if (passwordCtrl.text.length < 6) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Password must be at least 6 characters')));
-                  return;
-                }
-                setSt(() => saving = true);
-                try {
-                  await ref.read(agentServiceProvider).onboardCustomer({
-                    'name': nameCtrl.text.trim(),
-                    'owner_name': ownerCtrl.text.trim(),
-                    'email': emailCtrl.text.trim(),
-                    'phone': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                    'address': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                    'username': usernameCtrl.text.trim(),
-                    'password': passwordCtrl.text,
-                  });
-                  ref.invalidate(agentCustomersProvider);
-                  ref.invalidate(agentDashboardProvider);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Shop onboarded successfully')),
-                    );
-                  }
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                    );
-                  }
-                } finally {
-                  setSt(() => saving = false);
-                }
-              },
-              style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-              child: saving
-                  ? const SizedBox(height: 20, width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Onboard Shop'),
-            ),
-          ]),
-        ),
-      )),
+      builder: (_) => _OnboardWizardSheet(
+        onSuccess: () {
+          ref.invalidate(agentCustomersProvider);
+          ref.invalidate(agentDashboardProvider);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Shop onboarded — awaiting payment')),
+            );
+          }
+        },
+      ),
     );
   }
 

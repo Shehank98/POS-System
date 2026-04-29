@@ -22,6 +22,7 @@ function statusChip(status) {
     pending_verification: 'bg-yellow-100 text-yellow-800',
     verified:             'bg-green-100 text-green-800',
     rejected:             'bg-red-100 text-red-800',
+    pending_payment:      'bg-orange-100 text-orange-800',
     pending:              'bg-yellow-100 text-yellow-800',
     approved:             'bg-green-100 text-green-800',
     paid:                 'bg-blue-100 text-blue-800',
@@ -140,14 +141,247 @@ function DashboardTab() {
   );
 }
 
+// ── Onboard wizard (4 steps) ──────────────────────────────────
+const BLANK_FORM = { name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'', plan_id:'', subscription_months:1 };
+
+function OnboardWizard({ onDone, onClose }) {
+  const [step, setStep]   = useState(1);
+  const [form, setForm]   = useState(BLANK_FORM);
+  const [plans, setPlans] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    agentApi.plans().then(({ data }) => setPlans(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const MONTH_OPTS = [
+    { v:1,  label:'1 Month' },
+    { v:3,  label:'3 Months (-10%)' },
+    { v:6,  label:'6 Months (-15%)' },
+    { v:12, label:'1 Year (-20%)' },
+  ];
+
+  function calcPrice(plan, months) {
+    if (!plan) return null;
+    let disc = 0;
+    if (months >= 12) disc = parseFloat(plan.discount_12m);
+    else if (months >= 6) disc = parseFloat(plan.discount_6m);
+    else if (months >= 3) disc = parseFloat(plan.discount_3m);
+    return (parseFloat(plan.base_monthly_price) * months * (1 - disc)).toFixed(2);
+  }
+
+  const selectedPlan = plans.find((p) => String(p.id) === String(form.plan_id));
+  const totalPrice   = calcPrice(selectedPlan, form.subscription_months);
+
+  const STEPS = ['Shop Info', 'Login Account', 'Subscription', 'Review'];
+
+  async function handleSubmit() {
+    setSaving(true);
+    try {
+      await agentApi.onboard({
+        name:               form.name,
+        owner_name:         form.owner_name,
+        email:              form.email,
+        phone:              form.phone   || undefined,
+        address:            form.address || undefined,
+        username:           form.username,
+        password:           form.password,
+        plan_id:            form.plan_id || undefined,
+        subscription_months: Number(form.subscription_months),
+      });
+      toast.success('Shop onboarded! Awaiting payment.');
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to onboard shop');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-green-200 rounded-xl overflow-hidden">
+      {/* Step indicator */}
+      <div className="flex border-b border-gray-100">
+        {STEPS.map((label, i) => (
+          <div key={i} className={`flex-1 py-2 text-center text-xs font-medium transition-colors ${
+            i + 1 === step ? 'bg-green-700 text-white' :
+            i + 1 < step  ? 'bg-green-100 text-green-700' :
+                             'text-gray-400'
+          }`}>
+            <span className="inline-flex items-center gap-1">
+              <span className={`w-4 h-4 rounded-full text-[10px] inline-flex items-center justify-center font-bold ${
+                i + 1 < step ? 'bg-green-600 text-white' : i + 1 === step ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-500'
+              }`}>{i + 1}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Step 1 — Shop Info */}
+        {step === 1 && (
+          <>
+            <h3 className="font-semibold text-green-800 text-sm">Shop Information</h3>
+            {[
+              { key:'name',       label:'Shop Name *',  type:'text',  required:true },
+              { key:'owner_name', label:'Owner Name *', type:'text',  required:true },
+              { key:'email',      label:'Email *',      type:'email', required:true },
+              { key:'phone',      label:'Phone',        type:'tel',   required:false },
+              { key:'address',    label:'Address',      type:'text',  required:false },
+            ].map((f) => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <input type={f.type} value={form[f.key]}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Step 2 — Login account */}
+        {step === 2 && (
+          <>
+            <h3 className="font-semibold text-green-800 text-sm">Owner Login Account</h3>
+            <p className="text-xs text-gray-500">The shop owner will use these credentials to log into the POS system.</p>
+            {[
+              { key:'username', label:'Username *',                       type:'text',     required:true },
+              { key:'password', label:'Password * (min 6 characters)',    type:'password', required:true },
+            ].map((f) => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <input type={f.type} value={form[f.key]}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Step 3 — Subscription plan */}
+        {step === 3 && (
+          <>
+            <h3 className="font-semibold text-green-800 text-sm">Subscription Plan</h3>
+            {plans.length === 0
+              ? <p className="text-xs text-gray-400">No plans available — shop will be created without a plan.</p>
+              : (
+                <div className="space-y-2">
+                  {plans.map((p) => (
+                    <label key={p.id} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      String(form.plan_id) === String(p.id)
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:border-green-300'
+                    }`}>
+                      <input type="radio" name="plan" value={p.id}
+                        checked={String(form.plan_id) === String(p.id)}
+                        onChange={() => set('plan_id', p.id)}
+                        className="mt-0.5 accent-green-700" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-gray-800">{p.name}</span>
+                          <span className="text-sm font-bold text-green-700">LKR {Number(p.base_monthly_price).toLocaleString()}/mo</span>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )
+            }
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Subscription Duration</label>
+              <div className="grid grid-cols-2 gap-2">
+                {MONTH_OPTS.map((o) => (
+                  <button key={o.v} type="button"
+                    onClick={() => set('subscription_months', o.v)}
+                    className={`py-2 text-xs rounded-lg border font-medium transition-colors ${
+                      form.subscription_months === o.v
+                        ? 'bg-green-700 text-white border-green-700'
+                        : 'border-gray-300 text-gray-600 hover:border-green-400'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {totalPrice && (
+              <div className="bg-green-50 rounded-lg p-3 text-sm">
+                <span className="text-gray-600">Expected payment: </span>
+                <span className="font-bold text-green-800">LKR {Number(totalPrice).toLocaleString()}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Step 4 — Review */}
+        {step === 4 && (
+          <>
+            <h3 className="font-semibold text-green-800 text-sm">Review & Confirm</h3>
+            <div className="space-y-2 text-sm">
+              {[
+                ['Shop Name',    form.name],
+                ['Owner',        form.owner_name],
+                ['Email',        form.email],
+                ['Phone',        form.phone || '—'],
+                ['Username',     form.username],
+                ['Plan',         selectedPlan?.name || '— (no plan)'],
+                ['Duration',     `${form.subscription_months} month(s)`],
+                ['Expected Amt', totalPrice ? `LKR ${Number(totalPrice).toLocaleString()}` : '—'],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-2">
+                  <span className="text-gray-500 shrink-0">{k}</span>
+                  <span className="font-medium text-gray-800 text-right truncate">{v}</span>
+                </div>
+              ))}
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+              Shop will be created as <strong>Pending Payment</strong>. Agent must submit cash payment after collecting from owner.
+            </div>
+          </>
+        )}
+
+        {/* Nav buttons */}
+        <div className="flex gap-2 pt-1">
+          {step > 1
+            ? <button type="button" onClick={() => setStep((s) => s - 1)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                Back
+              </button>
+            : <button type="button" onClick={onClose}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+          }
+          {step < 4
+            ? <button type="button"
+                disabled={
+                  (step === 1 && (!form.name || !form.owner_name || !form.email)) ||
+                  (step === 2 && (!form.username || form.password.length < 6))
+                }
+                onClick={() => setStep((s) => s + 1)}
+                className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                Next
+              </button>
+            : <button type="button" disabled={saving} onClick={handleSubmit}
+                className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Onboard Shop'}
+              </button>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shops Tab ─────────────────────────────────────────────────
 function ShopsTab() {
   const [shops, setShops]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery]     = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState({ name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'' });
-  const [saving, setSaving]   = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,26 +400,6 @@ function ShopsTab() {
     s.owner_name?.toLowerCase().includes(query.toLowerCase()) ||
     s.email?.toLowerCase().includes(query.toLowerCase())
   );
-
-  async function handleOnboard(e) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await agentApi.onboard({
-        ...form,
-        phone:   form.phone   || undefined,
-        address: form.address || undefined,
-      });
-      toast.success('Shop onboarded successfully!');
-      setShowForm(false);
-      setForm({ name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'' });
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to onboard shop');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   if (loading) return <Spinner />;
 
@@ -207,41 +421,12 @@ function ShopsTab() {
         </button>
       </div>
 
-      {/* Onboard form */}
+      {/* Onboard wizard */}
       {showForm && (
-        <form onSubmit={handleOnboard} className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-          <h3 className="font-semibold text-green-800 text-sm">Onboard New Shop</h3>
-          {[
-            { key:'name',       label:'Shop Name *',           type:'text',     required:true },
-            { key:'owner_name', label:'Owner Name *',          type:'text',     required:true },
-            { key:'email',      label:'Email *',               type:'email',    required:true },
-            { key:'phone',      label:'Phone',                 type:'tel',      required:false },
-            { key:'address',    label:'Address',               type:'text',     required:false },
-            { key:'username',   label:'Login Username *',      type:'text',     required:true },
-            { key:'password',   label:'Login Password * (min 6 chars)', type:'password', required:true },
-          ].map((f) => (
-            <div key={f.key}>
-              <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-              <input
-                type={f.type}
-                required={f.required}
-                value={form[f.key]}
-                onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          ))}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={() => setShowForm(false)}
-              className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Onboard Shop'}
-            </button>
-          </div>
-        </form>
+        <OnboardWizard
+          onDone={() => { setShowForm(false); load(); }}
+          onClose={() => setShowForm(false)}
+        />
       )}
 
       {/* Shop list */}

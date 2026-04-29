@@ -71,6 +71,7 @@ class UserModel {
   bool get isManagerOrAbove => role == 'owner' || role == 'manager';
   bool get isClothingShop => shopType == 'clothing';
   bool get isCarServiceShop => shopType == 'car_wash';
+  bool get isPendingPayment => subscriptionStatus == 'pending_payment';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(

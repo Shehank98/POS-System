@@ -14,6 +14,7 @@ router.get ('/me/payments',                      ctrl.listPayments);
 router.get ('/me/commissions',                   ctrl.listCommissions);
 router.put ('/me/bank-details',                  ctrl.updateBankDetails);
 router.get ('/me/renewals',                      ctrl.getRenewals);
+router.get ('/me/plans',                         ctrl.listPlans);
 router.get ('/me/notifications',                 notifCtrl.getAgentNotifications);
 router.put ('/me/notifications/read-all',        notifCtrl.markAllAgentNotificationsRead);
 router.put ('/me/notifications/:id/read',        notifCtrl.markAgentNotificationRead);
