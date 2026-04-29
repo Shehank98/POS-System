@@ -105,4 +105,15 @@ class ApiConstants {
   static const String qrGenerate = '/qr/generate';
   static String qrStatus(String ref) => '/qr/status/$ref';
   static String qrDisplay(String ref) => '/qr/display/$ref';
+
+  // ── Sales Agent ───────────────────────────────────────────────
+  static const String agentLogin       = '/agent-auth/login';
+  static const String agentMe          = '/agent-auth/me';
+  static const String agentDashboard   = '/agents/me/dashboard';
+  static const String agentCustomers   = '/agents/me/customers';
+  static const String agentPayments    = '/agents/me/payments';
+  static const String agentCommissions = '/agents/me/commissions';
+  static const String agentBankDetails = '/agents/me/bank-details';
+  static const String agentRenewals    = '/agents/me/renewals';
+  static String agentEditCustomer(int shopId) => '/agents/me/customers/$shopId';
 }

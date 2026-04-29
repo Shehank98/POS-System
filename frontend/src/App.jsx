@@ -23,6 +23,7 @@ import PreOrdersPage from './pages/PreOrdersPage';
 import CustomersPage from './pages/CustomersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AgentsPage from './pages/admin/AgentsPage';
 
 // Clothing module
 import ClothingExchangesPage from './pages/ClothingExchangesPage';
@@ -102,6 +103,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminDashboardPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/agents"
+          element={
+            <AdminRoute>
+              <AgentsPage />
             </AdminRoute>
           }
         />

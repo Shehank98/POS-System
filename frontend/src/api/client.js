@@ -284,6 +284,22 @@ export const adminApi = {
   deletePlan:       (id)         => adminClient.delete(`/admin/plans/${id}`),
   // Notification dispatch
   dispatchNotification: (data)   => adminClient.post('/admin/notifications/dispatch', data),
+
+  // ── Sales Agent management ──────────────────────────────────
+  listAgents:           ()       => adminClient.get('/admin/agents'),
+  createAgent:          (data)   => adminClient.post('/admin/agents', data),
+  updateAgent:          (id, data) => adminClient.put(`/admin/agents/${id}`, data),
+  getAgentCustomers:    (id)     => adminClient.get(`/admin/agents/${id}/customers`),
+
+  // Agent payment submissions
+  pendingAgentPayments: ()       => adminClient.get('/admin/agent-payments/pending'),
+  allAgentPayments:     (params) => adminClient.get('/admin/agent-payments', { params }),
+  verifyAgentPayment:   (id)     => adminClient.put(`/admin/agent-payments/${id}/verify`),
+  rejectAgentPayment:   (id, data) => adminClient.put(`/admin/agent-payments/${id}/reject`, data),
+
+  // Agent commissions
+  agentCommissions: (params) => adminClient.get('/admin/agent-commissions', { params }),
+  payoutCommissions: (data)  => adminClient.put('/admin/agent-commissions/payout', data),
 };
 
 export default client;

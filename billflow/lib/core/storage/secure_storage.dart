@@ -43,6 +43,25 @@ class SecureStorage {
   Future<bool> readBiometricEnabled() async =>
       await _storage.read(key: _biometricKey) == 'true';
 
+  // ── Sales Agent ───────────────────────────────────────────────
+  static const _agentTokenKey = 'agent_token';
+  static const _agentUserKey  = 'agent_user_json';
+
+  Future<void> saveAgentToken(String token) =>
+      _storage.write(key: _agentTokenKey, value: token);
+
+  Future<String?> readAgentToken() => _storage.read(key: _agentTokenKey);
+
+  Future<void> saveAgentUser(String json) =>
+      _storage.write(key: _agentUserKey, value: json);
+
+  Future<String?> readAgentUser() => _storage.read(key: _agentUserKey);
+
+  Future<void> deleteAgentSession() async {
+    await _storage.delete(key: _agentTokenKey);
+    await _storage.delete(key: _agentUserKey);
+  }
+
   Future<void> deleteAll() => _storage.deleteAll();
 }
 

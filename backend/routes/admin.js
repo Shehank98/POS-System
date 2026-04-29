@@ -2,6 +2,7 @@ const router      = require('express').Router();
 const adminAuth   = require('../middleware/adminAuth');
 const ctrl        = require('../controllers/adminController');
 const auditCtrl   = require('../controllers/auditController');
+const agentCtrl   = require('../controllers/adminAgentController');
 
 // Public admin login
 router.post('/login', ctrl.adminLogin);
@@ -42,5 +43,21 @@ router.delete('/plans/:id',                 ctrl.deletePlan);
 
 // Admin notification dispatch
 router.post('/notifications/dispatch',      ctrl.dispatchNotification);
+
+// ── Sales Agent management ────────────────────────────────────
+router.get ('/agents',                      agentCtrl.listAgents);
+router.post('/agents',                      agentCtrl.createAgent);
+router.put ('/agents/:id',                  agentCtrl.updateAgent);
+router.get ('/agents/:id/customers',        agentCtrl.getAgentCustomers);
+
+// Agent payment submissions
+router.get ('/agent-payments/pending',      agentCtrl.listPendingPayments);
+router.get ('/agent-payments',              agentCtrl.listAllPayments);
+router.put ('/agent-payments/:id/verify',   agentCtrl.verifyPayment);
+router.put ('/agent-payments/:id/reject',   agentCtrl.rejectPayment);
+
+// Agent commissions
+router.get ('/agent-commissions',           agentCtrl.listCommissions);
+router.put ('/agent-commissions/payout',    agentCtrl.markPayout);
 
 module.exports = router;

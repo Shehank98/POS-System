@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -202,7 +203,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => context.go('/agent-login'),
+                    child: const Text(
+                      'Sales Agent? Sign in here →',
+                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   const Text(
                     'BillFlow © 2026',
                     style: TextStyle(color: Colors.white54, fontSize: 12),

@@ -17,6 +17,8 @@ const { setupWebSocket } = require('./websocket');
 const runMigrations  = require('./utils/runMigrations');
 
 const authRoutes         = require('./routes/auth');
+const agentAuthRoutes    = require('./routes/agentAuth');
+const agentRoutes        = require('./routes/agents');
 const productRoutes      = require('./routes/products');
 const transactionRoutes  = require('./routes/transactions');
 const adminRoutes        = require('./routes/admin');
@@ -51,6 +53,8 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date()
 
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/auth',          authRoutes);
+app.use('/api/agent-auth',    agentAuthRoutes);
+app.use('/api/agents',        agentRoutes);
 app.use('/api/products',      productRoutes);
 app.use('/api/transactions',  transactionRoutes);
 app.use('/api/admin',         adminRoutes);

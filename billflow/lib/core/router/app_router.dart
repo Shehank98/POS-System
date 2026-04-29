@@ -25,22 +25,33 @@ import '../../presentation/screens/carwash/carwash_services_screen.dart';
 import '../../presentation/screens/customers/customers_screen.dart';
 import '../../presentation/screens/pre_orders/pre_orders_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
+import '../../presentation/screens/agent/agent_login_screen.dart';
+import '../../presentation/screens/agent/agent_home_screen.dart';
+import '../../providers/agent_auth_provider.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final authState    = ref.watch(authProvider);
+  final agentState   = ref.watch(agentAuthProvider);
   final needsBiometric = ref.watch(biometricGateProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
-      final user = authState.valueOrNull;
+      final user    = authState.valueOrNull;
+      final agent   = agentState.valueOrNull;
       final isLoggedIn = user != null;
-      final isLoading = authState.isLoading;
+      final isLoading  = authState.isLoading;
       final loc = state.matchedLocation;
+
+      // Agent routes — completely separate from shop routes
+      if (loc.startsWith('/agent')) {
+        if (loc == '/agent-login') return agent != null ? '/agent' : null;
+        return agent == null ? '/agent-login' : null;
+      }
 
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';
@@ -70,6 +81,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/agent-login',
+        builder: (context, state) => const AgentLoginScreen(),
+      ),
+      GoRoute(
+        path: '/agent',
+        builder: (context, state) => const AgentHomeScreen(),
       ),
       GoRoute(
         path: '/biometric',

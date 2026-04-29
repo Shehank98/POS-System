@@ -1845,21 +1845,30 @@ export default function AdminDashboardPage() {
             { id: 'dashboard_tab', label: 'Overview',      icon: TrendingUp },
             { id: 'plans',         label: 'Plans',         icon: Layers },
             { id: 'notifications', label: 'Notifications', icon: Bell },
+            { id: 'agents',        label: 'Sales Agents',  icon: Users, isLink: '/admin/agents' },
           ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                ${tab === t.id ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {t.icon && <t.icon className="w-3.5 h-3.5" />}
-              {t.label}
-              {t.badge > 0 && (
-                <span className="ml-1.5 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full">
-                  {t.badge}
-                </span>
-              )}
-            </button>
+            t.isLink ? (
+              <a key={t.id} href={t.isLink}
+                className="relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors text-gray-400 hover:text-white">
+                {t.icon && <t.icon className="w-3.5 h-3.5" />}
+                {t.label}
+              </a>
+            ) : (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                  ${tab === t.id ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                {t.icon && <t.icon className="w-3.5 h-3.5" />}
+                {t.label}
+                {t.badge > 0 && (
+                  <span className="ml-1.5 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            )
           ))}
         </div>
 
