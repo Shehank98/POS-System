@@ -333,7 +333,7 @@ function CartPanel({ onPayClick, onClose, clothingProps, voucherAmount = 0, vouc
     setQty, setItemDiscount, removeItem, setOrderDiscount, clearCart,
   } = useCartStore();
   const totals = useCartStore((s) => s.totals);
-  const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+  const totalQty = items.length;
 
   // Scroll to top whenever the first item changes (new item added or re-added)
   const listRef = useRef(null);
@@ -786,7 +786,7 @@ export default function POSPage() {
     }
   }
 
-  const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
+  const totalItemCount = items.length;
 
   return (
     <div className="flex flex-col md:flex-row -mx-4 -my-6
@@ -1102,8 +1102,7 @@ export default function POSPage() {
           onDone={(items) => {
             items.forEach(({ product, quantity }) => addItem(product, quantity));
             if (items.length > 0) {
-              const total = items.reduce((s, i) => s + i.quantity, 0);
-              toast.success(`Added ${total} item${total !== 1 ? 's' : ''} to cart`);
+              toast.success(`Added ${items.length} item${items.length !== 1 ? 's' : ''} to cart`);
             }
             barcodeRef.current?.focus();
           }}

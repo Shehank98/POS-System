@@ -21,9 +21,7 @@ class CartState {
   double get taxAmount =>
       items.fold(0.0, (sum, item) => sum + item.taxAmount);
   double get total => subtotal + taxAmount - orderDiscount;
-  // kg items count as 1 each; unit items count by integer quantity
-  int get itemCount => items.fold(0, (s, i) =>
-      s + (i.product.unitType == 'kg' ? 1 : i.quantity.toInt().clamp(1, 9999)));
+  int get itemCount => items.length;
   bool get isEmpty => items.isEmpty;
 
   CartState copyWith({
