@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../data/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
@@ -18,6 +19,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _biometricEnabled = false;
   bool _biometricAvailable = false;
   bool _biometricLoading = false;
+  bool _deviceSupportsBiometrics = false;
 
   @override
   void initState() {
@@ -27,13 +29,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadBiometricState() async {
     final storage = ref.read(secureStorageProvider);
-    final service = ref.read(biometricServiceProvider);
     final enabled = await storage.readBiometricEnabled();
-    final available = await service.isAvailable();
+    final auth = LocalAuthentication();
+    final deviceSupported = await auth.isDeviceSupported();
+    final available = deviceSupported && await ref.read(biometricServiceProvider).isAvailable();
     if (mounted) {
       setState(() {
         _biometricEnabled = enabled;
         _biometricAvailable = available;
+        _deviceSupportsBiometrics = deviceSupported;
       });
     }
   }
@@ -175,25 +179,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
                 const Divider(height: 1),
-                _biometricLoading
-                    ? const ListTile(
-                        leading: Icon(Icons.fingerprint),
-                        title: Text('Fingerprint Login'),
-                        trailing: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                      )
-                    : SwitchListTile(
-                        title: const Text('Fingerprint Login'),
-                        subtitle: Text(_biometricAvailable
-                            ? 'Use fingerprint to unlock app'
-                            : 'No fingerprint enrolled on device'),
-                        secondary: const Icon(Icons.fingerprint),
-                        value: _biometricEnabled,
-                        onChanged:
-                            _biometricAvailable ? _toggleBiometric : null,
-                      ),
+                if (_biometricLoading)
+                  const ListTile(
+                    leading: Icon(Icons.fingerprint),
+                    title: Text('Fingerprint Login'),
+                    trailing: SizedBox(width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                else if (_deviceSupportsBiometrics && !_biometricAvailable)
+                  ListTile(
+                    leading: const Icon(Icons.fingerprint, color: Colors.orange),
+                    title: const Text('Fingerprint Login'),
+                    subtitle: const Text(
+                      'No fingerprint enrolled. Tap to open Security Settings.',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        // Open device security settings
+                        const intent = 'android.settings.SECURITY_SETTINGS';
+                        try {
+                          await LocalAuthentication().getAvailableBiometrics();
+                        } catch (_) {}
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Go to Settings → Security → Fingerprint to enroll'),
+                              duration: Duration(seconds: 5),
+                              action: SnackBarAction(label: 'OK', onPressed: () {}),
+                            ),
+                          );
+                          // Re-check after a short delay
+                          await Future.delayed(const Duration(seconds: 3));
+                          await _loadBiometricState();
+                        }
+                      },
+                      child: const Text('Open Settings'),
+                    ),
+                  )
+                else
+                  SwitchListTile(
+                    title: const Text('Fingerprint Login'),
+                    subtitle: Text(_biometricAvailable
+                        ? 'Use fingerprint to unlock app'
+                        : 'Not supported on this device'),
+                    secondary: Icon(Icons.fingerprint,
+                        color: _biometricAvailable ? null : Colors.grey),
+                    value: _biometricEnabled,
+                    onChanged: _biometricAvailable ? _toggleBiometric : null,
+                  ),
               ],
             ),
           ),

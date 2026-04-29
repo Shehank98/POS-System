@@ -70,6 +70,9 @@ class AgentCustomer {
   final String? address;
   final String subscriptionStatus;
   final DateTime? subscriptionEndDate;
+  final String? planName;
+  final double? expectedAmount;
+  final int subscriptionMonths;
   final DateTime createdAt;
 
   const AgentCustomer({
@@ -81,6 +84,9 @@ class AgentCustomer {
     this.address,
     required this.subscriptionStatus,
     this.subscriptionEndDate,
+    this.planName,
+    this.expectedAmount,
+    this.subscriptionMonths = 1,
     required this.createdAt,
   });
 
@@ -95,16 +101,26 @@ class AgentCustomer {
         subscriptionEndDate:  json['subscription_end_date'] != null
             ? DateTime.tryParse(json['subscription_end_date'].toString())
             : null,
+        planName:             json['plan_name'] as String?,
+        expectedAmount:       json['expected_amount'] != null
+            ? double.tryParse(json['expected_amount'].toString())
+            : null,
+        subscriptionMonths:   (json['subscription_months'] as num?)?.toInt() ?? 1,
         createdAt: json['created_at'] != null
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
       );
 
-  bool get isActive   => subscriptionStatus == 'active';
+  bool get isActive          => subscriptionStatus == 'active';
+  bool get isPendingPayment  => subscriptionStatus == 'pending_payment';
   bool get isExpiring =>
       isActive &&
       subscriptionEndDate != null &&
       subscriptionEndDate!.difference(DateTime.now()).inDays <= 3;
+
+  int? get daysUntilExpiry => subscriptionEndDate != null
+      ? subscriptionEndDate!.difference(DateTime.now()).inDays
+      : null;
 }
 
 class AgentPaymentSubmission {
@@ -137,7 +153,7 @@ class AgentPaymentSubmission {
         id:            (json['id'] as num?)?.toInt() ?? 0,
         shopId:        (json['shop_id'] as num?)?.toInt() ?? 0,
         shopName:      json['shop_name'] as String? ?? '',
-        amount:        double.parse(json['amount'].toString()),
+        amount:        double.tryParse((json['amount'] ?? json['submitted_amount'] ?? 0).toString()) ?? 0.0,
         paymentMethod: json['payment_method'] as String? ?? '',
         paymentDate:   json['payment_date'] != null
             ? DateTime.tryParse(json['payment_date'].toString()) ?? DateTime.now()
@@ -190,35 +206,49 @@ class AgentDashboard {
   final int totalCustomers;
   final int activeCustomers;
   final int inactiveCustomers;
+  final int pendingPaymentShops;
   final double approvedEarnings;
   final double pendingEarnings;
   final double totalPaid;
   final int pendingSubmissions;
   final int monthlyTarget;
+  final double walletCollected;
+  final double walletVerified;
   final List<Map<String, dynamic>> expiringSoon;
 
   const AgentDashboard({
     required this.totalCustomers,
     required this.activeCustomers,
     required this.inactiveCustomers,
+    this.pendingPaymentShops = 0,
     required this.approvedEarnings,
     required this.pendingEarnings,
     required this.totalPaid,
     required this.pendingSubmissions,
     required this.monthlyTarget,
+    this.walletCollected = 0,
+    this.walletVerified = 0,
     required this.expiringSoon,
   });
 
-  factory AgentDashboard.fromJson(Map<String, dynamic> json) => AgentDashboard(
-        totalCustomers:     (json['total_customers'] as num?)?.toInt() ?? 0,
-        activeCustomers:    (json['active_customers'] as num?)?.toInt() ?? 0,
-        inactiveCustomers:  (json['inactive_customers'] as num?)?.toInt() ?? 0,
-        approvedEarnings:   double.parse((json['approved_earnings'] ?? 0).toString()),
-        pendingEarnings:    double.parse((json['pending_earnings'] ?? 0).toString()),
-        totalPaid:          double.parse((json['total_paid'] ?? 0).toString()),
-        pendingSubmissions: (json['pending_submissions'] as num?)?.toInt() ?? 0,
-        monthlyTarget:      (json['monthly_target'] as num?)?.toInt() ?? 0,
-        expiringSoon: (json['expiring_soon'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>(),
-      );
+  double get walletBalance => walletCollected - walletVerified;
+
+  factory AgentDashboard.fromJson(Map<String, dynamic> json) {
+    double _d(dynamic v) => double.tryParse((v ?? 0).toString()) ?? 0.0;
+    return AgentDashboard(
+      totalCustomers:      (json['total_customers'] as num?)?.toInt() ?? 0,
+      activeCustomers:     (json['active_customers'] as num?)?.toInt() ?? 0,
+      inactiveCustomers:   (json['inactive_customers'] as num?)?.toInt() ?? 0,
+      pendingPaymentShops: (json['pending_payment_shops'] as num?)?.toInt() ?? 0,
+      approvedEarnings:    _d(json['approved_earnings']),
+      pendingEarnings:     _d(json['pending_earnings']),
+      totalPaid:           _d(json['total_paid']),
+      pendingSubmissions:  (json['pending_submissions'] as num?)?.toInt() ?? 0,
+      monthlyTarget:       (json['monthly_target'] as num?)?.toInt() ?? 0,
+      walletCollected:     _d(json['wallet_collected']),
+      walletVerified:      _d(json['wallet_verified']),
+      expiringSoon: (json['expiring_soon'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>(),
+    );
+  }
 }

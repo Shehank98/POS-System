@@ -607,6 +607,7 @@ class _CustomersTab extends ConsumerStatefulWidget {
 class _CustomersTabState extends ConsumerState<_CustomersTab> {
   final _search = TextEditingController();
   String _q = '';
+  String _filter = 'all'; // all | active | pending | expired
 
   @override
   void dispose() { _search.dispose(); super.dispose(); }
@@ -631,10 +632,29 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
     );
   }
 
+  String _expiryLabel(AgentCustomer c) {
+    final days = c.daysUntilExpiry;
+    if (days == null) return '';
+    if (days < 0)  return 'Expired ${-days} day${-days == 1 ? '' : 's'} ago';
+    if (days == 0) return 'Expires today';
+    return 'Expires in $days day${days == 1 ? '' : 's'}';
+  }
+
+  Color _expiryColor(AgentCustomer c) {
+    final days = c.daysUntilExpiry;
+    if (days == null) return Colors.transparent;
+    if (days < 0)  return AppColors.danger;
+    if (days <= 3) return AppColors.danger;
+    if (days <= 7) return AppColors.warning;
+    return Colors.black45;
+  }
+
   @override
   Widget build(BuildContext context) {
     final customers = ref.watch(agentCustomersProvider);
+
     return Column(children: [
+      // Search + Add
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Row(children: [
@@ -653,58 +673,152 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
           const SizedBox(width: 10),
           FilledButton.icon(
             onPressed: _showOnboardSheet,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add'),
+            icon: const Icon(Icons.store_mall_directory, size: 18),
+            label: const Text('Onboard'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1B5E20)),
           ),
         ]),
       ),
+
+      // Filter chips
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final (id, label) in [
+              ('all',     'All'),
+              ('active',  'Active'),
+              ('pending', 'Pending'),
+              ('expired', 'Expired'),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(label),
+                  selected: _filter == id,
+                  onSelected: (_) => setState(() => _filter = id),
+                  selectedColor: _filter == id ? _filterColor(id).withValues(alpha: 0.2) : null,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    color: _filter == id ? _filterColor(id) : null,
+                    fontWeight: _filter == id ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  checkmarkColor: _filterColor(id),
+                  side: BorderSide(
+                    color: _filter == id ? _filterColor(id) : Colors.grey[300]!,
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
+
       Expanded(child: customers.when(
         loading: () => const ShimmerList(itemCount: 6),
         error: (e, _) => Center(child: Text('$e')),
         data: (list) {
-          final filtered = list.where((c) =>
-              c.name.toLowerCase().contains(_q) ||
-              c.ownerName.toLowerCase().contains(_q) ||
-              c.email.toLowerCase().contains(_q)).toList();
+          final filtered = list.where((c) {
+            final q = _q.isEmpty ||
+                c.name.toLowerCase().contains(_q) ||
+                c.ownerName.toLowerCase().contains(_q) ||
+                c.email.toLowerCase().contains(_q);
+            if (!q) return false;
+            return switch (_filter) {
+              'active'  => c.subscriptionStatus == 'active',
+              'pending' => c.subscriptionStatus == 'pending_payment',
+              'expired' => c.subscriptionStatus == 'expired',
+              _         => true,
+            };
+          }).toList();
+
           if (filtered.isEmpty) {
-            return const Center(child: Text('No customers found', style: TextStyle(color: Colors.black45)));
+            return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.store_outlined, size: 48, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text(_q.isNotEmpty ? 'No results for "$_q"' : 'No shops in this category',
+                  style: const TextStyle(color: Colors.black45)),
+            ]));
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(agentCustomersProvider.future),
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               itemCount: filtered.length,
               itemBuilder: (_, i) {
                 final c = filtered[i];
+                final statusColor = _subColor(c.subscriptionStatus);
+                final expiryLabel = _expiryLabel(c);
+                final expiryColor = _expiryColor(c);
+
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    leading: CircleAvatar(
-                      backgroundColor: _subColor(c.subscriptionStatus).withValues(alpha: 0.15),
-                      child: Text(c.name[0].toUpperCase(),
-                          style: TextStyle(color: _subColor(c.subscriptionStatus), fontWeight: FontWeight.bold)),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                  color: Colors.white,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {}, // placeholder for detail view
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: statusColor.withValues(alpha: 0.15),
+                            child: Text(c.name[0].toUpperCase(),
+                                style: TextStyle(color: statusColor,
+                                    fontWeight: FontWeight.bold, fontSize: 15)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(c.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(c.ownerName,
+                                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                          ])),
+                          _StatusDot(status: c.subscriptionStatus, color: statusColor),
+                        ]),
+
+                        const SizedBox(height: 8),
+                        const Divider(height: 1),
+                        const SizedBox(height: 8),
+
+                        Row(children: [
+                          if (c.planName != null) ...[
+                            Icon(Icons.workspace_premium_outlined,
+                                size: 13, color: Colors.grey[500]),
+                            const SizedBox(width: 4),
+                            Text(c.planName!,
+                                style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                            const SizedBox(width: 12),
+                          ],
+                          if (c.isPendingPayment) ...[
+                            Icon(Icons.hourglass_top_outlined,
+                                size: 13, color: Colors.orange[600]),
+                            const SizedBox(width: 4),
+                            Text('Awaiting payment',
+                                style: TextStyle(fontSize: 11, color: Colors.orange[700],
+                                    fontWeight: FontWeight.w500)),
+                          ] else if (expiryLabel.isNotEmpty) ...[
+                            Icon(
+                              c.subscriptionStatus == 'expired'
+                                  ? Icons.cancel_outlined : Icons.schedule_outlined,
+                              size: 13, color: expiryColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(expiryLabel,
+                                style: TextStyle(fontSize: 11, color: expiryColor,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                          const Spacer(),
+                          if (c.expectedAmount != null && c.isPendingPayment)
+                            Text('LKR ${_currFmt.format(c.expectedAmount!)}',
+                                style: const TextStyle(fontSize: 11,
+                                    fontWeight: FontWeight.w600, color: Color(0xFF1B5E20))),
+                        ]),
+                      ]),
                     ),
-                    title: Row(children: [
-                      Expanded(child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600))),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _subColor(c.subscriptionStatus).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(c.subscriptionStatus,
-                            style: TextStyle(fontSize: 11, color: _subColor(c.subscriptionStatus))),
-                      ),
-                    ]),
-                    subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(c.ownerName, style: const TextStyle(fontSize: 12)),
-                      if (c.subscriptionEndDate != null)
-                        Text('Expires: ${fmtDate(c.subscriptionEndDate)}',
-                            style: TextStyle(fontSize: 11,
-                                color: c.isExpiring ? AppColors.danger : Colors.black45)),
-                    ]),
                   ),
                 );
               },
@@ -714,6 +828,44 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
       )),
     ]);
   }
+
+  Color _filterColor(String id) => switch (id) {
+    'active'  => AppColors.success,
+    'pending' => Colors.orange,
+    'expired' => AppColors.danger,
+    _         => AppColors.primary,
+  };
+}
+
+class _StatusDot extends StatelessWidget {
+  final String status;
+  final Color color;
+  const _StatusDot({required this.status, required this.color});
+
+  static const _labels = {
+    'active':          'Active',
+    'trial':           'Trial',
+    'expired':         'Expired',
+    'suspended':       'Suspended',
+    'pending_payment': 'Pending',
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: color.withValues(alpha: 0.3)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 6, height: 6,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+      const SizedBox(width: 5),
+      Text(_labels[status] ?? status,
+          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+    ]),
+  );
 }
 
 // ── Payments tab ──────────────────────────────────────────────
@@ -880,37 +1032,66 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
               itemCount: list.length,
               itemBuilder: (_, i) {
                 final p = list[i];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Expanded(child: Text(p.shopName,
-                            style: const TextStyle(fontWeight: FontWeight.w600))),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: _payColor(p.status).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(_payLabel(p.status),
-                              style: TextStyle(fontSize: 11, color: _payColor(p.status))),
-                        ),
-                      ]),
-                      const SizedBox(height: 4),
-                      Text(fmtMoney(p.amount),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                              color: AppColors.primary)),
-                      Text('${p.paymentMethod.toUpperCase()} · ${fmtDate(p.paymentDate)}',
-                          style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                      if (p.adminNote != null) ...[
-                        const SizedBox(height: 4),
-                        Text('Admin: ${p.adminNote}',
-                            style: const TextStyle(fontSize: 12, color: Colors.red)),
-                      ],
-                    ]),
+                final pColor = _payColor(p.status);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[200]!),
+                    // Left accent bar
+                    boxShadow: [BoxShadow(
+                      color: pColor.withValues(alpha: 0.15),
+                      blurRadius: 8, offset: const Offset(0, 2),
+                    )],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: IntrinsicHeight(child: Row(children: [
+                      Container(width: 4, color: pColor),
+                      Expanded(child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Expanded(child: Text(p.shopName,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: pColor,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(_payLabel(p.status),
+                                  style: const TextStyle(fontSize: 11,
+                                      color: Colors.white, fontWeight: FontWeight.w600)),
+                            ),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text(fmtMoney(p.amount),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1B5E20))),
+                          const SizedBox(height: 2),
+                          Text('${p.paymentMethod.toUpperCase()} · ${fmtDate(p.paymentDate)}',
+                              style: const TextStyle(fontSize: 12, color: Colors.black45)),
+                          if (p.adminNote != null) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(children: [
+                                const Icon(Icons.info_outline, color: Colors.red, size: 14),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text('${p.adminNote}',
+                                    style: const TextStyle(fontSize: 12, color: Colors.red))),
+                              ]),
+                            ),
+                          ],
+                        ]),
+                      )),
+                    ])),
                   ),
                 );
               },

@@ -129,6 +129,9 @@ class AdminPaymentSubmission {
   final int agentId;
   final String agentName;
   final double amount;
+  final double? expectedAmount;
+  final double? submittedAmount;
+  final bool isSuspicious;
   final String paymentMethod;
   final DateTime paymentDate;
   final String? notes;
@@ -143,6 +146,9 @@ class AdminPaymentSubmission {
     required this.agentId,
     required this.agentName,
     required this.amount,
+    this.expectedAmount,
+    this.submittedAmount,
+    this.isSuspicious = false,
     required this.paymentMethod,
     required this.paymentDate,
     this.notes,
@@ -151,22 +157,28 @@ class AdminPaymentSubmission {
     required this.createdAt,
   });
 
+  static double _toDouble(dynamic v) =>
+      v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
   factory AdminPaymentSubmission.fromJson(Map<String, dynamic> json) =>
       AdminPaymentSubmission(
-        id:            (json['id'] as num?)?.toInt() ?? 0,
-        shopId:        (json['shop_id'] as num?)?.toInt() ?? 0,
-        shopName:      json['shop_name'] as String? ?? '',
-        agentId:       (json['agent_id'] as num?)?.toInt() ?? 0,
-        agentName:     json['agent_name'] as String? ?? '',
-        amount:        double.parse(json['amount'].toString()),
-        paymentMethod: json['payment_method'] as String? ?? '',
-        paymentDate:   json['payment_date'] != null
+        id:              (json['id'] as num?)?.toInt() ?? 0,
+        shopId:          (json['shop_id'] as num?)?.toInt() ?? 0,
+        shopName:        json['shop_name'] as String? ?? '',
+        agentId:         (json['agent_id'] as num?)?.toInt() ?? 0,
+        agentName:       json['agent_name'] as String? ?? '',
+        amount:          _toDouble(json['amount']),
+        expectedAmount:  json['expected_amount'] != null ? _toDouble(json['expected_amount']) : null,
+        submittedAmount: json['submitted_amount'] != null ? _toDouble(json['submitted_amount']) : null,
+        isSuspicious:    json['is_suspicious'] == true,
+        paymentMethod:   json['payment_method'] as String? ?? '',
+        paymentDate:     json['payment_date'] != null
             ? DateTime.tryParse(json['payment_date'].toString()) ?? DateTime.now()
             : DateTime.now(),
-        notes:         json['notes'] as String?,
-        status:        json['status'] as String? ?? 'pending',
-        adminNote:     json['admin_note'] as String?,
-        createdAt:     json['created_at'] != null
+        notes:           json['notes'] as String?,
+        status:          json['status'] as String? ?? 'pending',
+        adminNote:       json['admin_note'] as String?,
+        createdAt:       json['created_at'] != null
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
       );

@@ -204,13 +204,13 @@ async function getMonth(req, res) {
            FROM transactions
           WHERE shop_id = $1
             AND status  = 'completed'
-            AND transaction_date >= DATE_TRUNC('month', NOW())
+            AND DATE(transaction_date AT TIME ZONE 'UTC') >= CURRENT_DATE - 29
           GROUP BY day
           ORDER BY day ASC`,
         [req.shopId]
       ),
 
-      // Payment method breakdown
+      // Payment method breakdown for the same 30-day window
       db.query(
         `SELECT payment_method,
                 COUNT(*)           AS count,
@@ -218,14 +218,14 @@ async function getMonth(req, res) {
            FROM transactions
           WHERE shop_id = $1
             AND status  = 'completed'
-            AND transaction_date >= DATE_TRUNC('month', NOW())
+            AND DATE(transaction_date AT TIME ZONE 'UTC') >= CURRENT_DATE - 29
           GROUP BY payment_method`,
         [req.shopId]
       ),
     ]);
 
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    const filled = fillDays(dailyRes.rows, daysInMonth, true);
+    // fillDays with fromMonthStart=false so it fills last 30 days back from today
+    const filled = fillDays(dailyRes.rows, 30);
 
     res.json({ daily: filled, payment_methods: methodRes.rows });
   } catch (err) {
