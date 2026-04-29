@@ -417,7 +417,7 @@ class _CarServiceScaffold extends ConsumerWidget {
     ];
 
     return Scaffold(
-      body: widget.child,
+      body: child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
