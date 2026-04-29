@@ -146,7 +146,7 @@ function ShopsTab() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery]     = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState({ name:'', owner_name:'', email:'', phone:'', address:'' });
+  const [form, setForm]       = useState({ name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'' });
   const [saving, setSaving]   = useState(false);
 
   const load = useCallback(async () => {
@@ -178,7 +178,7 @@ function ShopsTab() {
       });
       toast.success('Shop onboarded successfully!');
       setShowForm(false);
-      setForm({ name:'', owner_name:'', email:'', phone:'', address:'' });
+      setForm({ name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'' });
       load();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to onboard shop');
@@ -212,11 +212,13 @@ function ShopsTab() {
         <form onSubmit={handleOnboard} className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
           <h3 className="font-semibold text-green-800 text-sm">Onboard New Shop</h3>
           {[
-            { key:'name',       label:'Shop Name *',  type:'text',  required:true },
-            { key:'owner_name', label:'Owner Name *', type:'text',  required:true },
-            { key:'email',      label:'Email *',      type:'email', required:true },
-            { key:'phone',      label:'Phone',        type:'tel',   required:false },
-            { key:'address',    label:'Address',      type:'text',  required:false },
+            { key:'name',       label:'Shop Name *',           type:'text',     required:true },
+            { key:'owner_name', label:'Owner Name *',          type:'text',     required:true },
+            { key:'email',      label:'Email *',               type:'email',    required:true },
+            { key:'phone',      label:'Phone',                 type:'tel',      required:false },
+            { key:'address',    label:'Address',               type:'text',     required:false },
+            { key:'username',   label:'Login Username *',      type:'text',     required:true },
+            { key:'password',   label:'Login Password * (min 6 chars)', type:'password', required:true },
           ].map((f) => (
             <div key={f.key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>

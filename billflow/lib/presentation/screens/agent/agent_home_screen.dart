@@ -198,11 +198,13 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
   void dispose() { _search.dispose(); super.dispose(); }
 
   void _showOnboardSheet() {
-    final nameCtrl    = TextEditingController();
-    final ownerCtrl   = TextEditingController();
-    final emailCtrl   = TextEditingController();
-    final phoneCtrl   = TextEditingController();
-    final addressCtrl = TextEditingController();
+    final nameCtrl     = TextEditingController();
+    final ownerCtrl    = TextEditingController();
+    final emailCtrl    = TextEditingController();
+    final phoneCtrl    = TextEditingController();
+    final addressCtrl  = TextEditingController();
+    final usernameCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
     bool saving = false;
 
     showModalBottomSheet(
@@ -223,6 +225,10 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
             const Text('Onboard New Shop',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
+            const SizedBox(height: 4),
+            Text('Shop Details',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+            const SizedBox(height: 8),
             for (final cfg in [
               {'ctrl': nameCtrl,    'label': 'Shop Name',   'required': true,  'type': TextInputType.text},
               {'ctrl': ownerCtrl,   'label': 'Owner Name',  'required': true,  'type': TextInputType.text},
@@ -240,9 +246,37 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
               ),
               const SizedBox(height: 10),
             ],
+            const SizedBox(height: 4),
+            Text('Login Account (for the shop owner)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+            const SizedBox(height: 8),
+            TextField(
+              controller: usernameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Username *',
+                border: OutlineInputBorder(),
+                helperText: 'The owner will use this to log in to the POS',
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password * (min 6 chars)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
             FilledButton(
               onPressed: saving ? null : () async {
                 if (nameCtrl.text.isEmpty || ownerCtrl.text.isEmpty || emailCtrl.text.isEmpty) return;
+                if (usernameCtrl.text.isEmpty || passwordCtrl.text.isEmpty) return;
+                if (passwordCtrl.text.length < 6) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Password must be at least 6 characters')));
+                  return;
+                }
                 setSt(() => saving = true);
                 try {
                   await ref.read(agentServiceProvider).onboardCustomer({
@@ -251,6 +285,8 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                     'email': emailCtrl.text.trim(),
                     'phone': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
                     'address': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                    'username': usernameCtrl.text.trim(),
+                    'password': passwordCtrl.text,
                   });
                   ref.invalidate(agentCustomersProvider);
                   ref.invalidate(agentDashboardProvider);

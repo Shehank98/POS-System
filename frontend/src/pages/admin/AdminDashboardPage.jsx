@@ -1716,6 +1716,102 @@ function NotificationsTab({ shops }) {
   );
 }
 
+// ── Agent Payments Tab ────────────────────────────────────────
+function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
+  const [rejectNote, setRejectNote] = useState({});  // id → note string
+  const [rejectOpen, setRejectOpen] = useState(null); // id being rejected
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-24 bg-gray-800 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (payments.length === 0) {
+    return (
+      <div className="text-center py-16 text-gray-500">
+        <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+        <p>No pending agent payment submissions</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-400">
+        {payments.length} pending submission{payments.length !== 1 ? 's' : ''} — verifying activates the shop subscription
+      </p>
+      {payments.map((p) => (
+        <div key={p.id} className="bg-gray-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white truncate">{p.shop_name}</p>
+              <p className="text-xs text-gray-400">Owner: {p.owner_name}</p>
+              <p className="text-sm text-green-400 font-bold mt-0.5">
+                LKR {Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                via {p.payment_method?.toUpperCase()} · {fmtDate(p.payment_date)}
+                <span className="mx-1.5 text-gray-600">·</span>
+                Agent: <span className="text-gray-300">{p.agent_name}</span>
+              </p>
+              {p.notes && (
+                <p className="text-xs text-yellow-400 mt-1">Note: {p.notes}</p>
+              )}
+            </div>
+            <span className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">
+              Pending
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => onVerify(p.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
+                         bg-green-700 hover:bg-green-600 rounded-lg text-white transition-colors"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> Verify & Activate Shop
+            </button>
+            <button
+              onClick={() => setRejectOpen(rejectOpen === p.id ? null : p.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
+                         bg-red-700 hover:bg-red-600 rounded-lg text-white transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" /> Reject
+            </button>
+          </div>
+
+          {rejectOpen === p.id && (
+            <div className="flex gap-2 mt-1">
+              <input
+                type="text"
+                placeholder="Reason for rejection (optional)"
+                value={rejectNote[p.id] || ''}
+                onChange={(e) => setRejectNote((n) => ({ ...n, [p.id]: e.target.value }))}
+                className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-3 py-1.5
+                           focus:outline-none focus:ring-2 focus:ring-red-500 placeholder-gray-500"
+              />
+              <button
+                onClick={() => {
+                  onReject(p.id, rejectNote[p.id] || '');
+                  setRejectOpen(null);
+                }}
+                className="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-semibold text-white"
+              >
+                Confirm
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const logout   = useAdminStore((s) => s.logout);
   const navigate = useNavigate();
@@ -1723,6 +1819,7 @@ export default function AdminDashboardPage() {
   const [tab,        setTab]        = useState('payments');
   const [stats,      setStats]      = useState(null);
   const [payments,   setPayments]   = useState([]);
+  const [agentPayments, setAgentPayments] = useState([]);
   const [shops,      setShops]      = useState([]);
   const [auditLog,   setAuditLog]   = useState([]);
   const [auditTotal, setAuditTotal] = useState(0);
@@ -1743,14 +1840,16 @@ export default function AdminDashboardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashRes, payRes, shopRes] = await Promise.all([
+      const [dashRes, payRes, shopRes, agentPayRes] = await Promise.all([
         adminApi.dashboard(),
         adminApi.listPayments(),
         adminApi.listShops(),
+        adminApi.pendingAgentPayments(),
       ]);
       setStats(dashRes.data);
       setPayments(payRes.data);
       setShops(shopRes.data);
+      setAgentPayments(agentPayRes.data);
     } catch (err) {
       if (err.response?.status === 401) {
         logout();
@@ -1791,12 +1890,33 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleVerifyAgentPayment(id) {
+    try {
+      await adminApi.verifyAgentPayment(id);
+      toast.success('Agent payment verified — shop subscription activated!');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to verify');
+    }
+  }
+
+  async function handleRejectAgentPayment(id, note) {
+    try {
+      await adminApi.rejectAgentPayment(id, { admin_note: note });
+      toast.success('Payment rejected');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reject');
+    }
+  }
+
   function handleLogout() {
     logout();
     navigate('/admin/login', { replace: true });
   }
 
-  const pendingCount = payments.filter((p) => p.status === 'pending').length;
+  const pendingCount      = payments.filter((p) => p.status === 'pending').length;
+  const agentPendingCount = agentPayments.length;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -1838,8 +1958,9 @@ export default function AdminDashboardPage() {
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-800 rounded-xl p-1 w-fit flex-wrap">
           {[
-            { id: 'payments',      label: 'Payments',      badge: pendingCount },
-            { id: 'shops',         label: 'Shops'          },
+            { id: 'payments',       label: 'Payments',        badge: pendingCount },
+            { id: 'agent_payments', label: 'Agent Payments',  badge: agentPendingCount },
+            { id: 'shops',          label: 'Shops'            },
             { id: 'analysis',      label: 'Analysis',      icon: BarChart2 },
             { id: 'audit',         label: 'Audit Log'      },
             { id: 'dashboard_tab', label: 'Overview',      icon: TrendingUp },
@@ -1946,6 +2067,16 @@ export default function AdminDashboardPage() {
               );
             })}
           </div>
+        )}
+
+        {/* Agent Payments tab */}
+        {tab === 'agent_payments' && (
+          <AgentPaymentsTab
+            payments={agentPayments}
+            loading={loading}
+            onVerify={handleVerifyAgentPayment}
+            onReject={handleRejectAgentPayment}
+          />
         )}
 
         {/* Shops tab */}

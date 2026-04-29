@@ -1,4 +1,5 @@
-const db = require('../config/database');
+const bcrypt = require('bcryptjs');
+const db     = require('../config/database');
 
 // ── GET /api/agents/me/dashboard ──────────────────────────────
 async function getDashboard(req, res) {
@@ -53,10 +54,17 @@ async function listCustomers(req, res) {
 // ── POST /api/agents/me/customers ─────────────────────────────
 async function onboardCustomer(req, res) {
   const agentId = req.agent.id;
-  const { name, owner_name, email, phone, address } = req.body;
+  const { name, owner_name, email, phone, address, username, password } = req.body;
   if (!name || !owner_name || !email) {
     return res.status(400).json({ error: 'name, owner_name and email are required' });
   }
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required for the shop login account' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'password must be at least 6 characters' });
+  }
+
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -69,6 +77,14 @@ async function onboardCustomer(req, res) {
     );
     const shop = shopRows[0];
 
+    // Create the owner login account for this shop
+    const passwordHash = await bcrypt.hash(password, 10);
+    await client.query(
+      `INSERT INTO users (shop_id, username, password_hash, role)
+       VALUES ($1, $2, $3, 'owner')`,
+      [shop.id, username.trim(), passwordHash]
+    );
+
     // Signup commission is locked until admin verifies first payment
     await client.query(
       `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status)
@@ -80,7 +96,11 @@ async function onboardCustomer(req, res) {
     res.status(201).json(shop);
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err.code === '23505') return res.status(409).json({ error: 'A shop with this email already exists' });
+    if (err.code === '23505') {
+      const detail = err.detail || '';
+      if (detail.includes('username')) return res.status(409).json({ error: 'That username is already taken' });
+      return res.status(409).json({ error: 'A shop with this email already exists' });
+    }
     console.error('agent onboardCustomer error:', err);
     res.status(500).json({ error: 'Server error' });
   } finally {
