@@ -227,7 +227,7 @@ class _CustomerHeader extends StatelessWidget {
           child: Text(
             (insights.name?.isNotEmpty == true
                     ? insights.name![0]
-                    : insights.phone[0])
+                    : insights.phone.isNotEmpty ? insights.phone[0] : '?')
                 .toUpperCase(),
             style: TextStyle(
                 fontSize: 22,
@@ -593,7 +593,7 @@ class _TopCustomerCard extends StatelessWidget {
               child: Text(
                 (customer.name?.isNotEmpty == true
                         ? customer.name![0]
-                        : customer.phone[0])
+                        : customer.phone.isNotEmpty ? customer.phone[0] : '?')
                     .toUpperCase(),
                 style: TextStyle(
                     fontWeight: FontWeight.bold,

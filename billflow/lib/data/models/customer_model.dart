@@ -18,9 +18,9 @@ class TopCustomer {
   });
 
   factory TopCustomer.fromJson(Map<String, dynamic> j) => TopCustomer(
-        phone: j['phone'] as String? ?? '',
-        name: j['name'] as String?,
-        orderCount: toInt(j['order_count']),
+        phone: j['customer_phone'] as String? ?? j['phone'] as String? ?? '',
+        name: j['customer_name'] as String? ?? j['name'] as String?,
+        orderCount: toInt(j['total_orders'] ?? j['order_count']),
         totalSpent: toDouble(j['total_spent']),
         lastOrderDate: j['last_order_date'] as String?,
         loyaltyPoints: toInt(j['loyalty_points']),
@@ -110,25 +110,26 @@ class CustomerInsights {
     this.cancellationTracking,
   });
 
-  factory CustomerInsights.fromJson(Map<String, dynamic> j) => CustomerInsights(
-        phone: j['phone'] as String? ?? '',
-        name: j['name'] as String?,
-        totalOrders: toInt(j['total_orders']),
-        totalSpent: toDouble(j['total_spent']),
-        avgOrderValue: toDouble(j['avg_order_value']),
-        lastOrderDate: j['last_order_date'] as String?,
-        loyaltyPoints: toInt(j['loyalty_points']),
-        topItems: (j['top_items'] as List<dynamic>?)
-                ?.map((e) => TopItem.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            [],
-        recentOrders: (j['recent_orders'] as List<dynamic>?)
-                ?.map((e) => RecentOrder.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            [],
-        cancellationTracking: j['cancellation_tracking'] != null
-            ? CancellationTracking.fromJson(
-                j['cancellation_tracking'] as Map<String, dynamic>)
-            : null,
-      );
+  factory CustomerInsights.fromJson(Map<String, dynamic> j) {
+    final totalOrders = toInt(j['total_orders']);
+    final totalSpent  = toDouble(j['total_spent']);
+    return CustomerInsights(
+      phone:         j['customer_phone'] as String? ?? j['phone'] as String? ?? '',
+      name:          () { final n = j['customer_name'] as String? ?? j['name'] as String?; return (n == null || n.isEmpty) ? null : n; }(),
+      totalOrders:   totalOrders,
+      totalSpent:    totalSpent,
+      avgOrderValue: totalOrders > 0 ? totalSpent / totalOrders : 0.0,
+      lastOrderDate: j['last_order_date'] as String?,
+      loyaltyPoints: toInt(j['loyalty_points']),
+      topItems: (j['top_items'] as List<dynamic>?)
+              ?.map((e) => TopItem.fromJson(e as Map<String, dynamic>))
+              .toList() ?? [],
+      recentOrders: (j['recent_orders'] as List<dynamic>?)
+              ?.map((e) => RecentOrder.fromJson(e as Map<String, dynamic>))
+              .toList() ?? [],
+      cancellationTracking: j['cancellation_tracking'] != null
+          ? CancellationTracking.fromJson(j['cancellation_tracking'] as Map<String, dynamic>)
+          : null,
+    );
+  }
 }

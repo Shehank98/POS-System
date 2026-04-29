@@ -1,16 +1,19 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../data/models/dashboard_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../providers/notification_provider.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/common/shimmer_card.dart';
 import '../../widgets/common/shimmer_list.dart';
-import '../../widgets/charts/revenue_bar_chart.dart';
+
+enum _TrendPeriod { today, week, month }
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -100,7 +103,6 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).valueOrNull;
     final todayAsync = ref.watch(dashboardTodayProvider);
-    final weekAsync = ref.watch(dashboardWeekProvider);
     final unread = ref.watch(unreadNotificationCountProvider);
     final cs = Theme.of(context).colorScheme;
 
@@ -329,39 +331,23 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
 
-            // Weekly chart
+            // Sales Trend card
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          const Icon(Icons.show_chart,
-                              size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Text('Weekly Sales',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold)),
-                        ]),
-                        const SizedBox(height: 16),
-                        weekAsync.when(
-                          data: (week) => RevenueBarChart(data: week),
-                          loading: () => const ShimmerCard(height: 160),
-                          error: (_, __) => const SizedBox(
-                              height: 60,
-                              child: Center(
-                                  child: Text('Unable to load chart'))),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: todayAsync.whenData((today) =>
+                  _SalesTrendCard(today: today)
+                ).valueOrNull ?? const SizedBox.shrink(),
+              ),
+            ),
+
+            // Payment methods card
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: todayAsync.whenData((today) =>
+                  _PaymentMethodsCard(summary: today.summary)
+                ).valueOrNull ?? const SizedBox.shrink(),
               ),
             ),
 
@@ -503,6 +489,407 @@ class DashboardScreen extends ConsumerWidget {
     return 'evening';
   }
 }
+
+// ── Sales Trend Card ─────────────────────────────────────────────────────────
+
+class _SalesTrendCard extends ConsumerStatefulWidget {
+  final DashboardToday today;
+  const _SalesTrendCard({required this.today});
+
+  @override
+  ConsumerState<_SalesTrendCard> createState() => _SalesTrendCardState();
+}
+
+class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
+  _TrendPeriod _period = _TrendPeriod.week;
+
+  @override
+  Widget build(BuildContext context) {
+    final weekAsync = ref.watch(dashboardWeekProvider);
+    final monthAsync = ref.watch(dashboardMonthProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    // Compute total revenue for summary line
+    double periodTotal = 0;
+    if (_period == _TrendPeriod.today) {
+      periodTotal = widget.today.summary.totalSales;
+    } else if (_period == _TrendPeriod.week) {
+      if (weekAsync.hasValue) {
+        periodTotal = weekAsync.value!.fold(0, (s, d) => s + d.sales);
+      }
+    } else {
+      if (monthAsync.hasValue) {
+        periodTotal = monthAsync.value!.fold(0, (s, d) => s + d.sales);
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Row(
+              children: [
+                const Icon(Icons.show_chart, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sales Trend',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                // Period toggle buttons
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PeriodBtn(
+                      label: 'Today',
+                      active: _period == _TrendPeriod.today,
+                      onTap: () => setState(() => _period = _TrendPeriod.today),
+                    ),
+                    const SizedBox(width: 4),
+                    _PeriodBtn(
+                      label: '7 Days',
+                      active: _period == _TrendPeriod.week,
+                      onTap: () => setState(() => _period = _TrendPeriod.week),
+                    ),
+                    const SizedBox(width: 4),
+                    _PeriodBtn(
+                      label: '30 Days',
+                      active: _period == _TrendPeriod.month,
+                      onTap: () => setState(() => _period = _TrendPeriod.month),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            // Summary line
+            if (periodTotal > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Total: ${formatCurrency(periodTotal)}',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+            const SizedBox(height: 12),
+            // Chart area
+            if (_period == _TrendPeriod.today)
+              _buildTodayChart(cs)
+            else if (_period == _TrendPeriod.week)
+              weekAsync.when(
+                loading: () => const ShimmerCard(height: 160),
+                error: (_, __) => const SizedBox(
+                    height: 60,
+                    child: Center(child: Text('Unable to load'))),
+                data: (week) {
+                  if (week.isEmpty) {
+                    return const SizedBox(
+                        height: 160,
+                        child: Center(child: Text('No data')));
+                  }
+                  final spots = week
+                      .asMap()
+                      .entries
+                      .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
+                      .toList();
+                  final labels = week.map((d) => d.day).toList();
+                  return _buildLineChart(spots, labels, 1, cs);
+                },
+              )
+            else
+              monthAsync.when(
+                loading: () => const ShimmerCard(height: 160),
+                error: (_, __) => const SizedBox(
+                    height: 60,
+                    child: Center(child: Text('Unable to load'))),
+                data: (month) {
+                  if (month.isEmpty) {
+                    return const SizedBox(
+                        height: 160,
+                        child: Center(child: Text('No data')));
+                  }
+                  final spots = month
+                      .asMap()
+                      .entries
+                      .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
+                      .toList();
+                  final labels = month.map((d) => d.day).toList();
+                  return _buildLineChart(spots, labels, 7, cs);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayChart(ColorScheme cs) {
+    final hourly = widget.today.hourly;
+    if (hourly.isEmpty) {
+      return const SizedBox(
+          height: 160, child: Center(child: Text('No data')));
+    }
+    final spots =
+        hourly.map((h) => FlSpot(h.hour.toDouble(), h.sales)).toList();
+    // Labels every 6 hours: 0h, 6h, 12h, 18h
+    final labels = List.generate(24, (i) => '${i}h');
+    return _buildLineChart(spots, labels, 6, cs);
+  }
+
+  Widget _buildLineChart(
+      List<FlSpot> spots, List<String> labels, int labelInterval, ColorScheme cs) {
+    final maxY = spots.isEmpty
+        ? 0.0
+        : spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final chartMaxY = maxY == 0 ? 100.0 : maxY * 1.25;
+
+    return SizedBox(
+      height: 160,
+      child: LineChart(
+        LineChartData(
+          maxY: chartMaxY,
+          minY: 0,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: chartMaxY / 4,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: cs.outlineVariant.withValues(alpha: 0.5),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 22,
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= labels.length) {
+                    return const SizedBox.shrink();
+                  }
+                  if (idx % labelInterval != 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    labels[idx],
+                    style: const TextStyle(fontSize: 9),
+                  );
+                },
+              ),
+            ),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) => touchedSpots
+                  .map((s) => LineTooltipItem(
+                        formatCurrency(s.y),
+                        const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 11),
+                      ))
+                  .toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.35,
+              barWidth: 2.5,
+              color: cs.primary,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  colors: [
+                    cs.primary.withValues(alpha: 0.12),
+                    cs.primary.withValues(alpha: 0.0),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _PeriodBtn({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? cs.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: active ? Colors.white : cs.onSurfaceVariant,
+            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Payment Methods Card ─────────────────────────────────────────────────────
+
+class _PaymentMethodsCard extends StatelessWidget {
+  final DashboardSummary summary;
+  const _PaymentMethodsCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final total =
+        summary.cashSales + summary.cardSales + summary.mobileSales;
+    if (total == 0) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.payments_outlined,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Payment Methods',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            _PayRow(
+              label: 'Cash',
+              amount: summary.cashSales,
+              color: Colors.blue[600]!,
+              total: total,
+            ),
+            const SizedBox(height: 8),
+            _PayRow(
+              label: 'Card',
+              amount: summary.cardSales,
+              color: Colors.orange[600]!,
+              total: total,
+            ),
+            const SizedBox(height: 8),
+            _PayRow(
+              label: 'Mobile/QR',
+              amount: summary.mobileSales,
+              color: Colors.green[600]!,
+              total: total,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PayRow extends StatelessWidget {
+  final String label;
+  final double amount;
+  final Color color;
+  final double total;
+
+  const _PayRow({
+    required this.label,
+    required this.amount,
+    required this.color,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = total > 0 ? amount / total : 0.0;
+    final pctLabel =
+        '${(pct * 100).toStringAsFixed(0)}%';
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration:
+              BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 64,
+          child: Text(label,
+              style: const TextStyle(fontSize: 13)),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 8,
+              backgroundColor: cs.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              formatCurrency(amount),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            Text(
+              pctLabel,
+              style: TextStyle(
+                  fontSize: 10, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Reusable widgets ─────────────────────────────────────────────────────────
 
 class _StatCard extends StatelessWidget {
   final String label;

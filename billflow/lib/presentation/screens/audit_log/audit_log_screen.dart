@@ -43,7 +43,9 @@ class AuditLogEntry {
 final _auditLogProvider = FutureProvider.autoDispose<List<AuditLogEntry>>((ref) async {
   final dio = ref.read(dioProvider);
   final res = await dio.get(ApiConstants.auditLog);
-  return (res.data as List)
+  final raw = res.data;
+  final list = (raw is List ? raw : raw['records']) as List<dynamic>? ?? [];
+  return list
       .map((e) => AuditLogEntry.fromJson(e as Map<String, dynamic>))
       .toList();
 });
