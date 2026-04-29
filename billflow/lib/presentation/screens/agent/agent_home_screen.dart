@@ -237,7 +237,11 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
   Future<void> _loadPlans() async {
     try {
       final plans = await ref.read(agentServiceProvider).getPlans();
-      if (mounted) setState(() => _plans = plans);
+      // Normalize id to int so comparisons work regardless of JSON type
+      if (mounted) setState(() => _plans = plans.map((p) => {
+        ...p,
+        'id': int.tryParse(p['id'].toString()) ?? 0,
+      }).toList());
     } catch (_) {}
   }
 
@@ -406,7 +410,7 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                     style: TextStyle(color: Colors.black45, fontSize: 13))
               else ...[
                 ..._plans.map((p) {
-                  final id       = p['id'] as int?;
+                  final id       = p['id'] as int;
                   final selected = id == _selectedPlanId;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedPlanId = id),
