@@ -1,3 +1,6 @@
+double _d(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+int _i(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+
 class TaxReportDay {
   final String date;
   final double taxCollected;
@@ -11,14 +14,12 @@ class TaxReportDay {
     required this.transactions,
   });
 
-  factory TaxReportDay.fromJson(Map<String, dynamic> json) {
-    return TaxReportDay(
-      date: json['date'] as String? ?? '',
-      taxCollected: (json['tax_collected'] as num?)?.toDouble() ?? 0.0,
-      revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
-      transactions: int.tryParse(json['transactions']?.toString() ?? '0') ?? 0,
-    );
-  }
+  factory TaxReportDay.fromJson(Map<String, dynamic> json) => TaxReportDay(
+        date:         json['date'] as String? ?? '',
+        taxCollected: _d(json['tax_collected']),
+        revenue:      _d(json['revenue']),
+        transactions: _i(json['transactions']),
+      );
 }
 
 class TaxReportByRate {
@@ -32,13 +33,11 @@ class TaxReportByRate {
     required this.revenue,
   });
 
-  factory TaxReportByRate.fromJson(Map<String, dynamic> json) {
-    return TaxReportByRate(
-      taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0.0,
-      taxCollected: (json['tax_collected'] as num?)?.toDouble() ?? 0.0,
-      revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
-    );
-  }
+  factory TaxReportByRate.fromJson(Map<String, dynamic> json) => TaxReportByRate(
+        taxRate:      _d(json['tax_rate']),
+        taxCollected: _d(json['tax_collected']),
+        revenue:      _d(json['revenue']),
+      );
 }
 
 class TaxReport {
@@ -59,13 +58,13 @@ class TaxReport {
   });
 
   factory TaxReport.fromJson(Map<String, dynamic> json) {
-    final period = json['period'] as Map<String, dynamic>? ?? {};
+    final period  = json['period']  as Map<String, dynamic>? ?? {};
     final summary = json['summary'] as Map<String, dynamic>? ?? {};
     return TaxReport(
-      startDate: period['start'] as String? ?? '',
-      endDate: period['end'] as String? ?? '',
-      totalTax: (summary['total_tax'] as num?)?.toDouble() ?? 0.0,
-      totalRevenue: (summary['total_revenue'] as num?)?.toDouble() ?? 0.0,
+      startDate:    period['start'] as String? ?? '',
+      endDate:      period['end']   as String? ?? '',
+      totalTax:     _d(summary['total_tax']),
+      totalRevenue: _d(summary['total_revenue']),
       byDay: (json['by_day'] as List<dynamic>?)
               ?.map((e) => TaxReportDay.fromJson(e as Map<String, dynamic>))
               .toList() ??

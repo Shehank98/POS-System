@@ -1,3 +1,7 @@
+// Safe helpers — handles both numeric and string JSON values from PostgreSQL
+int _i(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+double _d(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
 class AgentModel {
   final int id;
   final String name;
@@ -24,12 +28,12 @@ class AgentModel {
   });
 
   factory AgentModel.fromJson(Map<String, dynamic> json) => AgentModel(
-        id:             (json['id'] as num?)?.toInt() ?? 0,
-        name:           json['name'] as String,
-        email:          json['email'] as String,
+        id:             _i(json['id']),
+        name:           json['name'] as String? ?? '',
+        email:          json['email'] as String? ?? '',
         phone:          json['phone'] as String?,
         district:       json['district'] as String?,
-        monthlyTarget:  (json['monthly_target'] as num?)?.toInt() ?? 0,
+        monthlyTarget:  _i(json['monthly_target']),
         bankName:       json['bank_name'] as String?,
         bankAccount:    json['bank_account'] as String?,
         bankBranch:     json['bank_branch'] as String?,
@@ -91,7 +95,7 @@ class AgentCustomer {
   });
 
   factory AgentCustomer.fromJson(Map<String, dynamic> json) => AgentCustomer(
-        id:                   (json['id'] as num?)?.toInt() ?? 0,
+        id:                   _i(json['id']),
         name:                 json['name'] as String? ?? '',
         ownerName:            json['owner_name'] as String? ?? '',
         email:                json['email'] as String? ?? '',
@@ -103,9 +107,11 @@ class AgentCustomer {
             : null,
         planName:             json['plan_name'] as String?,
         expectedAmount:       json['expected_amount'] != null
-            ? double.tryParse(json['expected_amount'].toString())
+            ? _d(json['expected_amount'])
             : null,
-        subscriptionMonths:   (json['subscription_months'] as num?)?.toInt() ?? 1,
+        subscriptionMonths:   _i(json['subscription_months']) == 0
+            ? 1
+            : _i(json['subscription_months']),
         createdAt: json['created_at'] != null
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
@@ -150,10 +156,10 @@ class AgentPaymentSubmission {
 
   factory AgentPaymentSubmission.fromJson(Map<String, dynamic> json) =>
       AgentPaymentSubmission(
-        id:            (json['id'] as num?)?.toInt() ?? 0,
-        shopId:        (json['shop_id'] as num?)?.toInt() ?? 0,
+        id:            _i(json['id']),
+        shopId:        _i(json['shop_id']),
         shopName:      json['shop_name'] as String? ?? '',
-        amount:        double.tryParse((json['amount'] ?? json['submitted_amount'] ?? 0).toString()) ?? 0.0,
+        amount:        _d(json['amount'] ?? json['submitted_amount']),
         paymentMethod: json['payment_method'] as String? ?? '',
         paymentDate:   json['payment_date'] != null
             ? DateTime.tryParse(json['payment_date'].toString()) ?? DateTime.now()
@@ -189,12 +195,14 @@ class AgentCommission {
   });
 
   factory AgentCommission.fromJson(Map<String, dynamic> json) => AgentCommission(
-        id:             (json['id'] as num?)?.toInt() ?? 0,
-        shopId:         (json['shop_id'] as num?)?.toInt() ?? 0,
+        id:             _i(json['id']),
+        shopId:         _i(json['shop_id']),
         shopName:       json['shop_name'] as String? ?? '',
         commissionType: json['commission_type'] as String? ?? '',
-        amount:         double.parse((json['amount'] ?? 0).toString()),
-        month:          json['month'] != null ? DateTime.tryParse(json['month'].toString()) : null,
+        amount:         _d(json['amount']),
+        month:          json['month'] != null
+            ? DateTime.tryParse(json['month'].toString())
+            : null,
         status:         json['status'] as String? ?? 'locked',
         createdAt:      json['created_at'] != null
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -233,22 +241,19 @@ class AgentDashboard {
 
   double get walletBalance => walletCollected - walletVerified;
 
-  factory AgentDashboard.fromJson(Map<String, dynamic> json) {
-    double _d(dynamic v) => double.tryParse((v ?? 0).toString()) ?? 0.0;
-    return AgentDashboard(
-      totalCustomers:      (json['total_customers'] as num?)?.toInt() ?? 0,
-      activeCustomers:     (json['active_customers'] as num?)?.toInt() ?? 0,
-      inactiveCustomers:   (json['inactive_customers'] as num?)?.toInt() ?? 0,
-      pendingPaymentShops: (json['pending_payment_shops'] as num?)?.toInt() ?? 0,
-      approvedEarnings:    _d(json['approved_earnings']),
-      pendingEarnings:     _d(json['pending_earnings']),
-      totalPaid:           _d(json['total_paid']),
-      pendingSubmissions:  (json['pending_submissions'] as num?)?.toInt() ?? 0,
-      monthlyTarget:       (json['monthly_target'] as num?)?.toInt() ?? 0,
-      walletCollected:     _d(json['wallet_collected']),
-      walletVerified:      _d(json['wallet_verified']),
-      expiringSoon: (json['expiring_soon'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>(),
-    );
-  }
+  factory AgentDashboard.fromJson(Map<String, dynamic> json) => AgentDashboard(
+        totalCustomers:      _i(json['total_customers']),
+        activeCustomers:     _i(json['active_customers']),
+        inactiveCustomers:   _i(json['inactive_customers']),
+        pendingPaymentShops: _i(json['pending_payment_shops']),
+        approvedEarnings:    _d(json['approved_earnings']),
+        pendingEarnings:     _d(json['pending_earnings']),
+        totalPaid:           _d(json['total_paid']),
+        pendingSubmissions:  _i(json['pending_submissions']),
+        monthlyTarget:       _i(json['monthly_target']),
+        walletCollected:     _d(json['wallet_collected']),
+        walletVerified:      _d(json['wallet_verified']),
+        expiringSoon: (json['expiring_soon'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>(),
+      );
 }

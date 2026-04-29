@@ -75,21 +75,23 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as int,
-      username: json['username'] as String,
+      id: int.tryParse(json['id'].toString()) ?? 0,
+      username: json['username'] as String? ?? '',
       email: json['email'] as String?,
-      role: json['role'] as String,
-      shopId: json['shop_id'] as int,
+      role: json['role'] as String? ?? 'cashier',
+      shopId: int.tryParse((json['shop_id'] ?? 0).toString()) ?? 0,
       shopName: json['shop_name'] as String? ?? '',
       subscriptionStatus: json['subscription_status'] as String? ?? 'active',
       subscriptionEndDate: json['subscription_end_date'] as String?,
-      barcodeEnabled: json['barcode_enabled'] as bool? ?? false,
-      defaultTaxRate: (json['default_tax_rate'] as num?)?.toDouble() ?? 0.0,
+      barcodeEnabled: json['barcode_enabled'] == true,
+      defaultTaxRate: double.tryParse((json['default_tax_rate'] ?? 0).toString()) ?? 0.0,
       shopType: json['shop_type'] as String? ?? 'retail',
-      readOnly: json['read_only'] as bool? ?? false,
-      inGracePeriod: json['in_grace_period'] as bool? ?? false,
-      graceDaysRemaining: json['grace_days_remaining'] as int? ?? 0,
-      daysUntilExpiry: (json['days_until_expiry'] as num?)?.toDouble(),
+      readOnly: json['read_only'] == true,
+      inGracePeriod: json['in_grace_period'] == true,
+      graceDaysRemaining: int.tryParse((json['grace_days_remaining'] ?? 0).toString()) ?? 0,
+      daysUntilExpiry: json['days_until_expiry'] != null
+          ? double.tryParse(json['days_until_expiry'].toString())
+          : null,
       // POS Core
       refundsEnabled: json['refunds_enabled'] as bool? ?? true,
       voidEnabled: json['void_enabled'] as bool? ?? true,

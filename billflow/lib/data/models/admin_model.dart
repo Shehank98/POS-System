@@ -1,3 +1,8 @@
+// Safe helpers — handles both numeric and string JSON values from PostgreSQL
+int _i(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+int? _iNull(dynamic v) => v == null ? null : int.tryParse(v.toString());
+double _d(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
 class AdminModel {
   final String email;
   final String role;
@@ -36,14 +41,14 @@ class AdminDashboardStats {
 
   factory AdminDashboardStats.fromJson(Map<String, dynamic> json) =>
       AdminDashboardStats(
-        totalShops:      (json['total_shops']      as num?)?.toInt() ?? 0,
-        activeShops:     (json['active_shops']     as num?)?.toInt() ?? 0,
-        trialShops:      (json['trial_shops']      as num?)?.toInt() ?? 0,
-        expiredShops:    (json['expired_shops']    as num?)?.toInt() ?? 0,
-        totalAgents:     (json['total_agents']     as num?)?.toInt() ?? 0,
-        pendingPayments: (json['pending_payments'] as num?)?.toInt() ?? 0,
-        mrr:             double.parse((json['mrr']           ?? 0).toString()),
-        totalRevenue:    double.parse((json['total_revenue'] ?? 0).toString()),
+        totalShops:      _i(json['total_shops']),
+        activeShops:     _i(json['active_shops']),
+        trialShops:      _i(json['trial_shops']),
+        expiredShops:    _i(json['expired_shops']),
+        totalAgents:     _i(json['total_agents']),
+        pendingPayments: _i(json['pending_payments']),
+        mrr:             _d(json['mrr']),
+        totalRevenue:    _d(json['total_revenue']),
       );
 }
 
@@ -88,27 +93,27 @@ class AdminShop {
   });
 
   factory AdminShop.fromJson(Map<String, dynamic> json) => AdminShop(
-        id:                   (json['id'] as num?)?.toInt() ?? 0,
-        name:                 json['name'] as String,
+        id:                   _i(json['id']),
+        name:                 json['name'] as String? ?? '',
         ownerName:            json['owner_name'] as String? ?? '',
-        email:                json['email'] as String,
+        email:                json['email'] as String? ?? '',
         phone:                json['phone'] as String?,
         address:              json['address'] as String?,
         subscriptionStatus:   json['subscription_status'] as String? ?? 'trial',
         subscriptionEndDate:  json['subscription_end_date'] != null
-            ? DateTime.tryParse(json['subscription_end_date'] as String)
+            ? DateTime.tryParse(json['subscription_end_date'].toString())
             : null,
         planName:             json['plan_name'] as String?,
         shopType:             json['shop_type'] as String? ?? 'retail',
-        isCarServiceShop:     json['is_car_service_shop'] as bool? ?? false,
+        isCarServiceShop:     json['is_car_service_shop'] == true,
         createdAt:            json['created_at'] != null
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
-        onboardedByAgentId:   (json['onboarded_by_agent_id'] as num?)?.toInt(),
+        onboardedByAgentId:   _iNull(json['onboarded_by_agent_id']),
         agentName:            json['agent_name'] as String?,
-        userCount:            (json['user_count'] as num?)?.toInt() ?? 0,
-        productCount:         (json['product_count'] as num?)?.toInt() ?? 0,
-        transactionCount:     (json['transaction_count'] as num?)?.toInt() ?? 0,
+        userCount:            _i(json['user_count']),
+        productCount:         _i(json['product_count']),
+        transactionCount:     _i(json['transaction_count']),
       );
 
   bool get isActive  => subscriptionStatus == 'active';
@@ -157,19 +162,16 @@ class AdminPaymentSubmission {
     required this.createdAt,
   });
 
-  static double _toDouble(dynamic v) =>
-      v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
-
   factory AdminPaymentSubmission.fromJson(Map<String, dynamic> json) =>
       AdminPaymentSubmission(
-        id:              (json['id'] as num?)?.toInt() ?? 0,
-        shopId:          (json['shop_id'] as num?)?.toInt() ?? 0,
+        id:              _i(json['id']),
+        shopId:          _i(json['shop_id']),
         shopName:        json['shop_name'] as String? ?? '',
-        agentId:         (json['agent_id'] as num?)?.toInt() ?? 0,
+        agentId:         _i(json['agent_id']),
         agentName:       json['agent_name'] as String? ?? '',
-        amount:          _toDouble(json['amount']),
-        expectedAmount:  json['expected_amount'] != null ? _toDouble(json['expected_amount']) : null,
-        submittedAmount: json['submitted_amount'] != null ? _toDouble(json['submitted_amount']) : null,
+        amount:          _d(json['amount']),
+        expectedAmount:  json['expected_amount'] != null ? _d(json['expected_amount']) : null,
+        submittedAmount: json['submitted_amount'] != null ? _d(json['submitted_amount']) : null,
         isSuspicious:    json['is_suspicious'] == true,
         paymentMethod:   json['payment_method'] as String? ?? '',
         paymentDate:     json['payment_date'] != null
@@ -213,16 +215,16 @@ class AdminAgent {
   });
 
   factory AdminAgent.fromJson(Map<String, dynamic> json) => AdminAgent(
-        id:               (json['id'] as num?)?.toInt() ?? 0,
-        name:             json['name'] as String,
-        email:            json['email'] as String,
+        id:               _i(json['id']),
+        name:             json['name'] as String? ?? '',
+        email:            json['email'] as String? ?? '',
         phone:            json['phone'] as String?,
         district:         json['district'] as String?,
-        monthlyTarget:    (json['monthly_target'] as num?)?.toInt() ?? 0,
-        isActive:         json['is_active'] as bool? ?? true,
-        totalCustomers:   (json['total_customers'] as num?)?.toInt() ?? 0,
-        activeCustomers:  (json['active_customers'] as num?)?.toInt() ?? 0,
-        totalEarnings:    double.parse((json['total_earnings'] ?? 0).toString()),
-        pendingEarnings:  double.parse((json['pending_earnings'] ?? 0).toString()),
+        monthlyTarget:    _i(json['monthly_target']),
+        isActive:         json['is_active'] == true,
+        totalCustomers:   _i(json['total_customers']),
+        activeCustomers:  _i(json['active_customers']),
+        totalEarnings:    _d(json['total_earnings']),
+        pendingEarnings:  _d(json['pending_earnings']),
       );
 }
