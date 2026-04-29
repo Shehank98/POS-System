@@ -203,9 +203,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         } catch (_) {}
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Go to Settings → Security → Fingerprint to enroll'),
-                              duration: Duration(seconds: 5),
+                            SnackBar(
+                              content: const Text('Go to Settings → Security → Fingerprint to enroll'),
+                              duration: const Duration(seconds: 5),
                               action: SnackBarAction(label: 'OK', onPressed: () {}),
                             ),
                           );
