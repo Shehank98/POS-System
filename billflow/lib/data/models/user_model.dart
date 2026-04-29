@@ -1,6 +1,7 @@
 class UserModel {
   final int id;
   final String username;
+  final String? email;
   final String role;
   final int shopId;
   final String shopName;
@@ -40,6 +41,7 @@ class UserModel {
   const UserModel({
     required this.id,
     required this.username,
+    this.email,
     required this.role,
     required this.shopId,
     required this.shopName,
@@ -74,6 +76,7 @@ class UserModel {
     return UserModel(
       id: json['id'] as int,
       username: json['username'] as String,
+      email: json['email'] as String?,
       role: json['role'] as String,
       shopId: json['shop_id'] as int,
       shopName: json['shop_name'] as String? ?? '',
@@ -107,6 +110,7 @@ class UserModel {
   Map<String, dynamic> toJson() => {
         'id': id,
         'username': username,
+        'email': email,
         'role': role,
         'shop_id': shopId,
         'shop_name': shopName,

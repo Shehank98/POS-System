@@ -2,10 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorage {
-  static const _tokenKey = 'pos_token';
-  static const _userKey = 'pos_user_json';
-  static const _shopIdKey = 'pos_last_shop_id';
-  static const _usernameKey = 'pos_last_username';
+  static const _tokenKey      = 'pos_token';
+  static const _userKey       = 'pos_user_json';
+  static const _identifierKey = 'pos_last_identifier';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -23,15 +22,12 @@ class SecureStorage {
 
   Future<String?> readUser() => _storage.read(key: _userKey);
 
-  Future<void> saveLastLogin(String shopId, String username) async {
-    await _storage.write(key: _shopIdKey, value: shopId);
-    await _storage.write(key: _usernameKey, value: username);
-  }
+  Future<void> saveLastLogin(String identifier) =>
+      _storage.write(key: _identifierKey, value: identifier);
 
   Future<Map<String, String?>> readLastLogin() async {
     return {
-      'shopId': await _storage.read(key: _shopIdKey),
-      'username': await _storage.read(key: _usernameKey),
+      'identifier': await _storage.read(key: _identifierKey),
     };
   }
 

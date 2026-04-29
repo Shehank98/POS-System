@@ -28,10 +28,10 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     return user;
   }
 
-  Future<void> login(String username, String password, String shopId) async {
+  Future<void> login(String identifier, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-        () => ref.read(authServiceProvider).login(username, password, shopId));
+        () => ref.read(authServiceProvider).login(identifier, password));
     _subscribeToShopTopics();
     _showWelcomeNotification();
   }

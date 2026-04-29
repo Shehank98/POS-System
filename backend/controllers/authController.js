@@ -28,42 +28,131 @@ function calcSubscriptionFlags(subscriptionStatus, subscriptionEndDate, gracePer
   return { readOnly, inGracePeriod, graceDaysRemaining, daysUntilExpiry };
 }
 
-// ── POST /api/auth/login ──────────────────────────────────────
-async function login(req, res) {
-  const { username, password, shop_id } = req.body;
+// ── Shared column list for login / getMe queries ──────────────
+const USER_SHOP_COLS = `
+  u.id, u.username, u.email AS user_email, u.password_hash, u.role, u.shop_id,
+  s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
+  COALESCE(s.contact_email, s.email, '') AS shop_email,
+  s.subscription_status, s.subscription_end_date,
+  s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
+  COALESCE(s.shop_type, 'retail') AS shop_type,
+  COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,
+  COALESCE(s.customers_enabled,  TRUE)  AS customers_enabled,
+  COALESCE(s.reports_enabled,    TRUE)  AS reports_enabled,
+  COALESCE(s.analytics_enabled,  TRUE)  AS analytics_enabled,
+  COALESCE(s.loyalty_enabled,    TRUE)  AS loyalty_enabled,
+  COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
+  COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
+  COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
+  COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
+  COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
+  COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
+  COALESCE(s.grace_period_days,            5)     AS grace_period_days
+`;
 
-  if (!username || !password || !shop_id) {
-    return res.status(400).json({ error: 'username, password and shop_id are required' });
+// Records a login session for security tracking (best-effort, non-blocking)
+async function recordLoginSession(userId, role, req) {
+  try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+               || req.socket?.remoteAddress
+               || null;
+    const deviceInfo = req.headers['user-agent'] || null;
+    await db.query(
+      `INSERT INTO login_sessions (user_id, role, device_info, ip_address)
+       VALUES ($1, $2, $3, $4)`,
+      [userId, role, deviceInfo, ip]
+    );
+  } catch (_) { /* non-fatal */ }
+}
+
+// ── POST /api/auth/login ──────────────────────────────────────
+// Accepts { identifier, password } — identifier is email or username.
+// Backward-compat: also accepts { username, password, shop_id } from legacy clients.
+async function login(req, res) {
+  // Support both new (identifier) and legacy (username + shop_id) payloads
+  const identifier = (req.body.identifier || req.body.username || '').trim();
+  const password   = (req.body.password || '').trim();
+  const shopIdHint = req.body.shop_id; // optional, used to disambiguate usernames
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'identifier and password are required' });
   }
 
   try {
-    const { rows } = await db.query(
-      `SELECT u.id, u.username, u.password_hash, u.role, u.shop_id,
-              s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
-              COALESCE(s.contact_email, s.email, '') AS shop_email,
-              s.subscription_status, s.subscription_end_date,
-              s.barcode_enabled, COALESCE(s.default_tax_rate, 0) AS default_tax_rate,
-              COALESCE(s.shop_type, 'retail') AS shop_type,
-              COALESCE(s.pre_orders_enabled, TRUE)  AS pre_orders_enabled,
-              COALESCE(s.customers_enabled,  TRUE)  AS customers_enabled,
-              COALESCE(s.reports_enabled,    TRUE)  AS reports_enabled,
-              COALESCE(s.analytics_enabled,  TRUE)  AS analytics_enabled,
-              COALESCE(s.loyalty_enabled,    TRUE)  AS loyalty_enabled,
-              COALESCE(s.refunds_enabled,    TRUE)  AS refunds_enabled,
-              COALESCE(s.void_enabled,       TRUE)  AS void_enabled,
-              COALESCE(s.offline_enabled,    TRUE)  AS offline_enabled,
-              COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
-              COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
-              COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
-              COALESCE(s.grace_period_days,            5)     AS grace_period_days
-         FROM users u
-         JOIN shops s ON s.id = u.shop_id
-        WHERE u.username = $1 AND u.shop_id = $2`,
-      [username, shop_id]
-    );
+    const isEmail = identifier.includes('@');
+    let rows;
 
-    if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (isEmail) {
+      // ── Email lookup (globally unique) ─────────────────────
+      // 1. Check users.email column (added in migration 025)
+      // 2. Fall back to matching shop owner via shops.email / shops.contact_email
+      const emailLower = identifier.toLowerCase();
+      const result = await db.query(
+        `SELECT ${USER_SHOP_COLS}
+           FROM users u
+           JOIN shops s ON s.id = u.shop_id
+          WHERE LOWER(COALESCE(u.email, '')) = $1
+          LIMIT 2`,
+        [emailLower]
+      );
+      rows = result.rows;
+
+      // Fallback: find owner by shop email when users.email is not yet populated
+      if (rows.length === 0) {
+        const fallback = await db.query(
+          `SELECT ${USER_SHOP_COLS}
+             FROM users u
+             JOIN shops s ON s.id = u.shop_id
+            WHERE u.role = 'owner'
+              AND (LOWER(COALESCE(s.contact_email, '')) = $1
+                   OR LOWER(COALESCE(s.email, '')) = $1)
+            LIMIT 2`,
+          [emailLower]
+        );
+        rows = fallback.rows;
+      }
+
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      if (rows.length > 1) {
+        // Two accounts share the same email — should not happen in clean data
+        return res.status(409).json({ error: 'Multiple accounts share this email. Please contact support.' });
+      }
+    } else {
+      // ── Username lookup ────────────────────────────────────
+      // If shop_id is provided (legacy clients), narrow by it.
+      // Otherwise look globally; if ambiguous, ask user to log in with email.
+      if (shopIdHint) {
+        const result = await db.query(
+          `SELECT ${USER_SHOP_COLS}
+             FROM users u
+             JOIN shops s ON s.id = u.shop_id
+            WHERE u.username = $1 AND u.shop_id = $2
+            LIMIT 1`,
+          [identifier, shopIdHint]
+        );
+        rows = result.rows;
+      } else {
+        const result = await db.query(
+          `SELECT ${USER_SHOP_COLS}
+             FROM users u
+             JOIN shops s ON s.id = u.shop_id
+            WHERE u.username = $1
+            LIMIT 2`,
+          [identifier]
+        );
+        rows = result.rows;
+        if (rows.length > 1) {
+          return res.status(409).json({
+            error: 'This username exists in multiple shops. Please log in with your email address instead.',
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
     }
 
     const user = rows[0];
@@ -79,6 +168,7 @@ async function login(req, res) {
 
     const sub = calcSubscriptionFlags(user.subscription_status, user.subscription_end_date, user.grace_period_days);
 
+    const iat = Math.floor(Date.now() / 1000);
     const token = jwt.sign(
       {
         id:              user.id,
@@ -89,16 +179,21 @@ async function login(req, res) {
         shop_type:       user.shop_type || 'retail',
         read_only:       sub.readOnly,
         in_grace_period: sub.inGracePeriod,
+        iat,
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
     );
+
+    // Record session (non-blocking)
+    recordLoginSession(user.id, user.role, req);
 
     res.json({
       token,
       user: {
         id:                    user.id,
         username:              user.username,
+        email:                 user.user_email || null,
         role:                  user.role,
         shop_id:               user.shop_id,
         shop_name:             user.shop_name,
@@ -198,7 +293,7 @@ async function registerUser(req, res) {
 async function getMe(req, res) {
   try {
     const { rows } = await db.query(
-      `SELECT u.id, u.username, u.role, u.shop_id, u.created_at,
+      `SELECT u.id, u.username, u.email AS user_email, u.role, u.shop_id, u.created_at,
               s.name AS shop_name, s.address AS shop_address, s.phone AS shop_phone,
               COALESCE(s.contact_email, s.email, '') AS shop_email,
               s.subscription_status, s.subscription_end_date,
@@ -227,6 +322,7 @@ async function getMe(req, res) {
     const sub = calcSubscriptionFlags(row.subscription_status, row.subscription_end_date, row.grace_period_days);
     res.json({
       ...row,
+      email:                row.user_email || null,
       read_only:            sub.readOnly,
       in_grace_period:      sub.inGracePeriod,
       grace_days_remaining: sub.graceDaysRemaining,

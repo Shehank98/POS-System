@@ -243,11 +243,10 @@ class _ShopLoginForm extends ConsumerStatefulWidget {
 }
 
 class _ShopLoginFormState extends ConsumerState<_ShopLoginForm> {
-  final _formKey      = GlobalKey<FormState>();
-  final _shopIdCtrl   = TextEditingController();
-  final _usernameCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _obscure = true;
+  final _formKey        = GlobalKey<FormState>();
+  final _identifierCtrl = TextEditingController();
+  final _passwordCtrl   = TextEditingController();
+  bool _obscure      = true;
   bool _loadingCreds = true;
 
   @override
@@ -259,16 +258,14 @@ class _ShopLoginFormState extends ConsumerState<_ShopLoginForm> {
   Future<void> _loadSaved() async {
     final saved = await SecureStorage().readLastLogin();
     if (mounted) {
-      _shopIdCtrl.text   = saved['shopId']   ?? '';
-      _usernameCtrl.text = saved['username'] ?? '';
+      _identifierCtrl.text = saved['identifier'] ?? '';
       setState(() => _loadingCreds = false);
     }
   }
 
   @override
   void dispose() {
-    _shopIdCtrl.dispose();
-    _usernameCtrl.dispose();
+    _identifierCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -276,9 +273,8 @@ class _ShopLoginFormState extends ConsumerState<_ShopLoginForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     await ref.read(authProvider.notifier).login(
-          _usernameCtrl.text.trim(),
+          _identifierCtrl.text.trim(),
           _passwordCtrl.text,
-          _shopIdCtrl.text.trim(),
         );
     final error = ref.read(authProvider).error;
     if (error != null && mounted) {
@@ -290,33 +286,24 @@ class _ShopLoginFormState extends ConsumerState<_ShopLoginForm> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading =
-        ref.watch(authProvider).isLoading || _loadingCreds;
+    final isLoading = ref.watch(authProvider).isLoading || _loadingCreds;
     return _FormCard(
       title: 'Shop Sign In',
-      subtitle: 'Enter your shop credentials',
+      subtitle: 'Sign in with your email or username',
       formKey: _formKey,
       fields: [
         TextFormField(
-          controller: _shopIdCtrl,
+          controller: _identifierCtrl,
           decoration: const InputDecoration(
-            labelText: 'Shop ID',
-            prefixIcon: Icon(Icons.store_outlined),
-            helperText: 'Your unique shop number',
-          ),
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-          validator: (v) => (v == null || v.isEmpty) ? 'Enter shop ID' : null,
-        ),
-        TextFormField(
-          controller: _usernameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Username',
+            labelText: 'Email or Username',
             prefixIcon: Icon(Icons.person_outline),
+            helperText: 'Use your email or account username',
           ),
+          keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
+          autocorrect: false,
           validator: (v) =>
-              (v == null || v.isEmpty) ? 'Enter username' : null,
+              (v == null || v.isEmpty) ? 'Enter your email or username' : null,
         ),
         TextFormField(
           controller: _passwordCtrl,

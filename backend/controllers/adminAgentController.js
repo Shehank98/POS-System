@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const db     = require('../config/database');
+const { createAgentNotification, AGENT_TYPES } = require('./notificationController');
 
 // ── GET /api/admin/agents ─────────────────────────────────────
 async function listAgents(req, res) {
@@ -181,6 +182,16 @@ async function verifyPayment(req, res) {
     );
 
     await client.query('COMMIT');
+
+    // Notify agent (non-blocking)
+    createAgentNotification(
+      sub.agent_id,
+      AGENT_TYPES.PAYMENT_VERIFIED,
+      'Payment Verified',
+      'Your payment submission has been verified and the shop subscription has been activated.',
+      { submission_id: submissionId, shop_id: sub.shop_id }
+    );
+
     res.json({ message: 'Payment verified, shop activated, commissions unlocked' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -195,13 +206,26 @@ async function verifyPayment(req, res) {
 async function rejectPayment(req, res) {
   const { admin_note } = req.body;
   try {
-    const { rowCount } = await db.query(
+    const { rows, rowCount } = await db.query(
       `UPDATE agent_payment_submissions
           SET status = 'rejected', admin_note = $1, reviewed_at = NOW()
-        WHERE id = $2 AND status = 'pending_verification'`,
+        WHERE id = $2 AND status = 'pending_verification'
+        RETURNING agent_id`,
       [admin_note || null, req.params.id]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Submission not found or already processed' });
+
+    // Notify agent (non-blocking)
+    createAgentNotification(
+      rows[0].agent_id,
+      AGENT_TYPES.PAYMENT_REJECTED,
+      'Payment Rejected',
+      admin_note
+        ? `Your payment submission was rejected: ${admin_note}`
+        : 'Your payment submission was rejected. Please contact admin for details.',
+      { submission_id: parseInt(req.params.id, 10), admin_note }
+    );
+
     res.json({ message: 'Payment rejected' });
   } catch (err) {
     console.error('rejectPayment error:', err);
@@ -264,6 +288,16 @@ async function markPayout(req, res) {
     );
 
     await client.query('COMMIT');
+
+    // Notify agent (non-blocking)
+    createAgentNotification(
+      agent_id,
+      AGENT_TYPES.PAYOUT_PROCESSED,
+      'Commission Payout Processed',
+      `A payout of LKR ${totalAmount.toLocaleString()} has been processed for ${updated.length} commission(s).`,
+      { total_amount: totalAmount, paid_count: updated.length, commission_ids: updated.map((c) => c.id) }
+    );
+
     res.json({ paid_count: updated.length, total_amount: totalAmount });
   } catch (err) {
     await client.query('ROLLBACK');

@@ -108,14 +108,17 @@ class ApiConstants {
   static String qrDisplay(String ref) => '/qr/display/$ref';
 
   // ── Sales Agent ───────────────────────────────────────────────
-  static const String agentLogin       = '/agent-auth/login';
-  static const String agentMe          = '/agent-auth/me';
-  static const String agentDashboard   = '/agents/me/dashboard';
-  static const String agentCustomers   = '/agents/me/customers';
-  static const String agentPayments    = '/agents/me/payments';
-  static const String agentCommissions = '/agents/me/commissions';
-  static const String agentBankDetails = '/agents/me/bank-details';
-  static const String agentRenewals    = '/agents/me/renewals';
+  static const String agentLogin         = '/agent-auth/login';
+  static const String agentMe            = '/agent-auth/me';
+  static const String agentDashboard     = '/agents/me/dashboard';
+  static const String agentCustomers     = '/agents/me/customers';
+  static const String agentPayments      = '/agents/me/payments';
+  static const String agentCommissions   = '/agents/me/commissions';
+  static const String agentBankDetails   = '/agents/me/bank-details';
+  static const String agentRenewals      = '/agents/me/renewals';
+  static const String agentNotifications = '/agents/me/notifications';
+  static const String agentNotificationsReadAll = '/agents/me/notifications/read-all';
+  static String agentNotificationRead(int id) => '/agents/me/notifications/$id/read';
   static String agentEditCustomer(int shopId) => '/agents/me/customers/$shopId';
 
   // ── Admin ─────────────────────────────────────────────────────

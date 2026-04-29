@@ -174,7 +174,78 @@ async function runDailyChecks() {
   }
 }
 
+// ── Agent notification types ──────────────────────────────────
+const AGENT_TYPES = {
+  PAYMENT_VERIFIED:    'payment_verified',
+  PAYMENT_REJECTED:    'payment_rejected',
+  COMMISSION_APPROVED: 'commission_approved',
+  PAYOUT_PROCESSED:    'payout_processed',
+};
+
+// ── Internal helper: create agent notification ────────────────
+async function createAgentNotification(agentId, type, title, message, data = null) {
+  try {
+    await db.query(
+      `INSERT INTO agent_notifications (agent_id, type, title, message, data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [agentId, type, title, message, data ? JSON.stringify(data) : null]
+    );
+  } catch (err) {
+    console.error('[AgentNotification] Failed to create notification:', err.message);
+  }
+}
+
+// ── GET /api/agents/me/notifications ─────────────────────────
+async function getAgentNotifications(req, res) {
+  const agentId = req.agent.id;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM agent_notifications
+        WHERE agent_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [agentId]
+    );
+    const unread_count = rows.filter((n) => !n.is_read).length;
+    res.json({ notifications: rows, unread_count });
+  } catch (err) {
+    console.error('getAgentNotifications error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/agents/me/notifications/:id/read ─────────────────
+async function markAgentNotificationRead(req, res) {
+  try {
+    await db.query(
+      `UPDATE agent_notifications SET is_read = TRUE
+        WHERE id = $1 AND agent_id = $2`,
+      [req.params.id, req.agent.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('markAgentNotificationRead error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/agents/me/notifications/read-all ─────────────────
+async function markAllAgentNotificationsRead(req, res) {
+  try {
+    await db.query(
+      `UPDATE agent_notifications SET is_read = TRUE WHERE agent_id = $1`,
+      [req.agent.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('markAllAgentNotificationsRead error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   getNotifications, markRead, markAllRead,
   createNotification, runDailyChecks, TYPES,
+  createAgentNotification, AGENT_TYPES,
+  getAgentNotifications, markAgentNotificationRead, markAllAgentNotificationsRead,
 };

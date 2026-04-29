@@ -13,20 +13,18 @@ class AuthService {
 
   AuthService(this._dio, this._storage);
 
-  Future<UserModel> login(
-      String username, String password, String shopId) async {
+  Future<UserModel> login(String identifier, String password) async {
     try {
       final response = await _dio.post(ApiConstants.login, data: {
-        'username': username,
+        'identifier': identifier,
         'password': password,
-        'shop_id': int.tryParse(shopId) ?? shopId,
       });
       final token = response.data['token'] as String;
       final user = UserModel.fromJson(
           response.data['user'] as Map<String, dynamic>);
       await _storage.saveToken(token);
       await _storage.saveUser(jsonEncode(user.toJson()));
-      await _storage.saveLastLogin(shopId, username);
+      await _storage.saveLastLogin(identifier);
       return user;
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
