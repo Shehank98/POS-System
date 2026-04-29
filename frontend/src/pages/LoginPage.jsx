@@ -9,7 +9,7 @@ export default function LoginPage() {
   const login    = useAuthStore((s) => s.login);
   const loading  = useAuthStore((s) => s.loading);
 
-  const [form, setForm]     = useState({ shop_id: '', username: '', password: '' });
+  const [form, setForm]     = useState({ identifier: '', password: '' });
   const [showPw, setShowPw] = useState(false);
   const [error, setError]   = useState('');
 
@@ -19,16 +19,15 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!form.shop_id || !form.username || !form.password) {
+    if (!form.identifier || !form.password) {
       setError('All fields are required');
       return;
     }
 
     try {
       const data = await login({
-        shop_id:  parseInt(form.shop_id, 10),
-        username: form.username.trim(),
-        password: form.password,
+        identifier: form.identifier.trim(),
+        password:   form.password,
       });
 
       if (data.user.read_only) {
@@ -100,31 +99,19 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="label">Shop ID</label>
-              <input
-                className="input"
-                type="number"
-                min="1"
-                placeholder="Enter your Shop ID (e.g. 1)"
-                value={form.shop_id}
-                onChange={set('shop_id')}
-                autoFocus
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Your Shop ID is provided when your account is created.
-              </p>
-            </div>
-
-            <div>
-              <label className="label">Username</label>
+              <label className="label">Email or Username</label>
               <input
                 className="input"
                 type="text"
-                placeholder="Enter username"
-                value={form.username}
-                onChange={set('username')}
+                placeholder="Enter your email or username"
+                value={form.identifier}
+                onChange={set('identifier')}
                 autoComplete="username"
+                autoFocus
               />
+              <p className="text-xs text-gray-400 mt-1">
+                Use your email address or account username.
+              </p>
             </div>
 
             <div>
@@ -166,3 +153,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
