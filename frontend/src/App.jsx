@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
 import useAdminStore from './store/adminStore';
+import useAgentStore from './store/agentStore';
 
 // Standard POS
 import Layout from './components/Layout';
@@ -24,6 +25,8 @@ import CustomersPage from './pages/CustomersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AgentsPage from './pages/admin/AgentsPage';
+import AgentLoginPage from './pages/agent/AgentLoginPage';
+import AgentPortalPage from './pages/agent/AgentPortalPage';
 
 // Clothing module
 import ClothingExchangesPage from './pages/ClothingExchangesPage';
@@ -54,6 +57,11 @@ function PrivateRoute({ children }) {
 function AdminRoute({ children }) {
   const token = useAdminStore((s) => s.token);
   return token ? children : <Navigate to="/admin/login" replace />;
+}
+
+function AgentRoute({ children }) {
+  const token = useAgentStore((s) => s.token);
+  return token ? children : <Navigate to="/agent/login" replace />;
 }
 
 /** Redirects to the right home page based on shop_type */
@@ -95,6 +103,17 @@ export default function App() {
         <Route path="/track"      element={<TrackOrderPage />} />
         <Route path="/cw-portal"  element={<CarWashPortal />} />
         <Route path="/qr-display" element={<QRDisplayPage />} />
+
+        {/* ── Agent portal ──────────────────────────────────── */}
+        <Route path="/agent/login" element={<AgentLoginPage />} />
+        <Route
+          path="/agent"
+          element={
+            <AgentRoute>
+              <AgentPortalPage />
+            </AgentRoute>
+          }
+        />
 
         {/* ── Admin section ─────────────────────────────────── */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

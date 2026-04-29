@@ -241,6 +241,36 @@ export const carwashPublicApi = {
   createBooking: (data)   => publicClient.post('/carwash/public/bookings', data),
 };
 
+// ── Agent API (uses separate agent token) ────────────────────
+const agentClient = axios.create({ baseURL: BASE_URL });
+agentClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('pos_agent_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+agentClient.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('pos_agent_token');
+      window.location.href = '/agent/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export const agentApi = {
+  login:         (data) => agentClient.post('/agent-auth/login', data),
+  me:            ()     => agentClient.get('/agent-auth/me'),
+  dashboard:     ()     => agentClient.get('/agents/me/dashboard'),
+  customers:     ()     => agentClient.get('/agents/me/customers'),
+  onboard:       (data) => agentClient.post('/agents/me/customers', data),
+  payments:      ()     => agentClient.get('/agents/me/payments'),
+  submitPayment: (data) => agentClient.post('/agents/me/payments', data),
+  commissions:   ()     => agentClient.get('/agents/me/commissions'),
+  bankDetails:   (data) => agentClient.put('/agents/me/bank-details', data),
+};
+
 // ── Admin API (uses separate admin token) ────────────────────
 const adminClient = axios.create({ baseURL: BASE_URL });
 adminClient.interceptors.request.use((config) => {
