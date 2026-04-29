@@ -62,6 +62,25 @@ class SecureStorage {
     await _storage.delete(key: _agentUserKey);
   }
 
+  // ── Admin ─────────────────────────────────────────────────────────
+  static const _adminTokenKey = 'admin_token';
+  static const _adminUserKey  = 'admin_user_json';
+
+  Future<void> saveAdminToken(String token) =>
+      _storage.write(key: _adminTokenKey, value: token);
+
+  Future<String?> readAdminToken() => _storage.read(key: _adminTokenKey);
+
+  Future<void> saveAdminUser(String json) =>
+      _storage.write(key: _adminUserKey, value: json);
+
+  Future<String?> readAdminUser() => _storage.read(key: _adminUserKey);
+
+  Future<void> deleteAdminSession() async {
+    await _storage.delete(key: _adminTokenKey);
+    await _storage.delete(key: _adminUserKey);
+  }
+
   Future<void> deleteAll() => _storage.deleteAll();
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -6,7 +7,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../providers/transaction_provider.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_overlay.dart';
+import '../../widgets/common/shimmer_list.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
@@ -73,7 +74,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               onRefresh: () =>
                   ref.read(transactionsProvider.notifier).refresh(),
               child: txnAsync.when(
-                loading: () => const LoadingOverlay(),
+                loading: () => const ShimmerList(itemCount: 8, itemHeight: 76),
                 error: (e, _) => ErrorView(
                     message: e.toString(),
                     onRetry: () =>
@@ -113,8 +114,18 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 4),
                     itemCount: filtered.length,
-                    itemBuilder: (ctx, i) =>
-                        _TxnCard(txn: filtered[i]),
+                    itemBuilder: (ctx, i) => _TxnCard(txn: filtered[i])
+                        .animate()
+                        .fadeIn(
+                            delay: Duration(
+                                milliseconds: (i * 35).clamp(0, 350)),
+                            duration: 300.ms)
+                        .slideX(
+                            begin: 0.04,
+                            end: 0,
+                            delay: Duration(
+                                milliseconds: (i * 35).clamp(0, 350)),
+                            duration: 300.ms),
                   );
                 },
               ),

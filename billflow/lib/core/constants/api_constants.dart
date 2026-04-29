@@ -61,6 +61,7 @@ class ApiConstants {
 
   // ── Reports ───────────────────────────────────────────────────
   static const String reportsTax = '/reports/tax';
+  static const String auditLog = '/audit-log';
 
   // ── Notifications ─────────────────────────────────────────────
   static const String notifications = '/notifications';
@@ -116,4 +117,23 @@ class ApiConstants {
   static const String agentBankDetails = '/agents/me/bank-details';
   static const String agentRenewals    = '/agents/me/renewals';
   static String agentEditCustomer(int shopId) => '/agents/me/customers/$shopId';
+
+  // ── Admin ─────────────────────────────────────────────────────
+  static const String adminLogin        = '/admin/login';
+  static const String adminMe           = '/admin/me';
+  static const String adminDashboard    = '/admin/dashboard';
+  static const String adminShops        = '/admin/shops';
+  static String adminShopById(int id)        => '/admin/shops/$id';
+  static String adminShopSubscription(int id) => '/admin/shops/$id/subscription';
+  static const String adminPayments     = '/admin/payments';
+  static const String adminPendingPayments = '/admin/agent-payments/pending';
+  static const String adminAllPayments  = '/admin/agent-payments';
+  static String adminVerifyPayment(int id) => '/admin/agent-payments/$id/verify';
+  static String adminRejectPayment(int id) => '/admin/agent-payments/$id/reject';
+  static const String adminAgents       = '/admin/agents';
+  static String adminAgentById(int id)  => '/admin/agents/$id';
+  static String adminAgentCustomers(int id) => '/admin/agents/$id/customers';
+  static const String adminAgentCommissions = '/admin/agent-commissions';
+  static const String adminAgentPayout  = '/admin/agent-commissions/payout';
+  static const String adminAuditLog     = '/admin/audit-log';
 }

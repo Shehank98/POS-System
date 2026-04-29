@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/biometric_provider.dart';
+import '../../providers/agent_auth_provider.dart';
+import '../../providers/admin_auth_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../presentation/screens/auth/login_screen.dart';
@@ -25,16 +27,37 @@ import '../../presentation/screens/carwash/carwash_services_screen.dart';
 import '../../presentation/screens/customers/customers_screen.dart';
 import '../../presentation/screens/pre_orders/pre_orders_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
-import '../../presentation/screens/agent/agent_login_screen.dart';
 import '../../presentation/screens/agent/agent_home_screen.dart';
-import '../../providers/agent_auth_provider.dart';
+import '../../presentation/screens/admin/admin_home_screen.dart';
+import '../../presentation/screens/audit_log/audit_log_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Subtle fade+slide used on every route push.
+Page<T> _fadeSlidePage<T>(Widget child, GoRouterState state) =>
+    CustomTransitionPage<T>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 200),
+      transitionsBuilder: (_, animation, __, child) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween(
+            begin: const Offset(0, 0.035),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+          child: child,
+        ),
+      ),
+    );
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState    = ref.watch(authProvider);
-  final agentState   = ref.watch(agentAuthProvider);
+  final authState      = ref.watch(authProvider);
+  final agentState     = ref.watch(agentAuthProvider);
+  final adminState     = ref.watch(adminAuthProvider);
   final needsBiometric = ref.watch(biometricGateProvider);
 
   return GoRouter(
@@ -43,28 +66,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final user    = authState.valueOrNull;
       final agent   = agentState.valueOrNull;
+      final admin   = adminState.valueOrNull;
       final isLoggedIn = user != null;
       final isLoading  = authState.isLoading;
       final loc = state.matchedLocation;
 
-      // Agent routes — completely separate from shop routes
-      if (loc.startsWith('/agent')) {
-        if (loc == '/agent-login') return agent != null ? '/agent' : null;
-        return agent == null ? '/agent-login' : null;
+      // ── Admin routes ──────────────────────────────────────────────────
+      if (loc.startsWith('/admin')) {
+        if (adminState.isLoading) return null;
+        return admin == null ? '/login?mode=admin' : null;
       }
 
+      // ── Agent routes ──────────────────────────────────────────────────
+      if (loc.startsWith('/agent')) {
+        if (agentState.isLoading) return null;
+        return agent == null ? '/login?mode=agent' : null;
+      }
+
+      // Legacy /agent-login deep-link redirect
+      if (loc == '/agent-login') {
+        return agent != null ? '/agent' : '/login?mode=agent';
+      }
+
+      // ── Shop auth ─────────────────────────────────────────────────────
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';
-      if (isLoggedIn && needsBiometric && loc != '/biometric') return '/biometric';
+      if (isLoggedIn && needsBiometric && loc != '/biometric') {
+        return '/biometric';
+      }
 
       if (isLoggedIn && !needsBiometric) {
-        // Subscription gate: fully locked accounts can only access /billing and /settings
         final isLocked = user.readOnly && !user.inGracePeriod;
         const allowedWhenLocked = {'/billing', '/settings'};
         if (isLocked && !allowedWhenLocked.contains(loc)) return '/billing';
 
         if (loc == '/login' || loc == '/' || loc == '/biometric') {
-          // Car service shops go to their own dashboard
           return user.isCarServiceShop ? '/carwash' : '/dashboard';
         }
       }
@@ -74,25 +110,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
+        pageBuilder: (_, s) => _fadeSlidePage(
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          s,
         ),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (_, s) => _fadeSlidePage(const LoginScreen(), s),
       ),
+      // Legacy path — redirected in guard above
       GoRoute(
         path: '/agent-login',
-        builder: (context, state) => const AgentLoginScreen(),
+        redirect: (_, __) => '/login?mode=agent',
       ),
       GoRoute(
         path: '/agent',
-        builder: (context, state) => const AgentHomeScreen(),
+        pageBuilder: (_, s) => _fadeSlidePage(const AgentHomeScreen(), s),
+      ),
+      GoRoute(
+        path: '/admin',
+        pageBuilder: (_, s) => _fadeSlidePage(const AdminHomeScreen(), s),
       ),
       GoRoute(
         path: '/biometric',
-        builder: (context, state) => const BiometricScreen(),
+        pageBuilder: (_, s) => _fadeSlidePage(const BiometricScreen(), s),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -100,84 +142,105 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const DashboardScreen(), s),
           ),
           GoRoute(
             path: '/sales',
-            builder: (context, state) => const SalesScreen(),
+            pageBuilder: (_, s) => _fadeSlidePage(const SalesScreen(), s),
           ),
           GoRoute(
             path: '/transactions',
-            builder: (context, state) => const TransactionsScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const TransactionsScreen(), s),
           ),
           GoRoute(
             path: '/products',
-            builder: (context, state) => const ProductsScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const ProductsScreen(), s),
           ),
           GoRoute(
             path: '/reports',
-            builder: (context, state) => const ReportsScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const ReportsScreen(), s),
           ),
           GoRoute(
             path: '/customers',
-            builder: (context, state) => const CustomersScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const CustomersScreen(), s),
           ),
           GoRoute(
             path: '/carwash',
-            builder: (context, state) => const CarwashScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const CarwashScreen(), s),
           ),
           GoRoute(
             path: '/carwash/bookings',
-            builder: (context, state) => const CarwashBookingsScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const CarwashBookingsScreen(), s),
           ),
           GoRoute(
             path: '/carwash/services',
-            builder: (context, state) => const CarwashServicesScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const CarwashServicesScreen(), s),
           ),
           GoRoute(
             path: '/analytics',
-            builder: (context, state) => const AnalyticsScreen(),
+            pageBuilder: (_, s) =>
+                _fadeSlidePage(const AnalyticsScreen(), s),
           ),
         ],
       ),
       GoRoute(
         path: '/billing',
-        builder: (context, state) => const BillingScreen(),
+        pageBuilder: (_, s) => _fadeSlidePage(const BillingScreen(), s),
       ),
       GoRoute(
         path: '/pre-orders',
-        builder: (context, state) => const PreOrdersScreen(),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const PreOrdersScreen(), s),
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const SettingsScreen(), s),
       ),
       GoRoute(
         path: '/products/add',
-        builder: (context, state) => const ProductFormScreen(),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const ProductFormScreen(), s),
       ),
       GoRoute(
         path: '/products/:id/edit',
-        builder: (context, state) {
-          final product = state.extra as ProductModel?;
-          return ProductFormScreen(product: product);
+        pageBuilder: (context, s) {
+          final product = s.extra as ProductModel?;
+          return _fadeSlidePage(ProductFormScreen(product: product), s);
         },
       ),
       GoRoute(
         path: '/transactions/:id',
-        builder: (context, state) {
-          final txn = state.extra as TransactionModel?;
-          final id = int.parse(state.pathParameters['id']!);
-          return TransactionDetailScreen(transactionId: id, transaction: txn);
+        pageBuilder: (context, s) {
+          final txn = s.extra as TransactionModel?;
+          final id  = int.parse(s.pathParameters['id']!);
+          return _fadeSlidePage(
+              TransactionDetailScreen(transactionId: id, transaction: txn),
+              s);
         },
       ),
       GoRoute(
         path: '/payment',
-        builder: (context, state) => const PaymentScreen(),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const PaymentScreen(), s),
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const NotificationsScreen(), s),
+      ),
+      GoRoute(
+        path: '/audit-log',
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const AuditLogScreen(), s),
       ),
     ],
   );

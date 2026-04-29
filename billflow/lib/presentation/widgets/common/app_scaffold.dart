@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
@@ -100,6 +101,25 @@ class AppScaffold extends ConsumerWidget {
           selectedIcon: Icons.insights,
           label: 'Analytics',
         ),
+      if (user?.isManagerOrAbove == true)
+        const _NavItem(
+          route: '/audit-log',
+          icon: Icons.history_outlined,
+          selectedIcon: Icons.history,
+          label: 'Audit Log',
+        ),
+      const _NavItem(
+        route: '/reports',
+        icon: Icons.bar_chart_outlined,
+        selectedIcon: Icons.bar_chart,
+        label: 'Reports',
+      ),
+      const _NavItem(
+        route: '/settings',
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: 'Settings',
+      ),
     ];
 
     final bool hasOverflow = allItems.length >= _kMaxNavItems;
@@ -436,7 +456,8 @@ class _MoreSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            ...items.map((item) {
+            ...items.indexed.map((entry) {
+              final (idx, item) = entry;
               final isActive = currentLocation.startsWith(item.route);
               return ListTile(
                 leading: Icon(
@@ -454,7 +475,16 @@ class _MoreSheet extends StatelessWidget {
                     ? Badge(label: Text('$unread'))
                     : null,
                 onTap: () => onTap(item.route),
-              );
+              )
+                  .animate()
+                  .fadeIn(
+                      delay: Duration(milliseconds: idx * 40),
+                      duration: 250.ms)
+                  .slideX(
+                      begin: 0.05,
+                      end: 0,
+                      delay: Duration(milliseconds: idx * 40),
+                      duration: 250.ms);
             }),
           ],
         ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/product_provider.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_overlay.dart';
+import '../../widgets/common/shimmer_list.dart';
 import '../../widgets/products/category_filter_bar.dart';
 import '../../widgets/products/product_card.dart';
 
@@ -57,7 +58,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               onRefresh: () =>
                   ref.read(productsProvider.notifier).refresh(),
               child: productsAsync.when(
-                loading: () => const LoadingOverlay(),
+                loading: () => const ShimmerGrid(
+                    crossAxisCount: 2, itemCount: 8, itemHeight: 160),
                 error: (e, _) => ErrorView(
                     message: e.toString(),
                     onRetry: () =>
@@ -96,7 +98,18 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     '/products/${p.id}/edit',
                                     extra: p)
                                 : null,
-                          );
+                          )
+                              .animate()
+                              .fadeIn(
+                                  delay: Duration(
+                                      milliseconds: (i * 35).clamp(0, 350)),
+                                  duration: 300.ms)
+                              .scale(
+                                  begin: const Offset(0.92, 0.92),
+                                  end: const Offset(1, 1),
+                                  delay: Duration(
+                                      milliseconds: (i * 35).clamp(0, 350)),
+                                  duration: 300.ms);
                         },
                       ),
               ),

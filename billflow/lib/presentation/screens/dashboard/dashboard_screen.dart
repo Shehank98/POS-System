@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -7,7 +8,8 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../providers/notification_provider.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_overlay.dart';
+import '../../widgets/common/shimmer_card.dart';
+import '../../widgets/common/shimmer_list.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -233,7 +235,7 @@ class DashboardScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               sliver: todayAsync.when(
                 loading: () => const SliverToBoxAdapter(
-                    child: SizedBox(height: 160, child: LoadingOverlay())),
+                    child: ShimmerGrid(itemCount: 4, itemHeight: 70)),
                 error: (e, _) => SliverToBoxAdapter(
                     child: ErrorView(
                         message: e.toString(),
@@ -350,8 +352,7 @@ class DashboardScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         weekAsync.when(
                           data: (week) => RevenueBarChart(data: week),
-                          loading: () => const SizedBox(
-                              height: 160, child: LoadingOverlay()),
+                          loading: () => const ShimmerCard(height: 160),
                           error: (_, __) => const SizedBox(
                               height: 60,
                               child: Center(
@@ -565,7 +566,10 @@ class _StatCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: 350.ms)
+        .slideY(begin: 0.1, end: 0, duration: 350.ms, curve: Curves.easeOut);
   }
 }
 

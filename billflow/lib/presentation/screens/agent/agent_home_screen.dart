@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import '../../../data/models/agent_model.dart';
 import '../../../data/services/agent_service.dart';
 import '../../../providers/agent_auth_provider.dart';
 import '../../../providers/agent_provider.dart';
+import '../../widgets/common/shimmer_list.dart';
 
 // ── Formatters ────────────────────────────────────────────────
 final _currFmt = NumberFormat('#,##0.00', 'en_US');
@@ -89,7 +91,7 @@ class _DashboardTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(agentDashboardProvider);
     return dash.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerList(itemCount: 6),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (d) => RefreshIndicator(
         onRefresh: () => ref.refresh(agentDashboardProvider.future),
@@ -317,7 +319,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
         ]),
       ),
       Expanded(child: customers.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ShimmerList(itemCount: 6),
         error: (e, _) => Center(child: Text('$e')),
         data: (list) {
           final filtered = list.where((c) =>
@@ -526,7 +528,7 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
         ]),
       ),
       Expanded(child: payments.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ShimmerList(itemCount: 6),
         error: (e, _) => Center(child: Text('$e')),
         data: (list) {
           if (list.isEmpty) return const Center(
@@ -588,7 +590,7 @@ class _CommissionsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final commissions = ref.watch(agentCommissionsProvider);
     return commissions.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerList(itemCount: 6),
       error: (e, _) => Center(child: Text('$e')),
       data: (list) {
         final locked   = list.where((c) => c.status == 'locked').toList();

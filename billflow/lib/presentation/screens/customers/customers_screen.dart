@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/customer_model.dart';
 import '../../../providers/customer_provider.dart';
+import '../../widgets/common/shimmer_list.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -146,7 +148,7 @@ class _InsightsView extends ConsumerWidget {
     final insightsAsync = ref.watch(customerInsightsProvider(phone));
 
     return insightsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerList(itemCount: 5, itemHeight: 80),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -501,7 +503,7 @@ class _TopCustomersTab extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     return topAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerList(itemCount: 6, itemHeight: 72),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -539,7 +541,13 @@ class _TopCustomersTab extends ConsumerWidget {
                 itemCount: customers.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) =>
-                    _TopCustomerCard(rank: i + 1, customer: customers[i]),
+                    _TopCustomerCard(rank: i + 1, customer: customers[i])
+                        .animate()
+                        .fadeIn(
+                            delay: Duration(
+                                milliseconds: (i * 40).clamp(0, 400)),
+                            duration: 300.ms)
+                        .slideX(begin: 0.04, end: 0),
               ),
             ),
     );
