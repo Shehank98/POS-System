@@ -54,25 +54,31 @@ class _StatCard extends StatelessWidget {
   const _StatCard({required this.label, required this.value, required this.icon, required this.color});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 8),
-            Text(value,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.18 : 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 8),
+          Text(value,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Dashboard tab ─────────────────────────────────────────────
@@ -93,10 +99,10 @@ class _DashboardTab extends ConsumerWidget {
             // Target progress
             if (d.monthlyTarget > 0) ...[
               Row(children: [
-                const Icon(Icons.flag_outlined, size: 16, color: Colors.black54),
+                Icon(Icons.flag_outlined, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 const SizedBox(width: 6),
                 Text('Monthly target: ${d.activeCustomers} / ${d.monthlyTarget} active shops',
-                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
               ]),
               const SizedBox(height: 6),
               ClipRRect(
@@ -106,7 +112,7 @@ class _DashboardTab extends ConsumerWidget {
                       ? (d.activeCustomers / d.monthlyTarget).clamp(0.0, 1.0)
                       : 0,
                   minHeight: 8,
-                  backgroundColor: Colors.grey[200],
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation(AppColors.accent),
                 ),
               ),
@@ -172,7 +178,7 @@ class _DashboardTab extends ConsumerWidget {
                         s['subscription_end_date'] != null
                             ? fmtDate(DateTime.tryParse(s['subscription_end_date'] as String))
                             : '—',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                       ),
                     ]),
                   )),
@@ -304,9 +310,9 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(children: [
         // Handle
@@ -381,8 +387,8 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
               const Text('Owner Login Account',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              const Text('The shop owner will use these credentials to log into the POS.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54)),
+              Text('The shop owner will use these credentials to log into the POS.',
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
               const SizedBox(height: 16),
               _field(_usernameCtrl, 'Username *', TextInputType.text),
               StatefulBuilder(builder: (_, ss) => TextField(
@@ -406,8 +412,8 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               if (_plans.isEmpty)
-                const Text('No plans available — shop will be created without a plan.',
-                    style: TextStyle(color: Colors.black45, fontSize: 13))
+                Text('No plans available — shop will be created without a plan.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), fontSize: 13))
               else ...[
                 ..._plans.map((p) {
                   final id       = p['id'] as int;
@@ -487,7 +493,7 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                     const Icon(Icons.calculate_outlined, color: Color(0xFF2E7D32), size: 18),
                     const SizedBox(width: 8),
                     Text('Expected payment: ',
-                        style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                     Text(fmtMoney(price),
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
                             color: Color(0xFF1B5E20))),
@@ -514,7 +520,7 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(children: [
                   SizedBox(width: 110,
-                      child: Text(row[0], style: const TextStyle(color: Colors.black45, fontSize: 13))),
+                      child: Text(row[0], style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), fontSize: 13))),
                   Expanded(child: Text(row[1],
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                 ]),
@@ -644,13 +650,13 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
     return 'Expires in $days day${days == 1 ? '' : 's'}';
   }
 
-  Color _expiryColor(AgentCustomer c) {
+  Color _expiryColor(AgentCustomer c, BuildContext context) {
     final days = c.daysUntilExpiry;
     if (days == null) return Colors.transparent;
     if (days < 0)  return AppColors.danger;
     if (days <= 3) return AppColors.danger;
     if (days <= 7) return AppColors.warning;
-    return Colors.black45;
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
   }
 
   @override
@@ -679,7 +685,6 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
             onPressed: _showOnboardSheet,
             icon: const Icon(Icons.store_mall_directory, size: 18),
             label: const Text('Onboard'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1B5E20)),
           ),
         ]),
       ),
@@ -741,7 +746,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
               Icon(Icons.store_outlined, size: 48, color: Colors.grey[300]),
               const SizedBox(height: 12),
               Text(_q.isNotEmpty ? 'No results for "$_q"' : 'No shops in this category',
-                  style: const TextStyle(color: Colors.black45)),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
             ]));
           }
           return RefreshIndicator(
@@ -753,13 +758,13 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                 final c = filtered[i];
                 final statusColor = _subColor(c.subscriptionStatus);
                 final expiryLabel = _expiryLabel(c);
-                final expiryColor = _expiryColor(c);
+                final expiryColor = _expiryColor(c, context);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {}, // placeholder for detail view
@@ -779,7 +784,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                             Text(c.name,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             Text(c.ownerName,
-                                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                           ])),
                           _StatusDot(status: c.subscriptionStatus, color: statusColor),
                         ]),
@@ -794,7 +799,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                                 size: 13, color: Colors.grey[500]),
                             const SizedBox(width: 4),
                             Text(c.planName!,
-                                style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                             const SizedBox(width: 12),
                           ],
                           if (c.isPendingPayment) ...[
@@ -893,9 +898,9 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(builder: (ctx, setSt) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
           top: 20, left: 20, right: 20,
@@ -1027,8 +1032,8 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
         loading: () => const ShimmerList(itemCount: 6),
         error: (e, _) => Center(child: Text('$e')),
         data: (list) {
-          if (list.isEmpty) return const Center(
-              child: Text('No submissions yet', style: TextStyle(color: Colors.black45)));
+          if (list.isEmpty) return Center(
+              child: Text('No submissions yet', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))));
           return RefreshIndicator(
             onRefresh: () => ref.refresh(agentPaymentsProvider.future),
             child: ListView.builder(
@@ -1040,9 +1045,9 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[200]!),
+                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                     // Left accent bar
                     boxShadow: [BoxShadow(
                       color: pColor.withValues(alpha: 0.15),
@@ -1076,7 +1081,7 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
                                   color: Color(0xFF1B5E20))),
                           const SizedBox(height: 2),
                           Text('${p.paymentMethod.toUpperCase()} · ${fmtDate(p.paymentDate)}',
-                              style: const TextStyle(fontSize: 12, color: Colors.black45)),
+                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
                           if (p.adminNote != null) ...[
                             const SizedBox(height: 6),
                             Container(
@@ -1145,7 +1150,7 @@ class _CommissionsTab extends ConsumerWidget {
 
               if (list.isEmpty) ...[
                 const SizedBox(height: 40),
-                const Center(child: Text('No commissions yet', style: TextStyle(color: Colors.black45))),
+                Center(child: Text('No commissions yet', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)))),
               ],
 
               for (final section in [
@@ -1266,13 +1271,13 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
               ),
               const SizedBox(height: 10),
               Text(agent.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(agent.email, style: const TextStyle(color: Colors.black54, fontSize: 13)),
+              Text(agent.email, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13)),
               if (agent.district != null) ...[
                 const SizedBox(height: 4),
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Icon(Icons.location_on_outlined, size: 14, color: Colors.black45),
+                  Icon(Icons.location_on_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
                   const SizedBox(width: 4),
-                  Text(agent.district!, style: const TextStyle(color: Colors.black45, fontSize: 13)),
+                  Text(agent.district!, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), fontSize: 13)),
                 ]),
               ],
             ]),
@@ -1308,7 +1313,7 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(children: [
                       SizedBox(width: 72,
-                          child: Text(row[0], style: const TextStyle(color: Colors.black45, fontSize: 13))),
+                          child: Text(row[0], style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), fontSize: 13))),
                       Expanded(child: Text(row[1], style: const TextStyle(fontWeight: FontWeight.w500))),
                     ]),
                   ),

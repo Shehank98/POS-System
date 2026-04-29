@@ -9,6 +9,7 @@ import 'admin_dashboard_screen.dart';
 import 'admin_shops_screen.dart';
 import 'admin_payments_screen.dart';
 import 'admin_agents_screen.dart';
+import 'admin_plans_screen.dart';
 
 class AdminHomeScreen extends ConsumerStatefulWidget {
   const AdminHomeScreen({super.key});
@@ -21,10 +22,11 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   int _tab = 0;
 
   static const _tabs = [
-    (icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard'),
-    (icon: Icons.store_outlined, activeIcon: Icons.store, label: 'Shops'),
-    (icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Payments'),
-    (icon: Icons.badge_outlined, activeIcon: Icons.badge, label: 'Agents'),
+    (icon: Icons.dashboard_outlined,          activeIcon: Icons.dashboard,          label: 'Dashboard'),
+    (icon: Icons.store_outlined,              activeIcon: Icons.store,              label: 'Shops'),
+    (icon: Icons.payments_outlined,           activeIcon: Icons.payments,           label: 'Payments'),
+    (icon: Icons.badge_outlined,              activeIcon: Icons.badge,              label: 'Agents'),
+    (icon: Icons.workspace_premium_outlined,  activeIcon: Icons.workspace_premium,  label: 'Plans'),
   ];
 
   static const _screens = [
@@ -32,9 +34,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     AdminShopsScreen(),
     AdminPaymentsScreen(),
     AdminAgentsScreen(),
+    AdminPlansScreen(),
   ];
 
-  static const _titles = ['Admin Dashboard', 'Shops', 'Payments', 'Agents'];
+  static const _titles = ['Admin Dashboard', 'Shops', 'Payments', 'Agents', 'Plans'];
 
   @override
   Widget build(BuildContext context) {

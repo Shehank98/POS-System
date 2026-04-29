@@ -138,6 +138,26 @@ class AdminService {
         data: {'commission_ids': commissionIds}, options: await _authOpts());
   }
 
+  // ── Plans ─────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getPlans() async {
+    final res = await _dio.get(ApiConstants.adminPlans, options: await _authOpts());
+    return (res.data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createPlan(Map<String, dynamic> data) async {
+    final res = await _dio.post(ApiConstants.adminPlans, data: data, options: await _authOpts());
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updatePlan(int id, Map<String, dynamic> data) async {
+    final res = await _dio.put(ApiConstants.adminPlanById(id), data: data, options: await _authOpts());
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<void> deletePlan(int id) async {
+    await _dio.delete(ApiConstants.adminPlanById(id), options: await _authOpts());
+  }
+
   // ── Push notification dispatch ────────────────────────────────
   // target: 'all' | 'active' | 'trial' | 'expired' | 'specific'
   Future<Map<String, dynamic>> dispatchNotification({
