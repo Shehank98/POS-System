@@ -138,5 +138,6 @@ class ApiConstants {
   static String adminAgentCustomers(int id) => '/admin/agents/$id/customers';
   static const String adminAgentCommissions = '/admin/agent-commissions';
   static const String adminAgentPayout  = '/admin/agent-commissions/payout';
-  static const String adminAuditLog     = '/admin/audit-log';
+  static const String adminAuditLog             = '/admin/audit-log';
+  static const String adminNotificationsDispatch = '/admin/notifications/dispatch';
 }

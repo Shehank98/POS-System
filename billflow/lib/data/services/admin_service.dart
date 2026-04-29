@@ -137,6 +137,24 @@ class AdminService {
     await _dio.put(ApiConstants.adminAgentPayout,
         data: {'commission_ids': commissionIds}, options: await _authOpts());
   }
+
+  // ── Push notification dispatch ────────────────────────────────
+  // target: 'all' | 'active' | 'trial' | 'expired' | 'specific'
+  Future<Map<String, dynamic>> dispatchNotification({
+    required String title,
+    required String body,
+    String target = 'all',
+    int? shopId,
+  }) async {
+    final data = <String, dynamic>{'title': title, 'body': body, 'target': target};
+    if (shopId != null) data['shop_id'] = shopId;
+    final res = await _dio.post(
+      ApiConstants.adminNotificationsDispatch,
+      data: data,
+      options: await _authOpts(),
+    );
+    return res.data as Map<String, dynamic>;
+  }
 }
 
 final adminServiceProvider = Provider<AdminService>((ref) => AdminService(
