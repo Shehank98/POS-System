@@ -108,7 +108,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.accent.withOpacity(0.35),
+                      color: AppColors.accent.withValues(alpha: 0.35),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -121,7 +121,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -148,7 +148,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -567,7 +567,7 @@ class _CartSheet extends ConsumerWidget {
                 const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 16,
                 offset: const Offset(0, -4),
               ),

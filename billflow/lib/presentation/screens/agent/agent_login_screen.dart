@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../providers/agent_auth_provider.dart';
 
@@ -68,7 +67,7 @@ class _AgentLoginScreenState extends ConsumerState<AgentLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: const Icon(Icons.badge_outlined, size: 56, color: Colors.white),

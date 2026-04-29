@@ -72,17 +72,17 @@ class _StepButton extends StatelessWidget {
         height: 32,
         decoration: BoxDecoration(
           color: onTap == null
-              ? cs.surfaceVariant.withOpacity(0.4)
+              ? cs.surfaceContainerHighest.withValues(alpha: 0.4)
               : primary
                   ? cs.primary
-                  : cs.surfaceVariant,
+                  : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
           size: 18,
           color: onTap == null
-              ? cs.onSurface.withOpacity(0.3)
+              ? cs.onSurface.withValues(alpha: 0.3)
               : primary
                   ? cs.onPrimary
                   : cs.onSurfaceVariant,

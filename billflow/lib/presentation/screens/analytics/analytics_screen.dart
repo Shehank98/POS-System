@@ -403,7 +403,7 @@ class _PayRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: pct,
-              backgroundColor: color.withOpacity(0.1),
+              backgroundColor: color.withValues(alpha: 0.1),
               valueColor: AlwaysStoppedAnimation(color),
               minHeight: 8,
             ),
@@ -478,7 +478,7 @@ class _TopProductRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: pct,
                     backgroundColor:
-                        AppColors.primary.withOpacity(0.08),
+                        AppColors.primary.withValues(alpha: 0.08),
                     valueColor:
                         AlwaysStoppedAnimation(AppColors.primary),
                     minHeight: 4,

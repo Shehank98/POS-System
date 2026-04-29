@@ -166,7 +166,7 @@ class _ShopTile extends ConsumerWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: statusColor.withOpacity(0.12),
+          backgroundColor: statusColor.withValues(alpha: 0.12),
           child: Icon(Icons.store_outlined, color: statusColor),
         ),
         title: Text(shop.name,
@@ -213,7 +213,7 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

@@ -25,7 +25,7 @@ class RevenueBarChart extends StatelessWidget {
         barRods: [
           BarChartRodData(
             toY: e.value.sales,
-            color: isToday ? cs.primary : cs.primary.withOpacity(0.4),
+            color: isToday ? cs.primary : cs.primary.withValues(alpha: 0.4),
             width: 20,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
           ),
@@ -43,7 +43,7 @@ class RevenueBarChart extends StatelessWidget {
             show: true,
             drawVerticalLine: false,
             getDrawingHorizontalLine: (v) =>
-                FlLine(color: cs.outlineVariant.withOpacity(0.5), strokeWidth: 1),
+                FlLine(color: cs.outlineVariant.withValues(alpha: 0.5), strokeWidth: 1),
           ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(

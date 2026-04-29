@@ -219,51 +219,6 @@ class _CarServiceScaffold extends ConsumerWidget {
     final productsEnabled = ref.watch(carServiceProductsEnabledProvider);
     final location = GoRouterState.of(context).matchedLocation;
 
-    // Car Service bottom nav items
-    final mainItems = <_NavItem>[
-      const _NavItem(
-        route: '/carwash',
-        icon: Icons.dashboard_outlined,
-        selectedIcon: Icons.dashboard,
-        label: 'Dashboard',
-      ),
-      const _NavItem(
-        route: '/carwash/bookings',
-        icon: Icons.calendar_today_outlined,
-        selectedIcon: Icons.calendar_today,
-        label: 'Pre-Bookings',
-      ),
-    ];
-
-    // More items (accessed via sheet)
-    final moreItems = <_NavItem>[
-      const _NavItem(
-        route: '/carwash/services',
-        icon: Icons.build_outlined,
-        selectedIcon: Icons.build,
-        label: 'Services',
-      ),
-      if (productsEnabled)
-        const _NavItem(
-          route: '/products',
-          icon: Icons.inventory_2_outlined,
-          selectedIcon: Icons.inventory_2,
-          label: 'Products',
-        ),
-      const _NavItem(
-        route: '/billing',
-        icon: Icons.credit_card_outlined,
-        selectedIcon: Icons.credit_card,
-        label: 'Billing',
-      ),
-      const _NavItem(
-        route: '/settings',
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
-        label: 'Settings',
-      ),
-    ];
-
     // My Jobs tab — visible to all roles but shown in main nav for staff
     // For owners/managers it goes in More sheet; for staff it's a main tab
     final myJobsItem = const _NavItem(
@@ -342,7 +297,6 @@ class _CarServiceScaffold extends ConsumerWidget {
 
     final isOverflowActive = overflowItems.any((e) => location.startsWith(e.route));
     final visibleRoutes = visibleItems.map((e) => e.route).toList();
-    final visibleIdx = visibleRoutes.indexWhere((r) => location.startsWith(r));
 
     // Exact match for /carwash to avoid matching /carwash/bookings etc.
     int selectedIndex;

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -23,14 +22,6 @@ Color _subColor(String status) {
     case 'trial':     return AppColors.primaryLight;
     case 'expired':   return AppColors.danger;
     default:          return Colors.grey;
-  }
-}
-
-Color _commColor(String status) {
-  switch (status) {
-    case 'approved': return AppColors.success;
-    case 'paid':     return AppColors.primaryLight;
-    default:         return Colors.grey;
   }
 }
 
@@ -65,9 +56,9 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,9 +133,9 @@ class _DashboardTab extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
+                  color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.warning.withOpacity(0.4)),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
                 ),
                 child: Row(children: [
                   Icon(Icons.hourglass_top_outlined, color: AppColors.warning, size: 18),
@@ -165,9 +156,9 @@ class _DashboardTab extends ConsumerWidget {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.dangerLight.withOpacity(0.1),
+                      color: AppColors.dangerLight.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.danger.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.warning_amber_outlined, color: AppColors.danger, size: 18),
@@ -342,7 +333,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     leading: CircleAvatar(
-                      backgroundColor: _subColor(c.subscriptionStatus).withOpacity(0.15),
+                      backgroundColor: _subColor(c.subscriptionStatus).withValues(alpha: 0.15),
                       child: Text(c.name[0].toUpperCase(),
                           style: TextStyle(color: _subColor(c.subscriptionStatus), fontWeight: FontWeight.bold)),
                     ),
@@ -351,7 +342,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _subColor(c.subscriptionStatus).withOpacity(0.12),
+                          color: _subColor(c.subscriptionStatus).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(c.subscriptionStatus,
@@ -552,7 +543,7 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: _payColor(p.status).withOpacity(0.12),
+                            color: _payColor(p.status).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(_payLabel(p.status),
@@ -638,7 +629,7 @@ class _CommissionsTab extends ConsumerWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: (section['color'] as Color).withOpacity(0.12),
+                        backgroundColor: (section['color'] as Color).withValues(alpha: 0.12),
                         child: Icon(
                           c.commissionType == 'signup' ? Icons.person_add_outlined : Icons.autorenew,
                           color: section['color'] as Color, size: 18,
@@ -734,7 +725,7 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
             child: Column(children: [
               CircleAvatar(
                 radius: 32,
-                backgroundColor: const Color(0xFF2E7D32).withOpacity(0.15),
+                backgroundColor: const Color(0xFF2E7D32).withValues(alpha: 0.15),
                 child: Text(agent.name[0].toUpperCase(),
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
                         color: Color(0xFF2E7D32))),

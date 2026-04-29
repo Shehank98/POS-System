@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/customer_model.dart';
 import '../../../providers/customer_provider.dart';
@@ -427,7 +426,7 @@ class _RecentOrderRow extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: _statusColor(order.status).withOpacity(0.1),
+              color: _statusColor(order.status).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(order.status,

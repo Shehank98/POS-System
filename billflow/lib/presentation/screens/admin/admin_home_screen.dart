@@ -38,9 +38,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final admin = ref.watch(adminAuthProvider).valueOrNull;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_tab]),

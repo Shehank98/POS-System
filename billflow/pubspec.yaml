@@ -23,7 +23,7 @@ dependencies:
   flutter_secure_storage: ^9.0.0
 
   # Barcode scanning
-  mobile_scanner: ^5.1.1
+  mobile_scanner: ^5.2.3
 
   # Charts
   fl_chart: ^0.68.0

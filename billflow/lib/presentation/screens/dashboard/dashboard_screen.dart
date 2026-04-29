@@ -37,7 +37,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             CircleAvatar(
               radius: 32,
-              backgroundColor: AppColors.primary.withOpacity(0.12),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
               child: Text(
                 (user?.username ?? 'U')[0].toUpperCase(),
                 style: const TextStyle(
@@ -189,7 +189,7 @@ class DashboardScreen extends ConsumerWidget {
                           onTap: () => _showProfileSheet(context, ref, user),
                           child: CircleAvatar(
                             radius: 18,
-                            backgroundColor: Colors.white.withOpacity(0.2),
+                            backgroundColor: Colors.white.withValues(alpha: 0.2),
                             child: Text(
                               (user?.username ?? 'U')[0].toUpperCase(),
                               style: const TextStyle(
@@ -211,7 +211,7 @@ class DashboardScreen extends ConsumerWidget {
             if (user?.readOnly == true)
               SliverToBoxAdapter(
                 child: Container(
-                  color: AppColors.warning.withOpacity(0.12),
+                  color: AppColors.warning.withValues(alpha: 0.12),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 10),
                   child: Row(children: [
@@ -395,7 +395,7 @@ class DashboardScreen extends ConsumerWidget {
                               leading: CircleAvatar(
                                 radius: 16,
                                 backgroundColor:
-                                    AppColors.primary.withOpacity(0.1),
+                                    AppColors.primary.withValues(alpha: 0.1),
                                 child: Text('${e.key + 1}',
                                     style: const TextStyle(
                                         fontSize: 13,
@@ -432,11 +432,11 @@ class DashboardScreen extends ConsumerWidget {
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     child: Card(
-                      color: AppColors.warning.withOpacity(0.07),
+                      color: AppColors.warning.withValues(alpha: 0.07),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: BorderSide(
-                            color: AppColors.warning.withOpacity(0.3)),
+                            color: AppColors.warning.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -463,12 +463,12 @@ class DashboardScreen extends ConsumerWidget {
                                             horizontal: 10, vertical: 5),
                                         decoration: BoxDecoration(
                                           color: AppColors.warning
-                                              .withOpacity(0.12),
+                                              .withValues(alpha: 0.12),
                                           borderRadius:
                                               BorderRadius.circular(20),
                                           border: Border.all(
                                               color: AppColors.warning
-                                                  .withOpacity(0.4)),
+                                                  .withValues(alpha: 0.4)),
                                         ),
                                         child: Text(
                                           '${p.name}: ${formatNumber(p.stockQuantity)}',
@@ -528,7 +528,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.05),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -593,9 +593,9 @@ class _QuickAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [

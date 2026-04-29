@@ -192,7 +192,7 @@ class _EntryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.12),
+          backgroundColor: color.withValues(alpha: 0.12),
           child: Icon(_iconFor(entry.action.toLowerCase()),
               color: color, size: 20),
         ),

@@ -110,7 +110,7 @@ class _FilterChip extends StatelessWidget {
     return FilterChip(
       label: Text(label),
       selected: selected,
-      selectedColor: c.withOpacity(0.15),
+      selectedColor: c.withValues(alpha: 0.15),
       checkmarkColor: c,
       onSelected: (_) => onTap(),
     );
@@ -182,7 +182,7 @@ class _InventoryTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: barValue,
-                      backgroundColor: barColor.withOpacity(0.12),
+                      backgroundColor: barColor.withValues(alpha: 0.12),
                       valueColor: AlwaysStoppedAnimation(barColor),
                       minHeight: 8,
                     ),

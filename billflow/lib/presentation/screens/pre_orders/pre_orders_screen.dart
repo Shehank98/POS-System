@@ -98,7 +98,7 @@ class _PreOrdersScreenState extends ConsumerState<PreOrdersScreen>
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withOpacity(0.2)),
+                          .withValues(alpha: 0.2)),
                   const SizedBox(height: 12),
                   Text(
                     'No orders found',
@@ -106,7 +106,7 @@ class _PreOrdersScreenState extends ConsumerState<PreOrdersScreen>
                         color: Theme.of(context)
                             .colorScheme
                             .onSurface
-                            .withOpacity(0.5)),
+                            .withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -196,7 +196,7 @@ class _OrderCard extends ConsumerWidget {
                         order.customerPhone,
                         style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurface.withOpacity(0.5)),
+                            color: cs.onSurface.withValues(alpha: 0.5)),
                       ),
                     ],
                   ),
@@ -205,7 +205,7 @@ class _OrderCard extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: sc.withOpacity(0.12),
+                    color: sc.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -225,7 +225,7 @@ class _OrderCard extends ConsumerWidget {
                     children: [
                       Text('${item.qty}x ',
                           style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                               fontSize: 13)),
                       Expanded(
                           child: Text(item.name,

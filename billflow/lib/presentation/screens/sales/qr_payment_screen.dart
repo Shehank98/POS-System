@@ -138,7 +138,7 @@ class _QrPaymentScreenState extends ConsumerState<QrPaymentScreen> {
             children: [
               const SizedBox(height: 12),
               Text('Scan with HelaPay or any LankaQR app',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
                   textAlign: TextAlign.center),
               const SizedBox(height: 24),
               Container(
@@ -146,7 +146,7 @@ class _QrPaymentScreenState extends ConsumerState<QrPaymentScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20)],
                 ),
                 child: QrImageView(
                   data: _session!.qrData,

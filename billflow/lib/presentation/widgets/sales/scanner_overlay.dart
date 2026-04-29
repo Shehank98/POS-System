@@ -254,7 +254,7 @@ class _ScannerOverlayState extends ConsumerState<ScannerOverlay> {
               _processing ? '' : 'Point camera at barcode',
               textAlign: TextAlign.center,
               style:
-                  TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                  TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
             ),
           ),
         ],

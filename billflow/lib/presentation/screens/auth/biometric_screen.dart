@@ -64,7 +64,7 @@ class _BiometricScreenState extends ConsumerState<BiometricScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Icon(

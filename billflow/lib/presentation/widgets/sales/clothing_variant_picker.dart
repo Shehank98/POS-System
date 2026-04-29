@@ -43,9 +43,6 @@ class _VariantPickerSheetState extends ConsumerState<_VariantPickerSheet> {
   String? _selectedSize;
   String? _selectedColor;
 
-  List<String> get _sizes => widget.product.availableSizes;
-  List<String> get _colors => widget.product.availableColors;
-
   ClothingVariant? get _matchedVariant {
     if (_selectedSize == null || _selectedColor == null) return null;
     try {
@@ -281,10 +278,10 @@ class _VariantPickerSheetState extends ConsumerState<_VariantPickerSheet> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: cs.primaryContainer.withOpacity(0.3),
+                            color: cs.primaryContainer.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: cs.primary.withOpacity(0.3)),
+                                color: cs.primary.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [

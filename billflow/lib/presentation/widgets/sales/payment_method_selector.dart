@@ -32,7 +32,7 @@ class PaymentMethodSelector extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: isSelected ? cs.primary : cs.surfaceVariant,
+                  color: isSelected ? cs.primary : cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected ? cs.primary : Colors.transparent,

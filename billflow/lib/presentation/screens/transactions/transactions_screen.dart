@@ -97,14 +97,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         children: [
                           Icon(Icons.receipt_long_outlined,
                               size: 64,
-                              color: cs.onSurface.withOpacity(0.2)),
+                              color: cs.onSurface.withValues(alpha: 0.2)),
                           const SizedBox(height: 12),
                           Text(
                             _query.isEmpty
                                 ? 'No transactions yet'
                                 : 'No results for "$_query"',
                             style: TextStyle(
-                                color: cs.onSurface.withOpacity(0.5)),
+                                color: cs.onSurface.withValues(alpha: 0.5)),
                           ),
                         ],
                       ),
@@ -188,7 +188,7 @@ class _TxnCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.05),
+              color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -200,7 +200,7 @@ class _TxnCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: methodColor.withOpacity(0.1),
+                color: methodColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(methodIcon, color: methodColor, size: 20),
@@ -222,14 +222,14 @@ class _TxnCard extends StatelessWidget {
                     _formatDate(txn.transactionDate),
                     style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.5)),
+                        color: cs.onSurface.withValues(alpha: 0.5)),
                   ),
                   if (txn.cashier != null)
                     Text(
                       txn.cashier!,
                       style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.5)),
+                          color: cs.onSurface.withValues(alpha: 0.5)),
                     ),
                 ],
               ),
@@ -264,7 +264,7 @@ class _TxnCard extends StatelessWidget {
 
             const SizedBox(width: 6),
             Icon(Icons.chevron_right,
-                size: 18, color: cs.onSurface.withOpacity(0.3)),
+                size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
           ],
         ),
       ),
