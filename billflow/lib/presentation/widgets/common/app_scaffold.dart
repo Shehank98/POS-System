@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
+import '../../../core/storage/secure_storage.dart';
+import '../../../data/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/feature_flag_provider.dart';
 import '../../../providers/notification_provider.dart';
@@ -23,12 +26,72 @@ class _NavItem {
 // Max nav items before collapsing extras into "More"
 const _kMaxNavItems = 5;
 
-class AppScaffold extends ConsumerWidget {
+class AppScaffold extends ConsumerStatefulWidget {
   final Widget child;
   const AppScaffold({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppScaffold> createState() => _AppScaffoldState();
+}
+
+class _AppScaffoldState extends ConsumerState<AppScaffold> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkBiometricPrompt());
+  }
+
+  Future<void> _checkBiometricPrompt() async {
+    if (!mounted) return;
+    final storage = ref.read(secureStorageProvider);
+
+    final alreadyPrompted = await storage.readBiometricPrompted();
+    if (alreadyPrompted) return;
+
+    final alreadyEnabled = await storage.readBiometricEnabled();
+    if (alreadyEnabled) return;
+
+    final auth = LocalAuthentication();
+    final deviceSupported = await auth.isDeviceSupported();
+    if (!deviceSupported) return;
+
+    final available = await ref.read(biometricServiceProvider).isAvailable();
+    if (!available) return;
+    if (!mounted) return;
+
+    await storage.saveBiometricPrompted();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _BiometricEnrollDialog(
+        onEnable: () async {
+          Navigator.pop(ctx);
+          final ok = await ref.read(biometricServiceProvider).authenticate();
+          if (!mounted) return;
+          if (ok) {
+            await storage.saveBiometricEnabled(true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Fingerprint login enabled — active on next app open'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Fingerprint verification failed. You can enable it later in Settings.'),
+              ),
+            );
+          }
+        },
+        onSkip: () => Navigator.pop(ctx),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).valueOrNull;
     final unread = ref.watch(unreadNotificationCountProvider);
     final isCarService = ref.watch(isCarServiceShopProvider);
@@ -37,7 +100,7 @@ class AppScaffold extends ConsumerWidget {
     final isLocked = (user?.readOnly ?? false) && !(user?.inGracePeriod ?? false);
     if (isLocked) {
       return Scaffold(
-        body: child,
+        body: widget.child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: 0,
           onDestinationSelected: (_) => context.go('/billing'),
@@ -55,7 +118,7 @@ class AppScaffold extends ConsumerWidget {
     // ── Car Service navigation ─────────────────────────────────────
     if (isCarService) {
       return _CarServiceScaffold(
-          child: child, user: user, unread: unread);
+          child: widget.child, user: user, unread: unread);
     }
 
     // ── Standard retail navigation ─────────────────────────────────
@@ -177,7 +240,7 @@ class AppScaffold extends ConsumerWidget {
     ];
 
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -354,7 +417,7 @@ class _CarServiceScaffold extends ConsumerWidget {
     ];
 
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -443,6 +506,65 @@ class _MoreSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Biometric enroll dialog ───────────────────────────────────────────────────
+class _BiometricEnrollDialog extends StatelessWidget {
+  final VoidCallback onEnable;
+  final VoidCallback onSkip;
+  const _BiometricEnrollDialog({required this.onEnable, required this.onSkip});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(
+            color: cs.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.fingerprint,
+              size: 40, color: cs.onPrimaryContainer),
+        ),
+        const SizedBox(height: 16),
+        Text('Enable Fingerprint Login?',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        Text(
+          'Log in faster next time using your fingerprint instead of your password.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 20),
+      ]),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: onEnable,
+            icon: const Icon(Icons.fingerprint, size: 18),
+            label: const Text('Enable Fingerprint'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: onSkip,
+            child: const Text('Not Now'),
+          ),
+        ),
+      ],
     );
   }
 }

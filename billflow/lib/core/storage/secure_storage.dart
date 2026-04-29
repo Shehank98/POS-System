@@ -31,13 +31,20 @@ class SecureStorage {
     };
   }
 
-  static const _biometricKey = 'pos_biometric_enabled';
+  static const _biometricKey        = 'pos_biometric_enabled';
+  static const _biometricPromptedKey = 'pos_biometric_prompted';
 
   Future<void> saveBiometricEnabled(bool v) =>
       _storage.write(key: _biometricKey, value: v.toString());
 
   Future<bool> readBiometricEnabled() async =>
       await _storage.read(key: _biometricKey) == 'true';
+
+  Future<void> saveBiometricPrompted() =>
+      _storage.write(key: _biometricPromptedKey, value: 'true');
+
+  Future<bool> readBiometricPrompted() async =>
+      await _storage.read(key: _biometricPromptedKey) == 'true';
 
   // ── Sales Agent ───────────────────────────────────────────────
   static const _agentTokenKey = 'agent_token';

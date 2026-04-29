@@ -622,26 +622,6 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
   @override
   void dispose() { _search.dispose(); super.dispose(); }
 
-  void _showOnboardSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _OnboardWizardSheet(
-        onSuccess: () {
-          ref.invalidate(agentCustomersProvider);
-          ref.invalidate(agentDashboardProvider);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Shop onboarded — awaiting payment')),
-            );
-          }
-        },
-      ),
-    );
-  }
-
   String _expiryLabel(AgentCustomer c) {
     final days = c.daysUntilExpiry;
     if (days == null) return '';
@@ -667,26 +647,16 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
       // Search + Add
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _search,
-              onChanged: (v) => setState(() => _q = v.toLowerCase()),
-              decoration: InputDecoration(
-                hintText: 'Search shops…',
-                prefixIcon: const Icon(Icons.search, size: 18),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              ),
-            ),
+        child: TextField(
+          controller: _search,
+          onChanged: (v) => setState(() => _q = v.toLowerCase()),
+          decoration: InputDecoration(
+            hintText: 'Search shops…',
+            prefixIcon: const Icon(Icons.search, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
-          const SizedBox(width: 10),
-          FilledButton.icon(
-            onPressed: _showOnboardSheet,
-            icon: const Icon(Icons.store_mall_directory, size: 18),
-            label: const Text('Onboard'),
-          ),
-        ]),
+        ),
       ),
 
       // Filter chips
@@ -1412,6 +1382,26 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
     }
   }
 
+  void _showOnboardSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OnboardWizardSheet(
+        onSuccess: () {
+          ref.invalidate(agentCustomersProvider);
+          ref.invalidate(agentDashboardProvider);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Shop onboarded — awaiting payment')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   void _showMoreSheet() {
     showModalBottomSheet(
       context: context,
@@ -1500,6 +1490,16 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
         ],
       ),
       body: _bodies[_tab],
+      floatingActionButton: _tab == 1
+          ? FloatingActionButton.extended(
+              onPressed: _showOnboardSheet,
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.store_mall_directory),
+              label: const Text('Onboard Shop',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: _onNavTap,
