@@ -270,6 +270,7 @@ export const agentApi = {
   commissions:   ()     => agentClient.get('/agents/me/commissions'),
   bankDetails:   (data) => agentClient.put('/agents/me/bank-details', data),
   plans:         ()     => agentClient.get('/agents/me/plans'),
+  renewals:      ()     => agentClient.get('/agents/me/renewals'),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────
@@ -320,6 +321,9 @@ export const adminApi = {
   markAdminNotificationRead:    (id)     => adminClient.put(`/admin/notifications/${id}/read`),
   markAllAdminNotificationsRead:()       => adminClient.put('/admin/notifications/read-all'),
 
+  fraudSummary:             ()       => adminClient.get('/admin/agent-payments/fraud-summary'),
+  financialSummary:         ()       => adminClient.get('/admin/financial-summary'),
+
   // ── Sales Agent management ──────────────────────────────────
   listAgents:           ()       => adminClient.get('/admin/agents'),
   createAgent:          (data)   => adminClient.post('/admin/agents', data),
@@ -335,6 +339,11 @@ export const adminApi = {
   // Agent commissions
   agentCommissions: (params) => adminClient.get('/admin/agent-commissions', { params }),
   payoutCommissions: (data)  => adminClient.put('/admin/agent-commissions/payout', data),
+
+  // Agent risk scores
+  listRiskScores:         ()           => adminClient.get('/admin/agent-risk-scores'),
+  recalculateRisk:        (agentId)    => adminClient.put(`/admin/agent-risk-scores/${agentId}/recalculate`),
+  setAgentRestriction:    (agentId, data) => adminClient.put(`/admin/agent-risk-scores/${agentId}/restrict`, data),
 };
 
 export default client;

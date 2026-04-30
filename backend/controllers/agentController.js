@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const db     = require('../config/database');
 const { createAdminNotification, ADMIN_TYPES } = require('./notificationController');
+const { recalculateRiskScore } = require('../services/riskScoringService');
 
 // ── GET /api/agents/me/dashboard ──────────────────────────────
 async function getDashboard(req, res) {
@@ -203,6 +204,33 @@ async function editCustomer(req, res) {
   }
 }
 
+// ── Payment fraud classification helper ───────────────────────
+function classifyPayment(submittedAmt, expectedAmt) {
+  if (expectedAmt === null || expectedAmt === 0) {
+    return { detailStatus: 'full', isSuspicious: false, flagReason: null };
+  }
+  const diff = submittedAmt - expectedAmt;
+  const pct  = diff / expectedAmt;
+
+  if (submittedAmt >= expectedAmt) {
+    return {
+      detailStatus: submittedAmt > expectedAmt ? 'overpayment' : 'full',
+      isSuspicious: false,
+      flagReason:   submittedAmt > expectedAmt
+        ? `Overpayment: LKR ${(submittedAmt - expectedAmt).toFixed(2)} excess`
+        : null,
+    };
+  }
+  // partial (below expected)
+  const shortage = expectedAmt - submittedAmt;
+  const isMismatch = pct < -0.05; // >5% shortage triggers mismatch/suspicious flag
+  return {
+    detailStatus: 'partial',
+    isSuspicious: isMismatch,
+    flagReason:   `Partial payment: short by LKR ${shortage.toFixed(2)} (${Math.abs(pct * 100).toFixed(1)}% below expected)`,
+  };
+}
+
 // ── POST /api/agents/me/payments ──────────────────────────────
 async function submitPayment(req, res) {
   const agentId = req.agent.id;
@@ -223,8 +251,7 @@ async function submitPayment(req, res) {
     if (check.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
     const shopExpected = check.rows[0].expected_amount ? parseFloat(check.rows[0].expected_amount) : null;
 
-    // Flag as suspicious if submitted is more than 5% below expected
-    const isSuspicious = shopExpected !== null && submittedAmt < shopExpected * 0.95;
+    const { detailStatus, isSuspicious, flagReason } = classifyPayment(submittedAmt, shopExpected);
 
     const client = await db.getClient();
     try {
@@ -233,11 +260,22 @@ async function submitPayment(req, res) {
       const { rows } = await client.query(
         `INSERT INTO agent_payment_submissions
            (agent_id, shop_id, amount, submitted_amount, expected_amount,
-            payment_method, payment_date, notes, status, is_suspicious)
-         VALUES ($1, $2, $3, $3, $4, $5, $6, $7, 'pending_verification', $8)
+            payment_method, payment_date, notes, status, is_suspicious,
+            payment_detail_status, flag_reason)
+         VALUES ($1, $2, $3, $3, $4, $5, $6, $7, 'pending_verification', $8, $9, $10)
          RETURNING *`,
-        [agentId, shop_id, submittedAmt, shopExpected, payment_method, payment_date, notes || null, isSuspicious]
+        [agentId, shop_id, submittedAmt, shopExpected, payment_method, payment_date, notes || null,
+         isSuspicious, detailStatus || null, flagReason || null]
       );
+
+      // Insert fraud flag record for audit trail
+      if (isSuspicious && flagReason) {
+        await client.query(
+          `INSERT INTO agent_payment_flags (agent_id, submission_id, flag_type, description)
+           VALUES ($1, $2, $3, $4)`,
+          [agentId, rows[0].id, 'partial', flagReason]
+        );
+      }
 
       // Update wallet: increment total_collected
       await client.query(
@@ -270,6 +308,8 @@ async function submitPayment(req, res) {
             'critical',
             { agent_id: agentId, shop_id, submitted: submittedAmt, expected: shopExpected }
           );
+          // Recalculate risk score after suspicious payment
+          recalculateRiskScore(agentId);
         } else {
           createAdminNotification(
             ADMIN_TYPES.PAYMENT_SUBMITTED,

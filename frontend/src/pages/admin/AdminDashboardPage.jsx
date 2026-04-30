@@ -1152,6 +1152,136 @@ function AuditRow({ record: r, preview }) {
   );
 }
 
+// ── Financial Summary Tab ─────────────────────────────────────
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+function FinancialTab() {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    adminApi.financialSummary()
+      .then(({ data: d }) => setData(d))
+      .catch(() => toast.error('Failed to load financial summary'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="space-y-3">
+      {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
+    </div>
+  );
+  if (!data) return null;
+
+  const rev   = data.revenue   || {};
+  const subs  = data.subscriptions || {};
+  const agents = data.agents   || [];
+  const monthly = (data.monthly || []).map((m) => ({
+    month:     m.month,
+    collected: Number(m.collected),
+    count:     Number(m.payment_count),
+  }));
+
+  const metricCard = (label, value, sub, color) => (
+    <div className="bg-gray-800 rounded-xl p-4">
+      <p className="text-xs text-gray-400 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color || 'text-white'}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Revenue KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {metricCard('Total Collected',    `LKR ${fmtMoney(rev.total_collected)}`,   `${rev.pending_count} pending`, 'text-green-400')}
+        {metricCard('Pending Verification', `LKR ${fmtMoney(rev.pending_amount)}`,   `awaiting admin review`, 'text-yellow-400')}
+        {metricCard('Partial Payment Shortage', `LKR ${fmtMoney(rev.total_shortage)}`, `${rev.partial_count} partial submission(s)`, 'text-red-400')}
+        {metricCard('Active Shops',        subs.active,   `${subs.expiring_7d} expiring in 7d`, 'text-blue-400')}
+        {metricCard('Expiring (30d)',       subs.expiring_30d, `${subs.expired} already expired`, 'text-orange-400')}
+        {metricCard('Suspicious Payments', rev.suspicious_count, 'flagged for review', 'text-red-400')}
+      </div>
+
+      {/* Monthly collection bar chart */}
+      {monthly.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-5">
+          <p className="text-sm font-semibold text-white mb-4">Monthly Collection (Verified)</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={monthly}>
+              <XAxis dataKey="month" tick={{ fill: '#9ca3af', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ background: '#1f2937', border: 'none', borderRadius: 8 }}
+                labelStyle={{ color: '#f9fafb' }}
+                formatter={(v) => [`LKR ${Number(v).toLocaleString()}`, 'Collected']}
+              />
+              <Bar dataKey="collected" fill="#6366f1" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Subscription breakdown */}
+      <div className="bg-gray-800 rounded-xl p-5">
+        <p className="text-sm font-semibold text-white mb-3">Subscription Status</p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+          {[
+            { label: 'Active',          value: subs.active,          cls: 'text-green-400' },
+            { label: 'Trial',           value: subs.trial,           cls: 'text-blue-400'  },
+            { label: 'Pending Payment', value: subs.pending_payment, cls: 'text-yellow-400'},
+            { label: 'Expired',         value: subs.expired,         cls: 'text-red-400'   },
+            { label: 'Expiring 7d',     value: subs.expiring_7d,     cls: 'text-orange-400'},
+          ].map((s) => (
+            <div key={s.label} className="bg-gray-700 rounded-lg p-3">
+              <p className={`text-2xl font-bold ${s.cls}`}>{s.value ?? 0}</p>
+              <p className="text-xs text-gray-400 mt-1">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Agent performance table */}
+      <div className="bg-gray-800 rounded-xl p-5 overflow-x-auto">
+        <p className="text-sm font-semibold text-white mb-3">Agent Performance</p>
+        <table className="w-full text-sm min-w-[640px]">
+          <thead>
+            <tr className="text-left text-gray-400 border-b border-gray-700">
+              <th className="pb-2">Agent</th>
+              <th className="pb-2 text-right">Shops</th>
+              <th className="pb-2 text-right">Verified Payments</th>
+              <th className="pb-2 text-right">Suspicious</th>
+              <th className="pb-2 text-right">Collected</th>
+              <th className="pb-2 text-right">Commission</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agents.map((a) => (
+              <tr key={a.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                <td className="py-2">
+                  <p className="font-medium text-white">{a.name}</p>
+                  <p className="text-xs text-gray-500">{a.email}</p>
+                </td>
+                <td className="py-2 text-right text-gray-300">{a.shops_onboarded}</td>
+                <td className="py-2 text-right text-green-400">{a.verified_payments}</td>
+                <td className="py-2 text-right">
+                  <span className={Number(a.suspicious_payments) > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}>
+                    {a.suspicious_payments}
+                  </span>
+                </td>
+                <td className="py-2 text-right text-white">LKR {fmtMoney(a.total_verified_amount)}</td>
+                <td className="py-2 text-right text-indigo-400">LKR {fmtMoney(a.total_commission)}</td>
+              </tr>
+            ))}
+            {agents.length === 0 && (
+              <tr><td colSpan={6} className="py-8 text-center text-gray-500">No agent data yet</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard Overview Tab ────────────────────────────────────
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -1741,36 +1871,50 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
     );
   }
 
+  const DETAIL_BADGE = {
+    full:        { label: 'Full Payment',  cls: 'bg-green-900 text-green-300'  },
+    partial:     { label: 'Partial',       cls: 'bg-red-900   text-red-300'    },
+    overpayment: { label: 'Overpayment',   cls: 'bg-blue-900  text-blue-300'   },
+    mismatch:    { label: 'Mismatch',      cls: 'bg-red-900   text-red-300'    },
+  };
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-400">
         {payments.length} pending submission{payments.length !== 1 ? 's' : ''} — verifying activates the shop subscription
       </p>
       {payments.map((p) => {
-        const submitted = Number(p.submitted_amount || p.amount || 0);
-        const expected  = p.expected_amount ? Number(p.expected_amount) : null;
-        const mismatch  = expected && submitted < expected * 0.95;
+        const submitted    = Number(p.submitted_amount || p.amount || 0);
+        const expected     = p.expected_amount ? Number(p.expected_amount) : null;
+        const shortage     = p.shortage_amount  ? Number(p.shortage_amount) : 0;
+        const detailStatus = p.payment_detail_status;
+        const detailBadge  = DETAIL_BADGE[detailStatus];
         return (
         <div key={p.id} className={`bg-gray-800 rounded-xl p-4 space-y-3 ${p.is_suspicious ? 'ring-2 ring-red-500' : ''}`}>
           {p.is_suspicious && (
             <div className="flex items-center gap-2 bg-red-900/40 border border-red-700 rounded-lg px-3 py-1.5 text-xs text-red-300">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              Suspicious: submitted amount is significantly below expected
+              {p.flag_reason || 'Suspicious: submitted amount is significantly below expected'}
             </div>
           )}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-white truncate">{p.shop_name}</p>
               <p className="text-xs text-gray-400">Owner: {p.owner_name}</p>
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className={`text-sm font-bold ${mismatch ? 'text-red-400' : 'text-green-400'}`}>
+              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                <p className={`text-sm font-bold ${p.is_suspicious ? 'text-red-400' : 'text-green-400'}`}>
                   LKR {submitted.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
                 {expected && (
                   <p className="text-xs text-gray-500">
-                    Expected: <span className={mismatch ? 'text-red-400' : 'text-gray-400'}>
+                    Expected: <span className={p.is_suspicious ? 'text-red-400' : 'text-gray-400'}>
                       LKR {expected.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
+                  </p>
+                )}
+                {shortage > 0 && (
+                  <p className="text-xs text-red-400 font-medium">
+                    Short: LKR {shortage.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 )}
               </div>
@@ -1783,9 +1927,16 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
                 <p className="text-xs text-yellow-400 mt-1">Note: {p.notes}</p>
               )}
             </div>
-            <span className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">
-              Pending
-            </span>
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                Pending
+              </span>
+              {detailBadge && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${detailBadge.cls}`}>
+                  {detailBadge.label}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -2104,6 +2255,7 @@ export default function AdminDashboardPage() {
             { id: 'payments',       label: 'Payments',        badge: pendingCount },
             { id: 'agent_payments', label: 'Agent Payments',  badge: agentPendingCount },
             { id: 'shops',          label: 'Shops'            },
+            { id: 'financial',      label: 'Financials',    icon: DollarSign },
             { id: 'analysis',      label: 'Analysis',      icon: BarChart2 },
             { id: 'audit',         label: 'Audit Log'      },
             { id: 'dashboard_tab', label: 'Overview',      icon: TrendingUp },
@@ -2422,6 +2574,9 @@ export default function AdminDashboardPage() {
 
         {/* Plans tab */}
         {tab === 'plans' && <PlansTab />}
+
+        {/* Financial Summary tab */}
+        {tab === 'financial' && <FinancialTab />}
 
         {/* Notifications tab */}
         {tab === 'notifications' && <NotificationsTab shops={shops} />}

@@ -12,6 +12,7 @@ router.post('/login', ctrl.adminLogin);
 router.use(adminAuth);
 
 router.get('/dashboard',                    ctrl.getDashboard);
+router.get('/financial-summary',            ctrl.getFinancialSummary);
 router.get('/analysis',                     ctrl.getAnalysis);
 
 // Shop management
@@ -57,13 +58,19 @@ router.put ('/agents/:id',                  agentCtrl.updateAgent);
 router.get ('/agents/:id/customers',        agentCtrl.getAgentCustomers);
 
 // Agent payment submissions
-router.get ('/agent-payments/pending',      agentCtrl.listPendingPayments);
-router.get ('/agent-payments',              agentCtrl.listAllPayments);
-router.put ('/agent-payments/:id/verify',   agentCtrl.verifyPayment);
-router.put ('/agent-payments/:id/reject',   agentCtrl.rejectPayment);
+router.get ('/agent-payments/fraud-summary', agentCtrl.getFraudSummary);
+router.get ('/agent-payments/pending',       agentCtrl.listPendingPayments);
+router.get ('/agent-payments',               agentCtrl.listAllPayments);
+router.put ('/agent-payments/:id/verify',    agentCtrl.verifyPayment);
+router.put ('/agent-payments/:id/reject',    agentCtrl.rejectPayment);
 
 // Agent commissions
 router.get ('/agent-commissions',           agentCtrl.listCommissions);
 router.put ('/agent-commissions/payout',    agentCtrl.markPayout);
+
+// Agent risk scores
+router.get ('/agent-risk-scores',           agentCtrl.listRiskScores);
+router.put ('/agent-risk-scores/:agentId/recalculate', agentCtrl.recalculateAgentRisk);
+router.put ('/agent-risk-scores/:agentId/restrict',    agentCtrl.setAgentRestriction);
 
 module.exports = router;

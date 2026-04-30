@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const db     = require('../config/database');
 const { createAgentNotification, AGENT_TYPES } = require('./notificationController');
+const { recalculateRiskScore } = require('../services/riskScoringService');
 
 // ── GET /api/admin/agents ─────────────────────────────────────
 async function listAgents(req, res) {
@@ -113,6 +114,40 @@ async function listPendingPayments(req, res) {
   }
 }
 
+// ── GET /api/admin/agent-payments/fraud-summary ──────────────
+async function getFraudSummary(req, res) {
+  try {
+    const { rows } = await db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM agent_payment_submissions WHERE is_suspicious = TRUE)                             AS total_suspicious,
+        (SELECT COUNT(*) FROM agent_payment_submissions WHERE payment_detail_status = 'partial')                AS total_partial,
+        (SELECT COUNT(*) FROM agent_payment_submissions WHERE payment_detail_status = 'mismatch')               AS total_mismatch,
+        (SELECT COALESCE(SUM(shortage_amount),0) FROM agent_payment_submissions WHERE payment_detail_status = 'partial') AS total_shortage,
+        (SELECT COUNT(DISTINCT agent_id) FROM agent_payment_submissions WHERE is_suspicious = TRUE)             AS flagged_agents,
+        (SELECT COUNT(*) FROM agent_payment_flags WHERE created_at >= NOW() - INTERVAL '30 days')              AS flags_last_30d
+    `);
+
+    const { rows: byAgent } = await db.query(`
+      SELECT sa.id, sa.name, sa.email,
+             COUNT(*)                                                  AS total_submissions,
+             SUM(CASE WHEN aps.is_suspicious THEN 1 ELSE 0 END)       AS suspicious_count,
+             SUM(CASE WHEN aps.payment_detail_status = 'partial' THEN 1 ELSE 0 END) AS partial_count,
+             COALESCE(SUM(aps.shortage_amount), 0)                    AS total_shortage
+        FROM agent_payment_submissions aps
+        JOIN sales_agents sa ON sa.id = aps.agent_id
+       GROUP BY sa.id, sa.name, sa.email
+      HAVING SUM(CASE WHEN aps.is_suspicious THEN 1 ELSE 0 END) > 0
+       ORDER BY suspicious_count DESC
+       LIMIT 20
+    `);
+
+    res.json({ summary: rows[0], risky_agents: byAgent });
+  } catch (err) {
+    console.error('getFraudSummary error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── GET /api/admin/agent-payments ────────────────────────────
 async function listAllPayments(req, res) {
   const { status } = req.query;
@@ -155,16 +190,42 @@ async function verifyPayment(req, res) {
     }
     const sub = subRows[0];
 
+    // Double-approval guard: check if this shop already has a verified payment
+    // for the same billing month (same calendar month as payment_date)
+    const billingMonth = sub.payment_date
+      ? new Date(sub.payment_date).toISOString().slice(0, 7) + '-01'
+      : new Date().toISOString().slice(0, 7) + '-01';
+
+    const dupCheck = await client.query(
+      `SELECT id FROM agent_payment_submissions
+        WHERE shop_id = $1
+          AND status  = 'verified'
+          AND DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', $2::DATE)
+          AND id != $3`,
+      [sub.shop_id, billingMonth, submissionId]
+    );
+    if (dupCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'This shop already has a verified payment for that billing month. Double approval prevented.',
+      });
+    }
+
     await client.query(
       `UPDATE agent_payment_submissions SET status = 'verified', reviewed_at = NOW() WHERE id = $1`,
       [submissionId]
     );
 
-    // Extend subscription by 1 month (never shrink existing end date)
+    // Extend subscription starting from the NEXT calendar month if the shop
+    // was just signed up this month (prevents charging for signup month twice).
+    // Rule: new end date = MAX(current end date, start of next month) + 1 month
     await client.query(
       `UPDATE shops
-          SET subscription_status    = 'active',
-              subscription_end_date  = GREATEST(COALESCE(subscription_end_date, NOW()), NOW()) + INTERVAL '1 month'
+          SET subscription_status   = 'active',
+              subscription_end_date = GREATEST(
+                COALESCE(subscription_end_date, NOW()),
+                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
+              ) + INTERVAL '1 month'
         WHERE id = $1`,
       [sub.shop_id]
     );
@@ -181,7 +242,8 @@ async function verifyPayment(req, res) {
     await client.query(
       `INSERT INTO agent_commissions
          (agent_id, shop_id, commission_type, amount, month, status, payment_submission_id)
-       VALUES ($1, $2, 'recurring', 500, DATE_TRUNC('month', NOW()), 'approved', $3)`,
+       VALUES ($1, $2, 'recurring', 500, DATE_TRUNC('month', NOW()), 'approved', $3)
+       ON CONFLICT DO NOTHING`,
       [sub.agent_id, sub.shop_id, submissionId]
     );
 
@@ -229,9 +291,11 @@ async function rejectPayment(req, res) {
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Submission not found or already processed' });
 
+    const agentId = rows[0].agent_id;
+
     // Notify agent (non-blocking)
     createAgentNotification(
-      rows[0].agent_id,
+      agentId,
       AGENT_TYPES.PAYMENT_REJECTED,
       'Payment Rejected',
       admin_note
@@ -239,6 +303,9 @@ async function rejectPayment(req, res) {
         : 'Your payment submission was rejected. Please contact admin for details.',
       { submission_id: parseInt(req.params.id, 10), admin_note }
     );
+
+    // Recalculate risk score after rejection (non-blocking)
+    recalculateRiskScore(agentId);
 
     res.json({ message: 'Payment rejected' });
   } catch (err) {
@@ -322,8 +389,64 @@ async function markPayout(req, res) {
   }
 }
 
+// ── GET /api/admin/agent-risk-scores ─────────────────────────
+async function listRiskScores(req, res) {
+  try {
+    const { rows } = await db.query(`
+      SELECT ars.*, sa.name, sa.email, sa.phone, sa.is_active, sa.district
+        FROM agent_risk_scores ars
+        JOIN sales_agents sa ON sa.id = ars.agent_id
+       ORDER BY ars.risk_score DESC, ars.updated_at DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('listRiskScores error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/agent-risk-scores/:agentId/recalculate ─────
+async function recalculateAgentRisk(req, res) {
+  const agentId = parseInt(req.params.agentId, 10);
+  try {
+    const result = await recalculateRiskScore(agentId);
+    if (!result) return res.status(500).json({ error: 'Recalculation failed' });
+    res.json(result);
+  } catch (err) {
+    console.error('recalculateAgentRisk error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/agent-risk-scores/:agentId/restrict ────────
+async function setAgentRestriction(req, res) {
+  const agentId   = parseInt(req.params.agentId, 10);
+  const { restrict, reason } = req.body; // restrict: true = restrict, false = lift
+  try {
+    await db.query(
+      `UPDATE agent_risk_scores
+          SET is_restricted = $1,
+              restriction_reason = $2,
+              updated_at = NOW()
+        WHERE agent_id = $3`,
+      [Boolean(restrict), reason || null, agentId]
+    );
+    // Mirror is_active on the sales_agent row
+    await db.query(
+      `UPDATE sales_agents SET is_active = $1 WHERE id = $2`,
+      [!restrict, agentId]
+    );
+    res.json({ ok: true, restricted: Boolean(restrict) });
+  } catch (err) {
+    console.error('setAgentRestriction error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
-  listPendingPayments, listAllPayments, verifyPayment, rejectPayment,
+  listPendingPayments, listAllPayments, getFraudSummary,
+  verifyPayment, rejectPayment,
   listCommissions, markPayout,
+  listRiskScores, recalculateAgentRisk, setAgentRestriction,
 };

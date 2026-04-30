@@ -3,7 +3,7 @@ import {
   Users, UserPlus, CheckCircle2, XCircle, Clock, DollarSign,
   ChevronDown, ChevronUp, RefreshCw, Loader2, MapPin,
   Phone, Mail, CreditCard, Store, Eye, EyeOff, Edit3,
-  ToggleLeft, ToggleRight, AlertTriangle,
+  ToggleLeft, ToggleRight, AlertTriangle, ShieldAlert, Lock, LockOpen,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
@@ -319,6 +319,194 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────────
+// ── Risk level helpers ────────────────────────────────────────
+const RISK_BADGE = {
+  low:      { label: 'Low',      cls: 'bg-green-900  text-green-300'  },
+  medium:   { label: 'Medium',   cls: 'bg-yellow-900 text-yellow-300' },
+  high:     { label: 'High',     cls: 'bg-orange-900 text-orange-300' },
+  critical: { label: 'Critical', cls: 'bg-red-900    text-red-300'    },
+};
+const RISK_BAR = {
+  low:      'bg-green-500',
+  medium:   'bg-yellow-500',
+  high:     'bg-orange-500',
+  critical: 'bg-red-500',
+};
+
+function RiskScoresTab({ onAgentUpdated }) {
+  const [scores,  setScores]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy,    setBusy]    = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.listRiskScores();
+      setScores(Array.isArray(data) ? data : []);
+    } catch { toast.error('Failed to load risk scores'); }
+    finally  { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleRecalculate(agentId) {
+    setBusy(`calc-${agentId}`);
+    try {
+      await adminApi.recalculateRisk(agentId);
+      toast.success('Risk score recalculated');
+      load();
+      onAgentUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to recalculate');
+    } finally { setBusy(null); }
+  }
+
+  async function handleToggleRestriction(agent) {
+    const willRestrict = !agent.is_restricted;
+    setBusy(`restrict-${agent.agent_id}`);
+    try {
+      await adminApi.setAgentRestriction(agent.agent_id, {
+        restrict: willRestrict,
+        reason: willRestrict ? 'Manually restricted by admin' : null,
+      });
+      toast.success(willRestrict ? 'Agent restricted' : 'Restriction lifted');
+      load();
+      onAgentUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update restriction');
+    } finally { setBusy(null); }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-400" /></div>;
+
+  const risky     = scores.filter((s) => s.risk_level !== 'low');
+  const allLow    = risky.length === 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Summary bar */}
+      <div className="grid grid-cols-4 gap-3">
+        {(['low','medium','high','critical']).map((level) => {
+          const count = scores.filter((s) => s.risk_level === level).length;
+          const badge = RISK_BADGE[level];
+          return (
+            <div key={level} className="bg-gray-800 rounded-xl p-4 text-center">
+              <p className={`text-2xl font-bold ${badge.cls.split(' ')[1]}`}>{count}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{badge.label} Risk</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {allLow && (
+        <div className="text-center py-12 text-gray-400">
+          <ShieldAlert className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>No agents with elevated risk — all scores are low.</p>
+        </div>
+      )}
+
+      {risky.map((s) => {
+        const badge = RISK_BADGE[s.risk_level] || RISK_BADGE.low;
+        const bar   = RISK_BAR[s.risk_level]   || RISK_BAR.low;
+        return (
+          <div key={s.agent_id} className={`bg-gray-800 rounded-2xl p-4 border ${s.is_restricted ? 'border-red-700' : 'border-gray-700'}`}>
+            <div className="flex items-start gap-4">
+              {/* Avatar */}
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm
+                               ${s.is_restricted ? 'bg-red-700' : 'bg-indigo-600'}`}>
+                {(s.name || '?').charAt(0).toUpperCase()}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-white">{s.name}</p>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>
+                    {badge.label} Risk
+                  </span>
+                  {s.is_restricted && (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-red-900 text-red-300 font-medium">
+                      Restricted
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">{s.email}</p>
+
+                {/* Score bar */}
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className={`h-2 rounded-full ${bar}`} style={{ width: `${s.risk_score}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-300 font-mono w-14 text-right shrink-0">
+                    {s.risk_score}/100
+                  </span>
+                </div>
+
+                {/* Metric pills */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {s.payment_mismatches_count > 0 && (
+                    <span className="text-xs bg-red-900/60 text-red-300 px-2 py-0.5 rounded-full">
+                      {s.payment_mismatches_count} mismatch{s.payment_mismatches_count > 1 ? 'es' : ''}
+                    </span>
+                  )}
+                  {s.partial_payments_count > 0 && (
+                    <span className="text-xs bg-orange-900/60 text-orange-300 px-2 py-0.5 rounded-full">
+                      {s.partial_payments_count} partial
+                    </span>
+                  )}
+                  {s.rejected_payments_count > 0 && (
+                    <span className="text-xs bg-yellow-900/60 text-yellow-300 px-2 py-0.5 rounded-full">
+                      {s.rejected_payments_count} rejected
+                    </span>
+                  )}
+                  {s.fraud_flags_count > 0 && (
+                    <span className="text-xs bg-purple-900/60 text-purple-300 px-2 py-0.5 rounded-full">
+                      {s.fraud_flags_count} flag{s.fraud_flags_count > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {s.restriction_reason && (
+                  <p className="text-xs text-red-400 mt-1.5">{s.restriction_reason}</p>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  onClick={() => handleRecalculate(s.agent_id)}
+                  disabled={busy === `calc-${s.agent_id}`}
+                  className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-50"
+                  title="Recalculate score"
+                >
+                  {busy === `calc-${s.agent_id}`
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <RefreshCw className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => handleToggleRestriction(s)}
+                  disabled={busy === `restrict-${s.agent_id}`}
+                  className={`p-2 rounded-lg disabled:opacity-50 transition-colors ${
+                    s.is_restricted
+                      ? 'bg-green-900 hover:bg-green-800 text-green-300'
+                      : 'bg-red-900 hover:bg-red-800 text-red-300'
+                  }`}
+                  title={s.is_restricted ? 'Lift restriction' : 'Restrict agent'}
+                >
+                  {busy === `restrict-${s.agent_id}`
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : s.is_restricted
+                    ? <LockOpen className="w-4 h-4" />
+                    : <Lock className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AgentsPage() {
   const [tab, setTab]                   = useState('agents');
   const [agents, setAgents]             = useState([]);
@@ -403,13 +591,14 @@ export default function AgentsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-700 mb-5">
+      <div className="flex border-b border-gray-700 mb-5 overflow-x-auto">
         {[
-          { key: 'agents',   label: 'Agents'           },
-          { key: 'payments', label: `Pending Payments ${pending.length > 0 ? `(${pending.length})` : ''}` },
+          { key: 'agents',      label: 'Agents'           },
+          { key: 'payments',    label: `Pending Payments${pending.length > 0 ? ` (${pending.length})` : ''}` },
+          { key: 'risk_scores', label: 'Risk Scores' },
         ].map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'
             }`}>
             {t.label}
@@ -480,6 +669,10 @@ export default function AgentsPage() {
             </div>
           ))}
         </div>
+
+      ) : tab === 'risk_scores' ? (
+
+        <RiskScoresTab onAgentUpdated={loadData} />
 
       ) : (
 

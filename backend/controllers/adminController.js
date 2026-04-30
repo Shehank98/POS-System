@@ -84,6 +84,81 @@ async function getDashboard(req, res) {
   }
 }
 
+// ── GET /api/admin/financial-summary ─────────────────────────
+async function getFinancialSummary(req, res) {
+  try {
+    // Overall revenue metrics from agent payment submissions
+    const { rows: rev } = await db.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN status = 'verified'              THEN amount END), 0) AS total_collected,
+        COALESCE(SUM(CASE WHEN status = 'pending_verification'  THEN amount END), 0) AS pending_amount,
+        COALESCE(SUM(CASE WHEN payment_detail_status = 'partial' THEN shortage_amount END), 0) AS total_shortage,
+        COUNT(CASE WHEN status = 'pending_verification'  THEN 1 END)                  AS pending_count,
+        COUNT(CASE WHEN is_suspicious = TRUE             THEN 1 END)                  AS suspicious_count,
+        COUNT(CASE WHEN payment_detail_status = 'partial' THEN 1 END)                 AS partial_count
+      FROM agent_payment_submissions
+    `);
+
+    // Monthly collection trend (last 12 months, verified only)
+    const { rows: monthly } = await db.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', payment_date), 'Mon YY')   AS month,
+        TO_CHAR(DATE_TRUNC('month', payment_date), 'YYYY-MM')  AS month_key,
+        COALESCE(SUM(amount), 0)                                AS collected,
+        COUNT(*)                                                 AS payment_count
+      FROM agent_payment_submissions
+      WHERE status = 'verified'
+        AND payment_date >= NOW() - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', payment_date)
+      ORDER BY DATE_TRUNC('month', payment_date)
+    `);
+
+    // Subscription health
+    const { rows: subs } = await db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE subscription_status = 'active')  AS active,
+        COUNT(*) FILTER (WHERE subscription_status = 'expired') AS expired,
+        COUNT(*) FILTER (WHERE subscription_status = 'trial')   AS trial,
+        COUNT(*) FILTER (WHERE subscription_status = 'pending_payment') AS pending_payment,
+        COUNT(*) FILTER (WHERE subscription_status = 'active'
+                           AND subscription_end_date <= NOW() + INTERVAL '7 days') AS expiring_7d,
+        COUNT(*) FILTER (WHERE subscription_status = 'active'
+                           AND subscription_end_date <= NOW() + INTERVAL '30 days') AS expiring_30d
+      FROM shops
+      WHERE COALESCE(is_deleted, FALSE) = FALSE
+    `);
+
+    // Agent performance table
+    const { rows: agents } = await db.query(`
+      SELECT
+        sa.id, sa.name, sa.email, sa.is_active,
+        COUNT(s.id)                                                     AS shops_onboarded,
+        COUNT(aps.id)                                                    AS total_payments,
+        COUNT(aps.id) FILTER (WHERE aps.status = 'verified')           AS verified_payments,
+        COUNT(aps.id) FILTER (WHERE aps.is_suspicious = TRUE)          AS suspicious_payments,
+        COALESCE(SUM(aps.amount) FILTER (WHERE aps.status = 'verified'), 0) AS total_verified_amount,
+        COALESCE(SUM(ac.amount)  FILTER (WHERE ac.status IN ('approved','paid')), 0) AS total_commission
+      FROM sales_agents sa
+      LEFT JOIN shops s  ON s.onboarded_by_agent_id = sa.id
+      LEFT JOIN agent_payment_submissions aps ON aps.agent_id = sa.id
+      LEFT JOIN agent_commissions ac          ON ac.agent_id  = sa.id
+      GROUP BY sa.id, sa.name, sa.email, sa.is_active
+      ORDER BY total_verified_amount DESC
+      LIMIT 50
+    `);
+
+    res.json({
+      revenue:      rev[0],
+      monthly:      monthly,
+      subscriptions: subs[0],
+      agents:       agents,
+    });
+  } catch (err) {
+    console.error('getFinancialSummary error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── GET /api/admin/shops ──────────────────────────────────────
 async function listShops(req, res) {
   try {
@@ -847,7 +922,7 @@ async function dispatchNotification(req, res) {
 }
 
 module.exports = {
-  adminLogin, getDashboard,
+  adminLogin, getDashboard, getFinancialSummary,
   listShops, createShop, getShop, updateShop, deleteShop,
   getShopUsers, changeUserPassword, addShopUser, deleteShopUser,
   updateSubscription, getShopSales,

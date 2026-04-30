@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Store, CreditCard, Wallet, LogOut,
   TrendingUp, Users, Clock, Lock, Plus, ChevronDown,
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw,
-  User, Building2, Save,
+  User, Building2, Save, Bell, PhoneCall, CalendarClock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { agentApi } from '../../api/client';
@@ -832,13 +832,157 @@ function Empty({ text }) {
   return <p className="text-center text-gray-400 py-16 text-sm">{text}</p>;
 }
 
+// ── Renewals Tab ──────────────────────────────────────────────
+function RenewalsTab() {
+  const [renewals, setRenewals] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await agentApi.renewals();
+      setRenewals(Array.isArray(data) ? data : []);
+    } catch { toast.error('Failed to load renewals'); }
+    finally  { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <Spinner />;
+
+  const expiring = renewals.filter(
+    (s) => s.subscription_status === 'active' && s.subscription_end_date
+  ).sort((a, b) => new Date(a.subscription_end_date) - new Date(b.subscription_end_date));
+
+  const expired = renewals.filter((s) => s.subscription_status === 'expired');
+
+  function daysUntil(dateStr) {
+    const diff = new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0);
+    return Math.ceil(diff / 86400000);
+  }
+  function daysSince(dateStr) {
+    const diff = new Date().setHours(0,0,0,0) - new Date(dateStr).setHours(0,0,0,0);
+    return Math.ceil(diff / 86400000);
+  }
+
+  const urgencyColor = (days) => {
+    if (days <= 0)  return 'text-red-600 bg-red-50 border-red-200';
+    if (days <= 3)  return 'text-red-500 bg-red-50 border-red-200';
+    if (days <= 7)  return 'text-orange-600 bg-orange-50 border-orange-200';
+    return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+  };
+
+  function handleCall(phone) {
+    if (phone) window.open(`tel:${phone}`);
+  }
+
+  if (renewals.length === 0) return <Empty text="No shops requiring renewal attention" />;
+
+  return (
+    <div className="space-y-5">
+      {/* Summary badges */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-orange-700">{expiring.length}</p>
+          <p className="text-xs text-orange-600 mt-0.5">Expiring Soon</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-red-700">{expired.length}</p>
+          <p className="text-xs text-red-600 mt-0.5">Not Renewed</p>
+        </div>
+      </div>
+
+      {/* Expiring soon section */}
+      {expiring.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <CalendarClock className="w-4 h-4 text-orange-500" /> Expiring Soon
+          </h3>
+          <div className="space-y-2">
+            {expiring.map((s) => {
+              const days = daysUntil(s.subscription_end_date);
+              return (
+                <div key={s.id} className={`rounded-xl border p-4 ${urgencyColor(days)}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{s.name}</p>
+                      <p className="text-xs opacity-75">{s.owner_name}</p>
+                      <p className="text-xs mt-0.5 font-medium">
+                        {days <= 0
+                          ? 'Expires today!'
+                          : days === 1
+                          ? 'Expires tomorrow'
+                          : `Expires in ${days} days`}
+                        {' — '}{fmtDate(s.subscription_end_date)}
+                      </p>
+                    </div>
+                    {s.phone && (
+                      <button
+                        onClick={() => handleCall(s.phone)}
+                        className="shrink-0 p-2 rounded-lg bg-white/60 hover:bg-white transition-colors"
+                        title="Call shop"
+                      >
+                        <PhoneCall className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Not renewed section */}
+      {expired.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <Bell className="w-4 h-4 text-red-500" /> Not Renewed (Expired)
+          </h3>
+          <div className="space-y-2">
+            {expired.map((s) => {
+              const since = s.subscription_end_date ? daysSince(s.subscription_end_date) : null;
+              return (
+                <div key={s.id} className="bg-white rounded-xl border border-red-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{s.name}</p>
+                      <p className="text-xs text-gray-500">{s.owner_name}</p>
+                      {since !== null && (
+                        <p className="text-xs text-red-600 mt-0.5">
+                          Expired {since === 0 ? 'today' : `${since} day${since > 1 ? 's' : ''} ago`}
+                          {s.subscription_end_date ? ` — ${fmtDate(s.subscription_end_date)}` : ''}
+                        </p>
+                      )}
+                    </div>
+                    {s.phone && (
+                      <button
+                        onClick={() => handleCall(s.phone)}
+                        className="shrink-0 p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                        title="Call shop"
+                      >
+                        <PhoneCall className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tabs config ───────────────────────────────────────────────
 const TABS = [
-  { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, component: DashboardTab },
-  { id: 'shops',       label: 'Shops',       icon: Store,           component: ShopsTab },
-  { id: 'payments',    label: 'Payments',    icon: CreditCard,      component: PaymentsTab },
-  { id: 'commissions', label: 'Commissions', icon: Wallet,          component: CommissionsTab },
-  { id: 'profile',     label: 'Profile',     icon: User,            component: ProfileTab },
+  { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, component: DashboardTab  },
+  { id: 'shops',       label: 'Shops',       icon: Store,           component: ShopsTab      },
+  { id: 'renewals',    label: 'Renewals',    icon: CalendarClock,   component: RenewalsTab   },
+  { id: 'payments',    label: 'Payments',    icon: CreditCard,      component: PaymentsTab   },
+  { id: 'commissions', label: 'Commissions', icon: Wallet,          component: CommissionsTab},
+  { id: 'profile',     label: 'Profile',     icon: User,            component: ProfileTab    },
 ];
 
 // ── Main Portal ───────────────────────────────────────────────
