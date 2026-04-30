@@ -3,6 +3,7 @@ const adminAuth   = require('../middleware/adminAuth');
 const ctrl        = require('../controllers/adminController');
 const auditCtrl   = require('../controllers/auditController');
 const agentCtrl   = require('../controllers/adminAgentController');
+const notifCtrl   = require('../controllers/notificationController');
 
 // Public admin login
 router.post('/login', ctrl.adminLogin);
@@ -41,8 +42,13 @@ router.post('/plans',                       ctrl.createPlan);
 router.put('/plans/:id',                    ctrl.updatePlan);
 router.delete('/plans/:id',                 ctrl.deletePlan);
 
-// Admin notification dispatch
-router.post('/notifications/dispatch',      ctrl.dispatchNotification);
+// Admin notification dispatch (legacy broadcast to shops)
+router.post('/notifications/dispatch',                  ctrl.dispatchNotification);
+
+// Admin-facing notifications (new shop onboards, payments, fraud alerts)
+router.get ('/notifications',                           notifCtrl.getAdminNotifications);
+router.put ('/notifications/read-all',                  notifCtrl.markAllAdminNotificationsRead);
+router.put ('/notifications/:id/read',                  notifCtrl.markAdminNotificationRead);
 
 // ── Sales Agent management ────────────────────────────────────
 router.get ('/agents',                      agentCtrl.listAgents);

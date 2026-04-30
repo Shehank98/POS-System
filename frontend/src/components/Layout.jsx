@@ -136,8 +136,9 @@ export default function Layout() {
     <div className="min-h-screen flex bg-gray-50">
 
       {/* ── Desktop sidebar ───────────────────────────────────── */}
-      <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200 shrink-0
-                         transition-all duration-200
+      <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200
+                         fixed inset-y-0 left-0 z-20 h-screen
+                         transition-all duration-300 ease-in-out
                          ${collapsed ? 'w-14' : 'w-56'}`}>
 
         {/* Brand */}
@@ -371,7 +372,9 @@ export default function Layout() {
 
       {/* ── Main content ──────────────────────────────────────── */}
       {/* pb-safe-tab = 3.5rem (tab bar) + env(safe-area-inset-bottom) */}
-      <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pb-0 pb-safe-tab">
+      <main className={`flex-1 min-w-0 pt-14 pb-safe-tab md:pt-0 md:pb-0
+                        transition-all duration-300 ease-in-out
+                        ${collapsed ? 'md:ml-14' : 'md:ml-56'}`}>
         <SubscriptionStatusBar />
         <div className="max-w-6xl mx-auto px-4 py-6">
           <Outlet />

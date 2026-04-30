@@ -95,6 +95,7 @@ async function listShops(req, res) {
              (SELECT COUNT(*) FROM products    p WHERE p.shop_id = s.id) AS product_count,
              (SELECT COUNT(*) FROM transactions t WHERE t.shop_id = s.id) AS transaction_count
         FROM shops s
+       WHERE COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY s.created_at DESC
     `);
     res.json(rows);
@@ -484,10 +485,16 @@ async function deleteShop(req, res) {
   }
 
   try {
-    const { rowCount } = await db.query(
-      `DELETE FROM shops WHERE id = $1`, [req.params.id]
+    const { rows, rowCount } = await db.query(
+      `UPDATE shops
+          SET is_deleted = TRUE,
+              deleted_at = NOW(),
+              deleted_by = 'admin'
+        WHERE id = $1 AND COALESCE(is_deleted, FALSE) = FALSE
+        RETURNING id`,
+      [req.params.id]
     );
-    if (rowCount === 0) return res.status(404).json({ error: 'Shop not found' });
+    if (rowCount === 0) return res.status(404).json({ error: 'Shop not found or already deleted' });
     res.status(204).end();
   } catch (err) {
     console.error('deleteShop error:', err);

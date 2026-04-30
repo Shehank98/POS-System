@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Store, CreditCard, Wallet, LogOut,
   TrendingUp, Users, Clock, Lock, Plus, ChevronDown,
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw,
+  User, Building2, Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { agentApi } from '../../api/client';
@@ -142,7 +143,19 @@ function DashboardTab() {
 }
 
 // ── Onboard wizard (4 steps) ──────────────────────────────────
-const BLANK_FORM = { name:'', owner_name:'', email:'', phone:'', address:'', username:'', password:'', plan_id:'', subscription_months:1 };
+const BLANK_FORM = { name:'', owner_name:'', email:'', phone:'', address:'', shop_type:'retail', username:'', password:'', plan_id:'', subscription_months:1 };
+
+const SHOP_TYPES = [
+  { value: 'retail',      label: 'Retail Store'        },
+  { value: 'clothing',    label: 'Clothing Store'       },
+  { value: 'grocery',     label: 'Grocery / Supermarket'},
+  { value: 'pharmacy',    label: 'Pharmacy'             },
+  { value: 'car_wash',    label: 'Car Wash'             },
+  { value: 'restaurant',  label: 'Restaurant / Cafe'    },
+  { value: 'salon',       label: 'Salon / Spa'          },
+  { value: 'electronics', label: 'Electronics'          },
+  { value: 'other',       label: 'Other'                },
+];
 
 function OnboardWizard({ onDone, onClose }) {
   const [step, setStep]   = useState(1);
@@ -186,6 +199,7 @@ function OnboardWizard({ onDone, onClose }) {
         email:              form.email,
         phone:              form.phone   || undefined,
         address:            form.address || undefined,
+        shop_type:          form.shop_type || 'retail',
         username:           form.username,
         password:           form.password,
         plan_id:            form.plan_id || undefined,
@@ -239,6 +253,18 @@ function OnboardWizard({ onDone, onClose }) {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Shop Type *</label>
+              <select
+                value={form.shop_type}
+                onChange={(e) => set('shop_type', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {SHOP_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
           </>
         )}
 
@@ -326,6 +352,7 @@ function OnboardWizard({ onDone, onClose }) {
                 ['Owner',        form.owner_name],
                 ['Email',        form.email],
                 ['Phone',        form.phone || '—'],
+                ['Shop Type',    SHOP_TYPES.find((t) => t.value === form.shop_type)?.label || form.shop_type],
                 ['Username',     form.username],
                 ['Plan',         selectedPlan?.name || '— (no plan)'],
                 ['Duration',     `${form.subscription_months} month(s)`],
@@ -693,6 +720,106 @@ function CommissionsTab() {
   );
 }
 
+// ── Profile / Bank Details Tab ────────────────────────────────
+function ProfileTab() {
+  const { agent } = useAgentStore();
+  const [form, setForm] = useState({
+    bank_name: '', bank_account: '', bank_branch: '', account_holder: '',
+  });
+  const [loaded,  setLoaded]  = useState(false);
+  const [saving,  setSaving]  = useState(false);
+
+  useEffect(() => {
+    agentApi.me?.()
+      .then(({ data }) => {
+        setForm({
+          bank_name:       data.bank_name       || '',
+          bank_account:    data.bank_account    || '',
+          bank_branch:     data.bank_branch     || '',
+          account_holder:  data.account_holder  || '',
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!form.bank_name || !form.bank_account || !form.account_holder) {
+      toast.error('Bank name, account number and account holder are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      await agentApi.bankDetails(form);
+      toast.success('Bank details saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save bank details');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!loaded) return <Spinner />;
+
+  const fieldCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+
+  return (
+    <div className="space-y-5">
+      {/* Agent info */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+          <User className="w-6 h-6 text-green-700" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900">{agent?.name}</p>
+          <p className="text-sm text-gray-500">{agent?.email}</p>
+          {agent?.district && <p className="text-xs text-gray-400">{agent.district}</p>}
+        </div>
+      </div>
+
+      {/* Bank details form */}
+      <form onSubmit={handleSave} className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Building2 className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-gray-800 text-sm">Bank Details</h3>
+        </div>
+        <p className="text-xs text-gray-500">
+          Bank details are used for commission payouts. Ensure accuracy before saving.
+        </p>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Account Holder Name *</label>
+          <input type="text" value={form.account_holder} onChange={set('account_holder')}
+            placeholder="Name as on bank account" className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Bank Name *</label>
+          <input type="text" value={form.bank_name} onChange={set('bank_name')}
+            placeholder="e.g. Bank of Ceylon" className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Account Number *</label>
+          <input type="text" value={form.bank_account} onChange={set('bank_account')}
+            placeholder="e.g. 0012345678" className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
+          <input type="text" value={form.bank_branch} onChange={set('bank_branch')}
+            placeholder="e.g. Colombo Main" className={fieldCls} />
+        </div>
+
+        <button type="submit" disabled={saving}
+          className="w-full py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Bank Details</>}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ── Shared micro-components ────────────────────────────────────
 function Spinner() {
   return (
@@ -711,6 +838,7 @@ const TABS = [
   { id: 'shops',       label: 'Shops',       icon: Store,           component: ShopsTab },
   { id: 'payments',    label: 'Payments',    icon: CreditCard,      component: PaymentsTab },
   { id: 'commissions', label: 'Commissions', icon: Wallet,          component: CommissionsTab },
+  { id: 'profile',     label: 'Profile',     icon: User,            component: ProfileTab },
 ];
 
 // ── Main Portal ───────────────────────────────────────────────

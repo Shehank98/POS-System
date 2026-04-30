@@ -243,9 +243,73 @@ async function markAllAgentNotificationsRead(req, res) {
   }
 }
 
+// ── Admin notification types ──────────────────────────────────
+const ADMIN_TYPES = {
+  SHOP_ONBOARDED:      'shop_onboarded',
+  PAYMENT_SUBMITTED:   'payment_submitted',
+  PAYMENT_SUSPICIOUS:  'payment_suspicious',
+  AGENT_RESTRICTED:    'agent_restricted',
+};
+
+// ── Internal helper: create admin notification ────────────────
+async function createAdminNotification(type, title, message, priority = 'normal', data = null) {
+  try {
+    await db.query(
+      `INSERT INTO admin_notifications (type, priority, title, message, data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [type, priority, title, message, data ? JSON.stringify(data) : null]
+    );
+  } catch (err) {
+    console.error('[AdminNotification] Failed to create notification:', err.message);
+  }
+}
+
+// ── GET /api/admin/notifications ─────────────────────────────
+async function getAdminNotifications(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM admin_notifications
+        ORDER BY created_at DESC
+        LIMIT 80`
+    );
+    const unread_count = rows.filter((n) => !n.is_read).length;
+    res.json({ notifications: rows, unread_count });
+  } catch (err) {
+    console.error('getAdminNotifications error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/notifications/:id/read ────────────────────
+async function markAdminNotificationRead(req, res) {
+  try {
+    await db.query(
+      `UPDATE admin_notifications SET is_read = TRUE WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('markAdminNotificationRead error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/notifications/read-all ────────────────────
+async function markAllAdminNotificationsRead(req, res) {
+  try {
+    await db.query(`UPDATE admin_notifications SET is_read = TRUE WHERE is_read = FALSE`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('markAllAdminNotificationsRead error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   getNotifications, markRead, markAllRead,
   createNotification, runDailyChecks, TYPES,
   createAgentNotification, AGENT_TYPES,
   getAgentNotifications, markAgentNotificationRead, markAllAgentNotificationsRead,
+  createAdminNotification, ADMIN_TYPES,
+  getAdminNotifications, markAdminNotificationRead, markAllAdminNotificationsRead,
 };

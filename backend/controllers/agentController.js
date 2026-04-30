@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const db     = require('../config/database');
+const { createAdminNotification, ADMIN_TYPES } = require('./notificationController');
 
 // ── GET /api/agents/me/dashboard ──────────────────────────────
 async function getDashboard(req, res) {
@@ -143,6 +144,21 @@ async function onboardCustomer(req, res) {
     );
 
     await client.query('COMMIT');
+
+    // Fetch agent name for notification (non-blocking)
+    db.query(`SELECT name FROM sales_agents WHERE id = $1`, [agentId])
+      .then(({ rows: agRows }) => {
+        const agentName = agRows[0]?.name || `Agent #${agentId}`;
+        createAdminNotification(
+          ADMIN_TYPES.SHOP_ONBOARDED,
+          'New Shop Onboarded',
+          `${agentName} onboarded shop "${name}" (${(shop_type || 'retail').replace('_', ' ')})`,
+          'high',
+          { agent_id: agentId, shop_id: shop.id, shop_name: name }
+        );
+      })
+      .catch(() => {});
+
     res.status(201).json(shop);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -234,7 +250,38 @@ async function submitPayment(req, res) {
       );
 
       await client.query('COMMIT');
-      res.status(201).json(rows[0]);
+
+      const submission = rows[0];
+
+      // Admin notification (non-blocking)
+      db.query(
+        `SELECT sa.name AS agent_name, s.name AS shop_name
+           FROM sales_agents sa, shops s
+          WHERE sa.id = $1 AND s.id = $2`,
+        [agentId, shop_id]
+      ).then(({ rows: nr }) => {
+        const agentName = nr[0]?.agent_name || `Agent #${agentId}`;
+        const shopName  = nr[0]?.shop_name  || `Shop #${shop_id}`;
+        if (isSuspicious) {
+          createAdminNotification(
+            ADMIN_TYPES.PAYMENT_SUSPICIOUS,
+            'Suspicious Payment Submitted',
+            `${agentName} submitted LKR ${submittedAmt.toLocaleString()} for "${shopName}" — expected LKR ${(shopExpected || 0).toLocaleString()}`,
+            'critical',
+            { agent_id: agentId, shop_id, submitted: submittedAmt, expected: shopExpected }
+          );
+        } else {
+          createAdminNotification(
+            ADMIN_TYPES.PAYMENT_SUBMITTED,
+            'Payment Pending Verification',
+            `${agentName} submitted LKR ${submittedAmt.toLocaleString()} for "${shopName}"`,
+            'high',
+            { agent_id: agentId, shop_id, amount: submittedAmt }
+          );
+        }
+      }).catch(() => {});
+
+      res.status(201).json(submission);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

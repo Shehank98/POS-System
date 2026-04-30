@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield, Store, CreditCard, CheckCircle2, XCircle,
   Clock, LogOut, RefreshCw, Eye, ChevronDown, ChevronUp,
@@ -1833,6 +1833,127 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
   );
 }
 
+// ── Admin Notification Bell ───────────────────────────────────
+const PRIORITY_COLOR = {
+  critical: 'bg-red-900 border-red-700 text-red-300',
+  high:     'bg-yellow-900 border-yellow-700 text-yellow-300',
+  normal:   'bg-gray-800 border-gray-700 text-gray-300',
+};
+const PRIORITY_DOT = {
+  critical: 'bg-red-400',
+  high:     'bg-yellow-400',
+  normal:   'bg-gray-400',
+};
+
+function AdminNotificationBell() {
+  const [open,          setOpen]          = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unread,        setUnread]        = useState(0);
+  const [loading,       setLoading]       = useState(false);
+  const pollRef = useRef(null);
+
+  const fetchNotifs = useCallback(async () => {
+    try {
+      const { data } = await adminApi.getAdminNotifications();
+      setNotifications(data.notifications || []);
+      setUnread(data.unread_count || 0);
+    } catch { /* non-fatal */ }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifs();
+    pollRef.current = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(pollRef.current);
+  }, [fetchNotifs]);
+
+  async function handleMarkAll() {
+    setLoading(true);
+    try {
+      await adminApi.markAllAdminNotificationsRead();
+      setUnread(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch { toast.error('Failed to mark all as read'); }
+    finally { setLoading(false); }
+  }
+
+  async function handleMarkOne(id) {
+    try {
+      await adminApi.markAdminNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => n.id === id ? { ...n, is_read: true } : n)
+      );
+      setUnread((u) => Math.max(0, u - 1));
+    } catch { /* silent */ }
+  }
+
+  const fmtAgo = (ts) => {
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="relative p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        title="Admin notifications"
+      >
+        <Bell className="w-5 h-5" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+            <span className="text-sm font-semibold text-white">Notifications</span>
+            {unread > 0 && (
+              <button
+                onClick={handleMarkAll}
+                disabled={loading}
+                className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-50"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="overflow-y-auto max-h-80">
+            {notifications.length === 0 ? (
+              <p className="text-center text-gray-500 py-8 text-sm">No notifications</p>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => !n.is_read && handleMarkOne(n.id)}
+                  className={`px-4 py-3 border-b border-gray-700/50 cursor-pointer hover:bg-gray-700/50 transition-colors
+                              ${!n.is_read ? 'bg-gray-750' : 'opacity-60'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[n.priority] || PRIORITY_DOT.normal}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-white truncate">{n.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{n.message}</p>
+                      <p className="text-[10px] text-gray-600 mt-1">{fmtAgo(n.created_at)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const logout   = useAdminStore((s) => s.logout);
   const navigate = useNavigate();
@@ -1953,9 +2074,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white">
+          <button onClick={load} className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
+          <AdminNotificationBell />
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-300 hover:bg-gray-700"

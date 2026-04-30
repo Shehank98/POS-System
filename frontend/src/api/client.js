@@ -313,8 +313,12 @@ export const adminApi = {
   createPlan:       (data)       => adminClient.post('/admin/plans', data),
   updatePlan:       (id, data)   => adminClient.put(`/admin/plans/${id}`, data),
   deletePlan:       (id)         => adminClient.delete(`/admin/plans/${id}`),
-  // Notification dispatch
-  dispatchNotification: (data)   => adminClient.post('/admin/notifications/dispatch', data),
+  // Notification dispatch (legacy broadcast to shops)
+  dispatchNotification:         (data)   => adminClient.post('/admin/notifications/dispatch', data),
+  // Admin notifications
+  getAdminNotifications:        ()       => adminClient.get('/admin/notifications'),
+  markAdminNotificationRead:    (id)     => adminClient.put(`/admin/notifications/${id}/read`),
+  markAllAdminNotificationsRead:()       => adminClient.put('/admin/notifications/read-all'),
 
   // ── Sales Agent management ──────────────────────────────────
   listAgents:           ()       => adminClient.get('/admin/agents'),
