@@ -510,10 +510,12 @@ function RiskScoresTab({ onAgentUpdated }) {
 
 // ── Agent Document Viewer Modal ───────────────────────────────
 function AgentDocModal({ agentId, onClose }) {
-  const [docs, setDocs]   = useState(null);
-  const [loading, setLd]  = useState(true);
-  const [acting,  setAct] = useState(false);
-  const [reason,  setRsn] = useState('');
+  const [docs,     setDocs]   = useState(null);
+  const [loading,  setLd]     = useState(true);
+  const [acting,   setAct]    = useState(false);
+  const [reason,   setRsn]    = useState('');
+  const [agrUrl,   setAgrUrl] = useState('');
+  const [savingAgr, setSavingAgr] = useState(false);
 
   useEffect(() => {
     adminApi.getAgentDocuments(agentId)
@@ -531,6 +533,19 @@ function AgentDocModal({ agentId, onClose }) {
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to approve');
     } finally { setAct(false); }
+  }
+
+  async function saveAgreementUrl() {
+    if (!agrUrl.trim()) return;
+    setSavingAgr(true);
+    try {
+      await adminApi.saveSignedAgreementUrl(agentId, agrUrl.trim());
+      setDocs((d) => ({ ...d, signed_agreement_url: agrUrl.trim() }));
+      setAgrUrl('');
+      toast.success('Signed agreement URL saved');
+    } catch {
+      toast.error('Failed to save URL');
+    } finally { setSavingAgr(false); }
   }
 
   async function reject() {
@@ -586,6 +601,23 @@ function AgentDocModal({ agentId, onClose }) {
               <DocLink label="Agent Photo"        url={docs.agent_photo_url} />
               <DocLink label="Bank Book"          url={docs.bank_book_url} />
               <DocLink label="Signed Agreement"   url={docs.signed_agreement_url} />
+              {!docs.signed_agreement_url && (
+                <div className="flex gap-2 mt-2">
+                  <input
+                    value={agrUrl}
+                    onChange={(e) => setAgrUrl(e.target.value)}
+                    placeholder="Paste Firebase URL to save…"
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                  />
+                  <button
+                    onClick={saveAgreementUrl}
+                    disabled={savingAgr || !agrUrl.trim()}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+                  >
+                    {savingAgr ? '…' : 'Save'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {docs.approval_status === 'pending' && (

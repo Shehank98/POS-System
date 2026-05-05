@@ -36,7 +36,8 @@ async function uploadRegistrationFile(req, res) {
   if (!allowed.includes(category)) return res.status(400).json({ error: 'Invalid category' });
 
   try {
-    const ext    = fileData.startsWith('data:image/png') ? 'png' : 'jpg';
+    const ext    = fileData.startsWith('data:application/pdf') ? 'pdf'
+                 : fileData.startsWith('data:image/png')       ? 'png' : 'jpg';
     const ts     = Date.now();
     const dest   = `agents/registration/${agentRef || 'tmp'}/${category}_${ts}.${ext}`;
     const url    = await uploadFile(fileData, dest);
@@ -54,7 +55,7 @@ async function register(req, res) {
     // Personal
     full_name, nic_number, driving_license_number, phone, district,
     // Document URLs (uploaded beforehand via uploadRegistrationFile)
-    nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+    nic_front_url, nic_back_url, agent_photo_url, bank_book_url, signed_agreement_url,
     // Bank
     bank_name, account_holder, bank_account, bank_branch,
     // Credentials
@@ -110,10 +111,10 @@ async function register(req, res) {
       `INSERT INTO sales_agents
          (name, email, phone, password_hash, district,
           nic_number, driving_license_number,
-          nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+          nic_front_url, nic_back_url, agent_photo_url, bank_book_url, signed_agreement_url,
           bank_name, account_holder, bank_account, bank_branch,
           approval_status, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending',FALSE)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',FALSE)
        RETURNING id, name, email, approval_status`,
       [
         full_name.trim(),
@@ -123,11 +124,12 @@ async function register(req, res) {
         district || null,
         nic_number.trim(),
         driving_license_number || null,
-        nic_front_url || null,
-        nic_back_url  || null,
-        agent_photo_url || null,
-        bank_book_url   || null,
-        bank_name || null,
+        nic_front_url    || null,
+        nic_back_url     || null,
+        agent_photo_url  || null,
+        bank_book_url    || null,
+        signed_agreement_url || null,
+        bank_name      || null,
         account_holder || null,
         bank_account   || null,
         bank_branch    || null,

@@ -568,6 +568,25 @@ async function listInviteTokens(req, res) {
   }
 }
 
+// ── PUT /api/admin/agents/:id/signed-agreement ───────────────
+// Admin manually saves the signed agreement URL (for agents registered before the fix)
+async function saveSignedAgreementUrl(req, res) {
+  const agentId = parseInt(req.params.id, 10);
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+  try {
+    const { rowCount } = await db.query(
+      `UPDATE sales_agents SET signed_agreement_url = $1 WHERE id = $2`,
+      [url.trim(), agentId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ message: 'Signed agreement URL saved' });
+  } catch (err) {
+    console.error('saveSignedAgreementUrl error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
   listPendingPayments, listAllPayments, getFraudSummary,
@@ -576,4 +595,5 @@ module.exports = {
   listRiskScores, recalculateAgentRisk, setAgentRestriction,
   generateInviteToken, listPendingRegistrations, getAgentDocuments,
   approveAgentRegistration, rejectAgentRegistration, listInviteTokens,
+  saveSignedAgreementUrl,
 };

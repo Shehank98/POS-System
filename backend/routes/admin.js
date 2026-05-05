@@ -79,9 +79,10 @@ const shopPayCtrl = require('../controllers/shopPaymentController');
 router.post('/generate-agent-invite',       agentCtrl.generateInviteToken);
 router.get ('/invite-tokens',               agentCtrl.listInviteTokens);
 router.get ('/agent-registrations',         agentCtrl.listPendingRegistrations);
-router.get ('/agents/:id/documents',        agentCtrl.getAgentDocuments);
-router.put ('/agents/:id/approve',          agentCtrl.approveAgentRegistration);
-router.put ('/agents/:id/reject',           agentCtrl.rejectAgentRegistration);
+router.get ('/agents/:id/documents',               agentCtrl.getAgentDocuments);
+router.put ('/agents/:id/approve',                 agentCtrl.approveAgentRegistration);
+router.put ('/agents/:id/reject',                  agentCtrl.rejectAgentRegistration);
+router.put ('/agents/:id/signed-agreement',        agentCtrl.saveSignedAgreementUrl);
 
 // ── Shop Payment Proofs (LKR 2500/month activation) ──────────
 router.get ('/shop-payments',               shopPayCtrl.adminListShopPayments);
