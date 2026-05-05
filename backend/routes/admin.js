@@ -84,7 +84,8 @@ router.put ('/agents/:id/approve',                 agentCtrl.approveAgentRegistr
 router.put ('/agents/:id/reject',                  agentCtrl.rejectAgentRegistration);
 router.put ('/agents/:id/signed-agreement',        agentCtrl.saveSignedAgreementUrl);
 
-// ── Shop Map ──────────────────────────────────────────────────
+// ── Shops by Agent / Shop Map ─────────────────────────────────
+router.get ('/shops-by-agent',              agentCtrl.getShopsByAgent);
 router.get ('/shops/map-data',              agentCtrl.getShopsMapData);
 
 // ── Shop Payment Proofs (LKR 2500/month activation) ──────────

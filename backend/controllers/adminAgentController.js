@@ -587,6 +587,59 @@ async function saveSignedAgreementUrl(req, res) {
   }
 }
 
+// ── GET /api/admin/shops-by-agent ────────────────────────────
+// Returns each agent with their shops + commission totals
+async function getShopsByAgent(req, res) {
+  try {
+    // Agents with aggregated shop + commission data
+    const { rows: agents } = await db.query(`
+      SELECT
+        sa.id, sa.name, sa.email, sa.phone, sa.district,
+        sa.is_active, sa.approval_status, sa.created_at,
+        COUNT(DISTINCT s.id)                                                           AS shop_count,
+        COUNT(DISTINCT s.id) FILTER (WHERE s.activation_status = 'active')             AS active_shops,
+        COUNT(DISTINCT s.id) FILTER (WHERE s.activation_status = 'inactive')           AS inactive_shops,
+        COALESCE(SUM(ac.amount) FILTER (WHERE ac.status IN ('approved','paid')), 0)    AS earned_commission,
+        COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'approved'),           0)    AS pending_commission,
+        COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'paid'),               0)    AS paid_commission
+      FROM sales_agents sa
+      LEFT JOIN shops           s  ON s.onboarded_by_agent_id = sa.id
+      LEFT JOIN agent_commissions ac ON ac.agent_id = sa.id
+      GROUP BY sa.id
+      ORDER BY COUNT(DISTINCT s.id) DESC, sa.name ASC
+    `);
+
+    // All shops with their agent id for the breakdown
+    const { rows: shops } = await db.query(`
+      SELECT
+        s.id, s.name, s.owner_name, s.email, s.contact_number,
+        s.shop_reference_id, s.shop_type,
+        s.activation_status, s.subscription_status, s.subscription_end_date,
+        s.location_map_url, s.district, s.created_at,
+        s.onboarded_by_agent_id AS agent_id,
+        COALESCE(SUM(ac.amount) FILTER (WHERE ac.status IN ('approved','paid')), 0) AS earned,
+        COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'approved'),           0) AS pending
+      FROM shops s
+      LEFT JOIN agent_commissions ac ON ac.shop_id = s.id
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+    `);
+
+    // Group shops under agents
+    const shopsByAgent = {};
+    shops.forEach((s) => {
+      const aid = s.agent_id;
+      if (!shopsByAgent[aid]) shopsByAgent[aid] = [];
+      shopsByAgent[aid].push(s);
+    });
+
+    res.json(agents.map((a) => ({ ...a, shops: shopsByAgent[a.id] || [] })));
+  } catch (err) {
+    console.error('getShopsByAgent error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── GET /api/admin/shops/map-data ────────────────────────────
 // Returns all shops with location + agent info for the map view
 async function getShopsMapData(req, res) {
@@ -616,5 +669,5 @@ module.exports = {
   listRiskScores, recalculateAgentRisk, setAgentRestriction,
   generateInviteToken, listPendingRegistrations, getAgentDocuments,
   approveAgentRegistration, rejectAgentRegistration, listInviteTokens,
-  saveSignedAgreementUrl, getShopsMapData,
+  saveSignedAgreementUrl, getShopsByAgent, getShopsMapData,
 };

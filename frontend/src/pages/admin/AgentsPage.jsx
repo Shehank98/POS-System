@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
 import ShopMapTab from './ShopMapTab';
+import ShopsByAgentTab from './ShopsByAgentTab';
 
 const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
@@ -968,6 +969,7 @@ export default function AgentsPage() {
           { key: 'agents',       label: 'Agents'           },
           { key: 'registrations',label: `Registrations${pendingReg.length > 0 ? ` (${pendingReg.length})` : ''}` },
           { key: 'shop_payments',label: 'Shop Payments'    },
+          { key: 'shops_by_agent',label: 'Shops by Agent'   },
           { key: 'shop_map',     label: 'Shop Map'         },
           { key: 'invite',       label: 'Invite Links'     },
           { key: 'payments',     label: `Cash Payments${pending.length > 0 ? ` (${pending.length})` : ''}` },
@@ -1080,6 +1082,10 @@ export default function AgentsPage() {
       ) : tab === 'shop_payments' ? (
 
         <ShopPaymentsTab />
+
+      ) : tab === 'shops_by_agent' ? (
+
+        <ShopsByAgentTab />
 
       ) : tab === 'shop_map' ? (
 
