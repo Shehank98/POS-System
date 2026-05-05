@@ -2161,10 +2161,82 @@ const TABS = [
   { id: 'profile',     label: 'Settings',    icon: Settings,        component: ProfileTab    },
 ];
 
+// ── Real-time agent WebSocket hook ───────────────────────────
+function useAgentWebSocket(agentId, onShopActivated) {
+  const wsRef = useRef(null);
+
+  useEffect(() => {
+    if (!agentId) return;
+
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host  = window.location.hostname;
+    const port  = process.env.REACT_APP_WS_PORT || '5000';
+    const url   = `${proto}://${host}:${port}/ws`;
+
+    let reconnectTimer = null;
+    let alive = true;
+
+    function connect() {
+      if (!alive) return;
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'subscribe_agent', agentId }));
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === 'agent_event' && msg.event === 'shop_activated') {
+            onShopActivated?.(msg);
+          }
+        } catch {}
+      };
+
+      ws.onclose = () => {
+        if (alive) reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    connect();
+
+    return () => {
+      alive = false;
+      clearTimeout(reconnectTimer);
+      wsRef.current?.close();
+    };
+  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 // ── Main Portal ───────────────────────────────────────────────
 export default function AgentPortalPage() {
   const { agent, logout } = useAgentStore();
   const [activeTab, setActiveTab] = useState('dashboard');
+  // Activation notifications: array of { shop_id, shop_name, method, ts }
+  const [activationNotifs, setActivationNotifs] = useState([]);
+
+  const handleShopActivated = useCallback((msg) => {
+    const notif = {
+      shop_id:   msg.shop_id,
+      shop_name: msg.shop_name,
+      method:    msg.method,
+      ts:        Date.now(),
+    };
+    setActivationNotifs((prev) => [notif, ...prev.slice(0, 4)]);
+    toast.success(`Shop "${msg.shop_name}" has been activated!`, {
+      duration: 6000,
+      icon: '🎉',
+    });
+  }, []);
+
+  useAgentWebSocket(agent?.id, handleShopActivated);
+
+  function dismissNotif(ts) {
+    setActivationNotifs((prev) => prev.filter((n) => n.ts !== ts));
+  }
 
   const ActiveComponent = TABS.find((t) => t.id === activeTab)?.component || DashboardTab;
 
@@ -2206,6 +2278,35 @@ export default function AgentPortalPage() {
           ))}
         </div>
       </header>
+
+      {/* Activation notification banners */}
+      {activationNotifs.length > 0 && (
+        <div className="max-w-5xl mx-auto w-full px-3 sm:px-4 pt-3 space-y-2">
+          {activationNotifs.map((n) => (
+            <div key={n.ts}
+              className="flex items-center gap-3 bg-green-50 border border-green-300 rounded-xl px-4 py-3 shadow-sm"
+            >
+              <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-green-800">
+                  Shop "{n.shop_name}" has been activated!
+                </p>
+                <p className="text-xs text-green-600 mt-0.5">
+                  LKR 500 onboarding commission is now approved
+                  {n.method ? ` · paid via ${n.method}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => dismissNotif(n.ts)}
+                className="shrink-0 text-green-600 hover:text-green-800 p-1"
+                aria-label="Dismiss"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6">

@@ -343,6 +343,7 @@ export const adminApi = {
   listAgents:           ()       => adminClient.get('/admin/agents'),
   createAgent:          (data)   => adminClient.post('/admin/agents', data),
   updateAgent:          (id, data) => adminClient.put(`/admin/agents/${id}`, data),
+  updateAgentBankDetails: (id, data) => adminClient.put(`/admin/agents/${id}/bank-details`, data),
   getAgentCustomers:    (id)     => adminClient.get(`/admin/agents/${id}/customers`),
 
   // Agent payment submissions

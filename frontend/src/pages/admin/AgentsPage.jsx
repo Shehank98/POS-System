@@ -5,6 +5,7 @@ import {
   Phone, Mail, CreditCard, Store, Eye, EyeOff, Edit3,
   ToggleLeft, ToggleRight, AlertTriangle, ShieldAlert, Lock, LockOpen,
   Link2, Copy, FileCheck, QrCode, CheckCheck, Map,
+  Building2, Save, Landmark,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
@@ -167,13 +168,24 @@ function RejectPaymentModal({ submissionId, onClose, onDone }) {
 }
 
 // ── Agent detail drawer ───────────────────────────────────────
-function AgentDetailPanel({ agent, onClose, onEdit }) {
+function AgentDetailPanel({ agent: initialAgent, onClose, onEdit }) {
+  const [agent, setAgent]             = useState(initialAgent);
   const [customers, setCustomers]     = useState([]);
   const [commissions, setCommissions] = useState([]);
   const [tab, setTab]                 = useState('customers');
   const [loading, setLoading]         = useState(true);
   const [selected, setSelected]       = useState(new Set());
   const [paying, setPaying]           = useState(false);
+
+  // Bank details state
+  const [bankForm, setBankForm] = useState({
+    bank_name:      initialAgent.bank_name      || '',
+    bank_account:   initialAgent.bank_account   || '',
+    bank_branch:    initialAgent.bank_branch     || '',
+    account_holder: initialAgent.account_holder || '',
+  });
+  const [bankEditing, setBankEditing] = useState(false);
+  const [bankSaving,  setBankSaving]  = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -188,6 +200,8 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
   const approvedCommissions = commissions.filter((c) => c.status === 'approved');
   const approvedTotal       = approvedCommissions.reduce((s, c) => s + parseFloat(c.amount), 0);
 
+  const hasBankDetails = !!(agent.bank_name && agent.bank_account && agent.account_holder);
+
   function toggleSelect(id) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -198,6 +212,9 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
 
   async function handlePayout() {
     if (!selected.size) return toast.error('Select at least one commission');
+    if (!hasBankDetails) {
+      return toast.error('Agent bank details are missing — add them in the Bank Account tab before paying');
+    }
     setPaying(true);
     try {
       const { data } = await adminApi.payoutCommissions({ commission_ids: [...selected], agent_id: agent.id });
@@ -211,6 +228,23 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
       setPaying(false);
     }
   }
+
+  async function saveBankDetails(e) {
+    e.preventDefault();
+    setBankSaving(true);
+    try {
+      const { data } = await adminApi.updateAgentBankDetails(agent.id, bankForm);
+      setAgent((a) => ({ ...a, ...data }));
+      setBankEditing(false);
+      toast.success('Bank details saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save bank details');
+    } finally {
+      setBankSaving(false);
+    }
+  }
+
+  const TABS = ['customers', 'commissions', 'bank'];
 
   return (
     <div className="fixed inset-0 z-40 flex" onClick={onClose}>
@@ -246,18 +280,22 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
           </div>
         </div>
 
-        <div className="flex border-b border-gray-700 px-4">
-          {['customers', 'commissions'].map((t) => (
+        <div className="flex border-b border-gray-700 px-4 overflow-x-auto">
+          {TABS.map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap flex items-center gap-1.5 ${
                 tab === t ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'
               }`}>
-              {t}
+              {t === 'bank' && <Landmark className="w-3.5 h-3.5" />}
+              {t === 'bank' ? 'Bank Account' : t}
+              {t === 'bank' && !hasBankDetails && (
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-0.5" title="Missing bank details" />
+              )}
             </button>
           ))}
         </div>
 
-        {loading ? (
+        {loading && tab !== 'bank' ? (
           <div className="flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-400" /></div>
         ) : tab === 'customers' ? (
           <div className="p-4 space-y-2">
@@ -275,8 +313,28 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
               </div>
             ))}
           </div>
-        ) : (
+
+        ) : tab === 'commissions' ? (
           <div className="p-4">
+            {/* Bank details warning before payout */}
+            {!hasBankDetails && (
+              <div className="flex items-start gap-2 bg-red-900/40 border border-red-700 rounded-xl p-3 mb-3">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-300">
+                  Bank account details are missing. Add them in the <button className="underline" onClick={() => setTab('bank')}>Bank Account</button> tab before processing payouts.
+                </p>
+              </div>
+            )}
+            {/* Bank details summary for payout reference */}
+            {hasBankDetails && (
+              <div className="flex items-start gap-2 bg-gray-800 border border-gray-700 rounded-xl p-3 mb-3">
+                <Building2 className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-gray-300 space-y-0.5">
+                  <p><span className="text-gray-500">Account:</span> {agent.account_holder} · {agent.bank_account}</p>
+                  <p><span className="text-gray-500">Bank:</span> {agent.bank_name}{agent.bank_branch ? ` — ${agent.bank_branch}` : ''}</p>
+                </div>
+              </div>
+            )}
             {approvedCommissions.length > 0 && (
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm text-gray-300">
@@ -314,6 +372,85 @@ function AgentDetailPanel({ agent, onClose, onEdit }) {
                 </div>
               ))}
             </div>
+          </div>
+
+        ) : (
+          /* Bank Account tab */
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Landmark className="w-5 h-5 text-indigo-400" />
+                <h4 className="text-sm font-semibold text-white">Bank Account Details</h4>
+              </div>
+              {!bankEditing && (
+                <button
+                  onClick={() => setBankEditing(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
+                >
+                  <Edit3 className="w-3 h-3" /> Edit
+                </button>
+              )}
+            </div>
+
+            {!bankEditing ? (
+              hasBankDetails ? (
+                <div className="bg-gray-800 rounded-2xl p-4 space-y-3">
+                  {[
+                    { label: 'Account Holder', value: agent.account_holder },
+                    { label: 'Bank Name',      value: agent.bank_name      },
+                    { label: 'Account Number', value: agent.bank_account   },
+                    { label: 'Branch',         value: agent.bank_branch || '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-gray-500">{label}</p>
+                      <p className="text-sm text-white font-medium mt-0.5">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <Building2 className="w-10 h-10 text-gray-600" />
+                  <p className="text-gray-400 text-sm">No bank details on file</p>
+                  <button
+                    onClick={() => setBankEditing(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg"
+                  >
+                    Add Bank Details
+                  </button>
+                </div>
+              )
+            ) : (
+              <form onSubmit={saveBankDetails} className="space-y-3">
+                {[
+                  { key: 'account_holder', label: 'Account Holder Name', required: true  },
+                  { key: 'bank_name',      label: 'Bank Name',           required: true  },
+                  { key: 'bank_account',   label: 'Account Number',      required: true  },
+                  { key: 'bank_branch',    label: 'Branch',              required: false },
+                ].map(({ key, label, required }) => (
+                  <div key={key}>
+                    <label className="block text-xs text-gray-400 mb-1">{label}{required && ' *'}</label>
+                    <input
+                      type="text"
+                      required={required}
+                      value={bankForm[key]}
+                      onChange={(e) => setBankForm((p) => ({ ...p, [key]: e.target.value }))}
+                      className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 py-2.5 border border-gray-600 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setBankEditing(false)}
+                    className="flex-1 py-2.5 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={bankSaving}
+                    className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50">
+                    {bankSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>

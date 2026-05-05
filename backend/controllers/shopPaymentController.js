@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 const db             = require('../config/database');
 const { uploadFile } = require('../utils/storageService');
 const sysHelaPOS     = require('../services/systemHelaposService');
+const { notifyAgent } = require('../websocket');
 
 const BILLING_QR_COOLDOWN = new Map(); // reference → timestamp of last status check
 
@@ -418,8 +419,28 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
       );
     }
 
+    // Fetch shop name for notifications (before releasing client)
+    const { rows: shopRows } = await client.query(
+      `SELECT name, onboarded_by_agent_id FROM shops WHERE id = $1`,
+      [shopId]
+    );
+    const shopName = shopRows[0]?.name || `Shop #${shopId}`;
+    const agentId  = shopRows[0]?.onboarded_by_agent_id || proof.agent_id;
+
     await client.query('COMMIT');
     BILLING_QR_COOLDOWN.delete(proofId?.toString());
+
+    // Notify agent via WebSocket (non-blocking)
+    if (agentId) {
+      try {
+        notifyAgent(agentId, {
+          event:     'shop_activated',
+          shop_id:   shopId,
+          shop_name: shopName,
+          method:    'helaPay',
+        });
+      } catch {}
+    }
 
     // Notify shop owner (non-blocking, outside transaction)
     try {

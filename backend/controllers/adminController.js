@@ -3,6 +3,7 @@ const jwt    = require('jsonwebtoken');
 const db     = require('../config/database');
 const { createNotification, TYPES } = require('./notificationController');
 const { sendToTopic } = require('../utils/fcm');
+const { notifyAgent } = require('../websocket');
 
 // ── POST /api/admin/login ─────────────────────────────────────
 async function adminLogin(req, res) {
@@ -411,6 +412,18 @@ async function verifyPayment(req, res) {
     }
 
     await client.query('COMMIT');
+
+    // Notify agent via WebSocket (non-blocking)
+    if (shop.agent_id) {
+      try {
+        notifyAgent(shop.agent_id, {
+          event:     'shop_activated',
+          shop_id:   payment.shop_id,
+          shop_name: shop.name,
+          method:    'bank_transfer',
+        });
+      } catch {}
+    }
 
     // Notify the shop
     await createNotification(

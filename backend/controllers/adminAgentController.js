@@ -10,6 +10,7 @@ async function listAgents(req, res) {
     const { rows } = await db.query(`
       SELECT sa.id, sa.name, sa.email, sa.phone, sa.district, sa.monthly_target,
              sa.is_active, sa.created_at,
+             sa.bank_name, sa.bank_account, sa.bank_branch, sa.account_holder,
              (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = sa.id)                              AS total_customers,
              (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = sa.id AND subscription_status = 'active') AS active_customers,
              (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = sa.id AND status = 'approved')                    AS approved_commissions
@@ -328,7 +329,10 @@ async function listCommissions(req, res) {
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const { rows } = await db.query(`
-      SELECT ac.*, sa.name AS agent_name, s.name AS shop_name
+      SELECT ac.*,
+             sa.name AS agent_name, sa.bank_name, sa.bank_account,
+             sa.bank_branch, sa.account_holder,
+             s.name AS shop_name
         FROM agent_commissions ac
         JOIN sales_agents sa ON sa.id = ac.agent_id
         JOIN shops s ON s.id = ac.shop_id
@@ -663,6 +667,29 @@ async function getShopsMapData(req, res) {
   }
 }
 
+// ── PUT /api/admin/agents/:id/bank-details ────────────────────
+async function updateAgentBankDetails(req, res) {
+  const agentId = parseInt(req.params.id, 10);
+  const { bank_name, bank_account, bank_branch, account_holder } = req.body;
+  try {
+    const { rows } = await db.query(
+      `UPDATE sales_agents
+          SET bank_name      = COALESCE($1, bank_name),
+              bank_account   = COALESCE($2, bank_account),
+              bank_branch    = COALESCE($3, bank_branch),
+              account_holder = COALESCE($4, account_holder)
+        WHERE id = $5
+        RETURNING id, bank_name, bank_account, bank_branch, account_holder`,
+      [bank_name || null, bank_account || null, bank_branch || null, account_holder || null, agentId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Agent not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('updateAgentBankDetails error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
   listPendingPayments, listAllPayments, getFraudSummary,
@@ -672,4 +699,5 @@ module.exports = {
   generateInviteToken, listPendingRegistrations, getAgentDocuments,
   approveAgentRegistration, rejectAgentRegistration, listInviteTokens,
   saveSignedAgreementUrl, getShopsByAgent, getShopsMapData,
+  updateAgentBankDetails,
 };

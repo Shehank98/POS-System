@@ -6,6 +6,9 @@ const sessions = new Map();
 // Shop-level subscriptions for QR payment events: shopId -> Set<ws>
 const shopSubscriptions = new Map();
 
+// Agent-level subscriptions for activation/commission events: agentId -> Set<ws>
+const agentSubscriptions = new Map();
+
 function generateCode() {
   let code;
   do {
@@ -74,6 +77,13 @@ function setupWebSocket(server) {
         ws._shopId = shopId;
         if (!shopSubscriptions.has(shopId)) shopSubscriptions.set(shopId, new Set());
         shopSubscriptions.get(shopId).add(ws);
+
+      // ── Agent subscribes to activation/commission events ─────
+      } else if (msg.type === 'subscribe_agent' && msg.agentId) {
+        const agentId = String(msg.agentId);
+        ws._agentId = agentId;
+        if (!agentSubscriptions.has(agentId)) agentSubscriptions.set(agentId, new Set());
+        agentSubscriptions.get(agentId).add(ws);
       }
     });
 
@@ -81,6 +91,11 @@ function setupWebSocket(server) {
       // Clean up shop subscription
       if (ws._shopId) {
         const subs = shopSubscriptions.get(ws._shopId);
+        if (subs) subs.delete(ws);
+      }
+      // Clean up agent subscription
+      if (ws._agentId) {
+        const subs = agentSubscriptions.get(ws._agentId);
         if (subs) subs.delete(ws);
       }
 
@@ -119,4 +134,15 @@ function notifyShopQRPayment(shopId, data) {
   });
 }
 
-module.exports = { setupWebSocket, notifyShopQRPayment };
+function notifyAgent(agentId, data) {
+  const subs = agentSubscriptions.get(String(agentId));
+  if (!subs) return;
+  const msg = JSON.stringify({ type: 'agent_event', ...data });
+  subs.forEach((ws) => {
+    if (ws.readyState === 1) {
+      try { ws.send(msg); } catch {}
+    }
+  });
+}
+
+module.exports = { setupWebSocket, notifyShopQRPayment, notifyAgent };

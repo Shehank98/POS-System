@@ -56,6 +56,7 @@ router.put ('/notifications/:id/read',                  notifCtrl.markAdminNotif
 router.get ('/agents',                      agentCtrl.listAgents);
 router.post('/agents',                      agentCtrl.createAgent);
 router.put ('/agents/:id',                  agentCtrl.updateAgent);
+router.put ('/agents/:id/bank-details',     agentCtrl.updateAgentBankDetails);
 router.get ('/agents/:id/customers',        agentCtrl.getAgentCustomers);
 
 // Agent payment submissions
