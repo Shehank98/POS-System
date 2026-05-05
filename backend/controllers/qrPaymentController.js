@@ -3,6 +3,7 @@ const db             = require('../config/database');
 const helapos        = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
 const { sendToTopic } = require('../utils/fcm');
+const { fulfillBillingPayment } = require('./shopPaymentController');
 
 // Prevent hammering HelaPOS — at most one getSaleStatus call per session per 12 s.
 // Key: reference (our UUID), Value: timestamp of last HelaPOS call.
@@ -112,7 +113,7 @@ async function handleWebhook(req, res) {
     // HelaPOS sends their internal qr_reference as the webhook "reference" field,
     // NOT the UUID we passed as "r". Match on either column.
     const { rows } = await db.query(
-      `SELECT id, shop_id, reference, payment_status
+      `SELECT id, shop_id, reference, qr_reference, payment_status, session_type, billing_proof_id
          FROM qr_payment_sessions
         WHERE reference = $1 OR qr_reference = $1`,
       [ourRef]
@@ -136,6 +137,22 @@ async function handleWebhook(req, res) {
     );
 
     helaposCallCooldown.delete(session.reference);
+
+    // ── Billing QR: activate shop when paid ──────────────────
+    if (session.session_type === 'billing' && payStatus === 2 && session.billing_proof_id) {
+      fulfillBillingPayment(session.billing_proof_id, session.shop_id, session.qr_reference)
+        .catch((e) => console.error('[QR] webhook billing fulfil error:', e.message));
+
+      // Notify the shop frontend via WebSocket so the billing page updates live
+      notifyShopQRPayment(session.shop_id, {
+        reference:      session.reference,
+        payment_status: payStatus,
+        session_type:   'billing',
+      });
+      return; // skip generic POS notification below
+    }
+
+    // ── POS QR: standard notification path ───────────────────
     notifyShopQRPayment(session.shop_id, {
       reference:      session.reference,
       payment_status: payStatus,

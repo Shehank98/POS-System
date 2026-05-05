@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, AlertTriangle, Upload, RefreshCw,
   ShieldCheck, Zap, Clock, Check, X, ChevronRight, Flame,
-  Star, CreditCard, Building2,
+  Star, CreditCard, Building2, QrCode, Smartphone, Banknote,
+  Loader2, WifiOff, PartyPopper,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import { paymentsApi, shopPayApi } from '../api/client';
@@ -408,18 +410,174 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
 
 // ── Main page ─────────────────────────────────────────────────
 // ── Inactive Shop Payment Form ────────────────────────────────
-function InactiveShopBilling({ user }) {
-  const [proofs,     setProofs]     = useState([]);
+// ── HelaPlay QR payment panel ─────────────────────────────────
+function HelaPlayQRPanel({ onPaid }) {
+  const [qrSession,  setQrSession]  = useState(null); // { reference, qr_data, amount, expires_at }
+  const [generating, setGenerating] = useState(false);
+  const [status,     setStatus]     = useState(0);    // 0=pending, 2=paid, -1=failed, -2=expired
+  const [timeLeft,   setTimeLeft]   = useState(null);
+  const pollRef  = useRef(null);
+  const timerRef = useRef(null);
+
+  const clearPolling = useCallback(() => {
+    clearInterval(pollRef.current);
+    clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => () => clearPolling(), [clearPolling]);
+
+  async function generateQR() {
+    setGenerating(true);
+    setStatus(0);
+    clearPolling();
+    try {
+      const { data } = await shopPayApi.generateBillingQR();
+      setQrSession(data);
+      startPolling(data.reference, data.expires_at);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to generate QR. Check system configuration.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function startPolling(reference, expiresAt) {
+    // Countdown timer
+    timerRef.current = setInterval(() => {
+      const secs = Math.max(0, Math.round((new Date(expiresAt) - Date.now()) / 1000));
+      setTimeLeft(secs);
+      if (secs === 0) clearPolling();
+    }, 1000);
+
+    // Poll for payment status every 3s
+    pollRef.current = setInterval(async () => {
+      try {
+        const { data } = await shopPayApi.billingQRStatus(reference);
+        const ps = data.payment_status;
+        if (ps !== 0) {
+          setStatus(ps);
+          clearPolling();
+          if (ps === 2) {
+            // Small delay then reload so subscription guard re-evaluates
+            setTimeout(() => { onPaid(); }, 2500);
+          }
+        }
+      } catch { /* silent — keep polling */ }
+    }, 3000);
+  }
+
+  const fmtTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const expired = timeLeft === 0 || status === -2;
+
+  if (status === 2) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8 text-center">
+        <PartyPopper className="w-14 h-14 text-green-500" />
+        <p className="text-xl font-bold text-green-700">Payment Confirmed!</p>
+        <p className="text-sm text-gray-500">Your account is being activated — refreshing…</p>
+        <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (status === -1) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <XCircle className="w-12 h-12 text-red-400" />
+        <p className="font-semibold text-red-600">Payment Failed</p>
+        <button onClick={generateQR}
+          className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!qrSession) {
+    return (
+      <div className="space-y-5">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-1">
+          <p className="font-semibold flex items-center gap-1.5"><Smartphone className="w-4 h-4" /> How to pay with HelaPlay</p>
+          <ol className="list-decimal list-inside space-y-1 text-blue-700 mt-2">
+            <li>Tap "Generate QR Code" below</li>
+            <li>Open your HelaPlay / LankaQR mobile app</li>
+            <li>Scan the QR code displayed on screen</li>
+            <li>Confirm the payment of <strong>LKR 2,500</strong></li>
+            <li>Your account activates instantly upon confirmation</li>
+          </ol>
+        </div>
+        <button
+          onClick={generateQR}
+          disabled={generating}
+          className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold
+                     flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          {generating
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating QR…</>
+            : <><QrCode className="w-5 h-5" /> Generate QR Code — LKR 2,500</>}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* QR code box */}
+      <div className="flex flex-col items-center gap-3">
+        <div className={`p-3 bg-white rounded-2xl border-2 shadow-sm transition-opacity
+                         ${expired ? 'opacity-30 border-red-300' : 'border-primary-300'}`}>
+          <QRCodeSVG value={qrSession.qr_data} size={220} level="M" includeMargin />
+        </div>
+
+        {/* Timer */}
+        {!expired && timeLeft !== null && (
+          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-600">
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span>Expires in <span className="font-bold text-amber-600">{fmtTime(timeLeft)}</span></span>
+          </div>
+        )}
+
+        {expired && (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-red-500 font-medium flex items-center gap-1.5">
+              <WifiOff className="w-4 h-4" /> QR code expired
+            </p>
+            <button onClick={generateQR}
+              className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 flex items-center gap-1.5">
+              <RefreshCw className="w-4 h-4" /> Generate New QR
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Amount + instructions */}
+      <div className="bg-gray-50 rounded-xl p-4 text-center space-y-1">
+        <p className="text-2xl font-black text-gray-900">LKR 2,500</p>
+        <p className="text-xs text-gray-500">Scan with HelaPlay or any LankaQR-compatible app</p>
+      </div>
+
+      {/* Polling indicator */}
+      {!expired && (
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          Waiting for payment confirmation…
+        </div>
+      )}
+
+      <button onClick={generateQR} disabled={generating}
+        className="w-full py-2 border border-gray-300 text-gray-600 rounded-xl text-sm hover:bg-gray-50 flex items-center justify-center gap-2">
+        <RefreshCw className="w-4 h-4" /> Regenerate QR
+      </button>
+    </div>
+  );
+}
+
+// ── Bank transfer panel ───────────────────────────────────────
+function BankTransferPanel({ user, onProofsChange }) {
   const [fileData,   setFileData]   = useState(null);
   const [fileName,   setFileName]   = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef(null);
-
-  useEffect(() => {
-    shopPayApi.myProofs()
-      .then(({ data }) => setProofs(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, []);
 
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
@@ -440,8 +598,7 @@ function InactiveShopBilling({ user }) {
       setFileData(null);
       setFileName('');
       if (fileRef.current) fileRef.current.value = '';
-      const { data } = await shopPayApi.myProofs();
-      setProofs(Array.isArray(data) ? data : []);
+      onProofsChange?.();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to submit proof');
     } finally {
@@ -449,57 +606,112 @@ function InactiveShopBilling({ user }) {
     }
   }
 
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Transfer <strong>LKR 2,500</strong> to the company bank account and upload the receipt below.
+        Your account will be activated once an admin verifies the payment.
+      </p>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 space-y-1">
+        <p className="font-semibold text-gray-800">Bank Transfer Details</p>
+        <p>Bank: <strong>Contact your agent for bank details</strong></p>
+        <p>Amount: <strong>LKR 2,500.00</strong></p>
+        <p>Reference: <strong>{user?.shop_reference_id || 'Your Shop ID'}</strong></p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div
+          onClick={() => fileRef.current?.click()}
+          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6
+                      cursor-pointer transition-colors
+                      ${fileData ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-primary-400 hover:bg-primary-50'}`}
+        >
+          <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf" onChange={handleFileChange} />
+          {fileData ? (
+            <><CheckCircle2 className="w-8 h-8 text-green-500 mb-2" /><p className="text-sm text-green-700 font-medium">{fileName}</p></>
+          ) : (
+            <><Upload className="w-8 h-8 text-gray-400 mb-2" /><p className="text-sm text-gray-500">Click to upload bank slip</p><p className="text-xs text-gray-400">JPG, PNG, or PDF · max 8MB</p></>
+          )}
+        </div>
+        <button type="submit" disabled={!fileData || submitting}
+          className="w-full py-3 bg-green-700 hover:bg-green-800 text-white rounded-xl font-semibold
+                     disabled:opacity-50 flex items-center justify-center gap-2">
+          {submitting
+            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting…</>
+            : <><Upload className="w-4 h-4" /> Submit Payment Proof</>}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function InactiveShopBilling({ user }) {
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const [tab,    setTab]    = useState('qr'); // 'qr' | 'bank'
+  const [proofs, setProofs] = useState([]);
+
+  useEffect(() => {
+    shopPayApi.myProofs()
+      .then(({ data }) => setProofs(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  async function reloadProofs() {
+    try { const { data } = await shopPayApi.myProofs(); setProofs(Array.isArray(data) ? data : []); } catch { /* noop */ }
+  }
+
+  async function handlePaid() {
+    // Reload user so activation_status updates and SubscriptionGuard lifts
+    try { await refreshUser(); } catch { /* noop */ }
+    window.location.reload();
+  }
+
   const statusColor = { pending: 'text-yellow-600', verified: 'text-green-600', rejected: 'text-red-600' };
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
+
       {/* Banner */}
-      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 text-center">
-        <AlertTriangle className="w-10 h-10 text-orange-500 mx-auto mb-3" />
-        <h2 className="text-lg font-bold text-orange-900 mb-2">Account Activation Required</h2>
-        <p className="text-sm text-orange-700 mb-1">
-          Your shop account is currently <strong>inactive</strong>.
-          To activate it, please pay <strong>LKR 2,500</strong> for the first month and upload the payment slip below.
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
+        <AlertTriangle className="w-9 h-9 text-amber-500 mx-auto mb-2" />
+        <h2 className="text-lg font-bold text-amber-900">Account Activation Required</h2>
+        <p className="text-sm text-amber-700 mt-1">
+          Pay <strong>LKR 2,500</strong> to activate your account and access all features.
         </p>
-        <p className="text-xs text-orange-500">Your account will be activated once the payment is verified by admin.</p>
       </div>
 
-      {/* Upload form */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-        <h3 className="font-bold text-gray-800">Upload Payment Proof</h3>
-        <p className="text-sm text-gray-500">
-          Transfer <strong>LKR 2,500</strong> to the company bank account and upload the bank transfer receipt here.
-        </p>
-
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 space-y-1">
-          <p className="font-semibold text-gray-800">Bank Transfer Details</p>
-          <p>Bank: <strong>Contact your agent for bank details</strong></p>
-          <p>Amount: <strong>LKR 2,500.00</strong></p>
-          <p>Reference: <strong>{user?.shop_reference_id || 'Your Shop ID'}</strong></p>
+      {/* Payment method tabs */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setTab('qr')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors
+              ${tab === 'qr'
+                ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-600'
+                : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <QrCode className="w-4 h-4" /> HelaPlay QR
+            <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">INSTANT</span>
+          </button>
+          <button
+            onClick={() => setTab('bank')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors
+              ${tab === 'bank'
+                ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-600'
+                : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <Banknote className="w-4 h-4" /> Bank Transfer
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Slip / Receipt *</label>
-            <div
-              onClick={() => fileRef.current?.click()}
-              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors
-                ${fileData ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-green-400 hover:bg-green-50'}`}
-            >
-              <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf" onChange={handleFileChange} />
-              {fileData ? (
-                <><CheckCircle2 className="w-8 h-8 text-green-500 mb-2" /><p className="text-sm text-green-700 font-medium">{fileName}</p></>
-              ) : (
-                <><Upload className="w-8 h-8 text-gray-400 mb-2" /><p className="text-sm text-gray-500">Click to upload bank slip</p><p className="text-xs text-gray-400">JPG, PNG, or PDF · max 8MB</p></>
-              )}
-            </div>
-          </div>
-
-          <button type="submit" disabled={!fileData || submitting}
-            className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">
-            {submitting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting…</> : <><Upload className="w-4 h-4" /> Submit Payment Proof</>}
-          </button>
-        </form>
+        {/* Tab content */}
+        <div className="p-5">
+          {tab === 'qr'
+            ? <HelaPlayQRPanel onPaid={handlePaid} />
+            : <BankTransferPanel user={user} onProofsChange={reloadProofs} />}
+        </div>
       </div>
 
       {/* Previous submissions */}
@@ -510,12 +722,14 @@ function InactiveShopBilling({ user }) {
             {proofs.map((p) => (
               <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
                 <div>
-                  <p className="font-medium text-gray-700">LKR {Number(p.amount || 0).toLocaleString()}</p>
+                  <p className="font-medium text-gray-700 capitalize">
+                    {p.payment_method === 'helaPay' ? '⚡ HelaPlay QR' : '🏦 Bank Transfer'} — LKR {Number(p.amount || 0).toLocaleString()}
+                  </p>
                   <p className="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString()}</p>
-                  {p.admin_note && <p className="text-xs text-red-500 mt-0.5">Admin: {p.admin_note}</p>}
+                  {p.admin_note && <p className="text-xs text-red-500 mt-0.5">Note: {p.admin_note}</p>}
                 </div>
                 <span className={`text-xs font-semibold capitalize ${statusColor[p.status] || 'text-gray-500'}`}>
-                  {p.status}
+                  {p.status === 'pending' && p.payment_method === 'helaPay' ? '⏳ Pending' : p.status}
                 </span>
               </div>
             ))}

@@ -375,8 +375,10 @@ export const adminApi = {
 
 // ── Shop payment proofs (shop owner) ─────────────────────────
 export const shopPayApi = {
-  uploadProof: (data)  => client.post('/shop-payments/upload-proof', data),
-  myProofs:    ()      => client.get('/shop-payments/my-proofs'),
+  uploadProof:          (data)      => client.post('/shop-payments/upload-proof', data),
+  myProofs:             ()          => client.get('/shop-payments/my-proofs'),
+  generateBillingQR:    ()          => client.post('/shop-payments/generate-billing-qr'),
+  billingQRStatus:      (reference) => client.get(`/shop-payments/billing-qr-status/${reference}`),
 };
 
 export default client;

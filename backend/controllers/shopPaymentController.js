@@ -1,5 +1,9 @@
-const db = require('../config/database');
+const { randomUUID } = require('crypto');
+const db             = require('../config/database');
 const { uploadFile } = require('../utils/storageService');
+const sysHelaPOS     = require('../services/systemHelaposService');
+
+const BILLING_QR_COOLDOWN = new Map(); // reference → timestamp of last status check
 
 // ── POST /api/shop-payments/upload-proof ─────────────────────
 // Shop owner uploads a payment proof (bank slip photo)
@@ -234,6 +238,209 @@ async function adminVerifyHelaPay(req, res) {
   }
 }
 
+// ── POST /api/shop-payments/generate-billing-qr ──────────────
+// Shop owner generates a HelaPOS QR code to pay the activation fee
+async function generateBillingQR(req, res) {
+  const shopId = req.user.shop_id;
+
+  // Only inactive shops need to pay via this endpoint
+  const { rows: shopRows } = await db.query(
+    'SELECT activation_status, shop_reference_id, onboarded_by_agent_id FROM shops WHERE id = $1',
+    [shopId]
+  );
+  if (!shopRows.length) return res.status(404).json({ error: 'Shop not found' });
+
+  const shop = shopRows[0];
+  if (shop.activation_status === 'active') {
+    return res.status(400).json({ error: 'Shop is already active' });
+  }
+
+  // Cancel any existing pending billing QR for this shop
+  await db.query(
+    `UPDATE qr_payment_sessions
+        SET payment_status = -3  -- cancelled
+      WHERE shop_id = $1 AND session_type = 'billing' AND payment_status = 0`,
+    [shopId]
+  );
+
+  const amount    = 2500; // LKR 2500 activation fee
+  const reference = randomUUID();
+
+  try {
+    const { qr_data, qr_reference } = await sysHelaPOS.generateBillingQR(reference, amount);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+    // Create a shop_payment_proofs record (pending, helaPay method)
+    const { rows: proofRows } = await db.query(
+      `INSERT INTO shop_payment_proofs
+         (shop_id, agent_id, amount, payment_method, qr_reference, month_paid_for, status)
+       VALUES ($1, $2, $3, 'helaPay', $4, DATE_TRUNC('month', NOW()), 'pending')
+       RETURNING id`,
+      [shopId, shop.onboarded_by_agent_id || null, amount, qr_reference]
+    );
+    const proofId = proofRows[0].id;
+
+    // Create QR session linked to proof
+    await db.query(
+      `INSERT INTO qr_payment_sessions
+         (shop_id, reference, qr_reference, qr_data, amount, session_type, billing_proof_id, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'billing', $6, $7)`,
+      [shopId, reference, qr_reference, qr_data, amount, proofId, expiresAt]
+    );
+
+    res.json({ reference, qr_data, qr_reference, amount, expires_at: expiresAt });
+  } catch (err) {
+    console.error('[BillingQR] generateBillingQR error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to generate billing QR' });
+  }
+}
+
+// ── GET /api/shop-payments/billing-qr-status/:reference ──────
+// Poll for billing QR payment status (shop-scoped)
+async function getBillingQRStatus(req, res) {
+  const { reference } = req.params;
+  const shopId        = req.user.shop_id;
+
+  try {
+    const { rows } = await db.query(
+      `SELECT id, qr_reference, payment_status, amount, expires_at, billing_proof_id
+         FROM qr_payment_sessions
+        WHERE reference = $1 AND shop_id = $2 AND session_type = 'billing'`,
+      [reference, shopId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const session = rows[0];
+
+    // Settled or expired — return cached state
+    if (session.payment_status !== 0) {
+      return res.json({ payment_status: session.payment_status, amount: session.amount, expires_at: session.expires_at });
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      return res.json({ payment_status: -2, amount: session.amount, expires_at: session.expires_at });
+    }
+
+    // Cooldown: one HelaPOS check per session per 12s
+    const lastCall = BILLING_QR_COOLDOWN.get(reference) || 0;
+    if (Date.now() - lastCall < 12_000) {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+    BILLING_QR_COOLDOWN.set(reference, Date.now());
+
+    try {
+      const { payment_status } = await sysHelaPOS.checkBillingQRStatus(reference, session.qr_reference);
+      if (payment_status === 2 || payment_status === -1) {
+        await db.query(
+          'UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW() WHERE id = $2 AND payment_status = 0',
+          [payment_status, session.id]
+        );
+        // Trigger billing fulfilment if paid
+        if (payment_status === 2 && session.billing_proof_id) {
+          fulfillBillingPayment(session.billing_proof_id, shopId, qr_reference_from_session(session)).catch(
+            (e) => console.error('[BillingQR] fulfil error (from poll):', e.message)
+          );
+        }
+      }
+      return res.json({ payment_status, amount: session.amount, expires_at: session.expires_at });
+    } catch {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+  } catch (err) {
+    console.error('[BillingQR] getBillingQRStatus error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+function qr_reference_from_session(session) {
+  return session.qr_reference || null;
+}
+
+// ── Shared billing fulfilment logic (called from webhook + poll) ──
+// Idempotent: checks proof status before updating, wrapped in transaction
+async function fulfillBillingPayment(proofId, shopId, qrReference) {
+  const { createNotification } = require('./notificationController');
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Lock proof row — bail if already verified (idempotent)
+    const { rows: proofRows } = await client.query(
+      `SELECT * FROM shop_payment_proofs WHERE id = $1 AND status = 'pending' FOR UPDATE`,
+      [proofId]
+    );
+    if (!proofRows.length) {
+      await client.query('ROLLBACK');
+      return; // already processed
+    }
+    const proof = proofRows[0];
+
+    // Mark proof verified
+    await client.query(
+      `UPDATE shop_payment_proofs
+          SET status = 'verified', reviewed_at = NOW(),
+              qr_reference = COALESCE(qr_reference, $1)
+        WHERE id = $2`,
+      [qrReference, proofId]
+    );
+
+    // Activate shop
+    await client.query(
+      `UPDATE shops
+          SET activation_status   = 'active',
+              subscription_status = 'active',
+              subscription_end_date = GREATEST(
+                COALESCE(subscription_end_date, NOW()),
+                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
+              ) + INTERVAL '1 month'
+        WHERE id = $1`,
+      [shopId]
+    );
+
+    // Unlock agent signup commission
+    if (proof.agent_id) {
+      await client.query(
+        `UPDATE agent_commissions
+            SET status = 'approved'
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'signup' AND status = 'locked'`,
+        [proof.agent_id, shopId]
+      );
+
+      // Create monthly recurring commission for this payment
+      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      await client.query(
+        `INSERT INTO agent_commissions
+           (agent_id, shop_id, commission_type, amount, month, status, payment_submission_id)
+         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'locked', NULL)
+         ON CONFLICT DO NOTHING`,
+        [proof.agent_id, shopId, currentMonth]
+      );
+    }
+
+    await client.query('COMMIT');
+    BILLING_QR_COOLDOWN.delete(proofId?.toString());
+
+    // Notify shop owner (non-blocking, outside transaction)
+    try {
+      await createNotification(
+        shopId,
+        'payment_verified',
+        'Payment Confirmed — Account Activated!',
+        'Your HelaPlay QR payment of LKR 2,500 has been confirmed. Your account is now active.',
+        { method: 'helaPay', amount: 2500 }
+      );
+    } catch (e) {
+      console.warn('[BillingQR] notification error:', e.message);
+    }
+
+    console.log(`[BillingQR] Fulfilled billing payment for shop ${shopId}, proof ${proofId}`);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   uploadPaymentProof,
   listMyProofs,
@@ -241,4 +448,7 @@ module.exports = {
   adminVerifyShopPayment,
   adminRejectShopPayment,
   adminVerifyHelaPay,
+  generateBillingQR,
+  getBillingQRStatus,
+  fulfillBillingPayment,
 };
