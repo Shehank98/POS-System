@@ -22,6 +22,7 @@ router.get('/shops/:id',                          ctrl.getShop);
 router.put('/shops/:id',                          ctrl.updateShop);
 router.put('/shops/:id/subscription',             ctrl.updateSubscription);
 router.get('/shops/:id/sales',                    ctrl.getShopSales);
+router.get('/shops/:id/agent-info',               ctrl.getShopAgentInfo);
 router.delete('/shops/:id',                           ctrl.deleteShop);
 router.get('/shops/:id/users',                        ctrl.getShopUsers);
 router.post('/shops/:id/users',                       ctrl.addShopUser);

@@ -6,6 +6,7 @@ import {
   KeyRound, Loader2, BarChart2, TrendingUp, DollarSign,
   ShoppingCart, Package, Trash2, UserPlus, Search,
   Bell, Send, Layers, Edit3, ToggleLeft, ToggleRight,
+  UserCheck, Phone, Mail, MapPin, Wallet, Lock,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -349,7 +350,20 @@ function ShopControlCenter({ shop, onClose, onDone }) {
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deleting,          setDeleting]          = useState(false);
 
+  // Agent Info
+  const [agentInfo,        setAgentInfo]        = useState(null);
+  const [loadingAgentInfo, setLoadingAgentInfo] = useState(false);
+
   const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  useEffect(() => {
+    if (activeTab !== 'agent') return;
+    setLoadingAgentInfo(true);
+    adminApi.getShopAgentInfo(shop.id)
+      .then(({ data }) => setAgentInfo(data))
+      .catch(() => toast.error('Failed to load agent info'))
+      .finally(() => setLoadingAgentInfo(false));
+  }, [activeTab, shop.id]);
 
   useEffect(() => {
     if (activeTab !== 'users') return;
@@ -483,6 +497,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
     { id: 'subscription', label: 'Subscription' },
     { id: 'features',     label: 'Features'     },
     { id: 'users',        label: 'Users'        },
+    { id: 'agent',        label: 'Agent'        },
     { id: 'danger',       label: 'Danger'       },
   ];
 
@@ -748,6 +763,138 @@ function ShopControlCenter({ shop, onClose, onDone }) {
             </div>
           )}
 
+          {/* ── Agent / Onboarded By ── */}
+          {activeTab === 'agent' && (
+            <div className="space-y-4">
+              {loadingAgentInfo && (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              )}
+
+              {!loadingAgentInfo && agentInfo && (
+                <>
+                  {agentInfo.agent_id ? (
+                    <div className="bg-gray-900/60 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <UserCheck className="w-4 h-4 text-primary-400" />
+                        <p className="text-sm font-semibold text-white">Onboarded By</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Agent Name</p>
+                          <p className="text-sm font-medium text-white">{agentInfo.agent_name || '—'}</p>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Agent ID</p>
+                          <p className="text-sm font-medium text-white">#{agentInfo.agent_id}</p>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg p-3 flex items-start gap-2">
+                          <Mail className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-500 mb-0.5">Email</p>
+                            <p className="text-sm text-white truncate">{agentInfo.agent_email || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg p-3 flex items-start gap-2">
+                          <Phone className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Phone</p>
+                            <p className="text-sm text-white">{agentInfo.agent_phone || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg p-3 flex items-start gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">District</p>
+                            <p className="text-sm text-white capitalize">{agentInfo.agent_district || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Onboarded On</p>
+                          <p className="text-sm text-white">{fmtDate(agentInfo.onboarded_at)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          agentInfo.approval_status === 'approved'
+                            ? 'bg-green-900/40 text-green-300'
+                            : agentInfo.approval_status === 'pending'
+                            ? 'bg-yellow-900/40 text-yellow-300'
+                            : 'bg-red-900/40 text-red-300'
+                        }`}>
+                          Agent: {agentInfo.approval_status}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          agentInfo.agent_is_active ? 'bg-green-900/40 text-green-300' : 'bg-gray-700 text-gray-400'
+                        }`}>
+                          {agentInfo.agent_is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      This shop was not onboarded through an agent.
+                    </div>
+                  )}
+
+                  {/* Commission records */}
+                  {agentInfo.commissions && agentInfo.commissions.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-primary-400" />
+                        <p className="text-sm font-semibold text-white">Commission Records</p>
+                      </div>
+                      <div className="overflow-x-auto rounded-xl">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="bg-gray-900/80 text-gray-500">
+                              <th className="px-3 py-2 font-medium">Type</th>
+                              <th className="px-3 py-2 font-medium">Amount</th>
+                              <th className="px-3 py-2 font-medium">Month</th>
+                              <th className="px-3 py-2 font-medium">Status</th>
+                              <th className="px-3 py-2 font-medium">Paid</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {agentInfo.commissions.map((c) => (
+                              <tr key={c.id} className="border-t border-gray-700/50 hover:bg-gray-700/20">
+                                <td className="px-3 py-2 text-gray-300 capitalize">{c.commission_type?.replace(/_/g, ' ') || '—'}</td>
+                                <td className="px-3 py-2 text-white font-medium">LKR {fmtMoney(c.amount)}</td>
+                                <td className="px-3 py-2 text-gray-400">{c.month || '—'}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-2 py-0.5 rounded-full font-medium ${
+                                    c.status === 'paid'     ? 'bg-green-900/40 text-green-300' :
+                                    c.status === 'approved' ? 'bg-blue-900/40 text-blue-300'  :
+                                    c.status === 'locked'   ? 'bg-gray-700 text-gray-400'      :
+                                                              'bg-yellow-900/40 text-yellow-300'
+                                  }`}>
+                                    {c.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-400">{c.paid_at ? fmtDate(c.paid_at) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {agentInfo.agent_id && (!agentInfo.commissions || agentInfo.commissions.length === 0) && (
+                    <p className="text-center text-gray-500 text-xs py-2">No commission records for this shop yet.</p>
+                  )}
+                </>
+              )}
+
+              {!loadingAgentInfo && !agentInfo && (
+                <p className="text-center text-gray-500 text-sm py-8">Failed to load agent info.</p>
+              )}
+            </div>
+          )}
+
           {/* ── Danger Zone ── */}
           {activeTab === 'danger' && (
             <div className="space-y-4">
@@ -807,7 +954,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
         </div>
 
         {/* Footer save — hidden on Users and Danger tabs */}
-        {!['users', 'danger'].includes(activeTab) && (
+        {!['users', 'agent', 'danger'].includes(activeTab) && (
           <div className="flex gap-2 px-5 py-3 border-t border-gray-700 shrink-0">
             <button onClick={onClose}
                     className="flex-1 py-2 text-sm text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">

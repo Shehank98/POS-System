@@ -921,11 +921,43 @@ async function dispatchNotification(req, res) {
   }
 }
 
+// ── GET /api/admin/shops/:id/agent-info ──────────────────────
+async function getShopAgentInfo(req, res) {
+  const shopId = parseInt(req.params.id, 10);
+  try {
+    // Agent details
+    const { rows: shopRows } = await db.query(`
+      SELECT s.onboarded_by_agent_id, s.created_at AS onboarded_at,
+             sa.id AS agent_id, sa.name AS agent_name, sa.email AS agent_email,
+             sa.phone AS agent_phone, sa.district AS agent_district,
+             sa.approval_status, sa.is_active AS agent_is_active
+        FROM shops s
+        LEFT JOIN sales_agents sa ON sa.id = s.onboarded_by_agent_id
+       WHERE s.id = $1
+    `, [shopId]);
+    if (!shopRows.length) return res.status(404).json({ error: 'Shop not found' });
+    const info = shopRows[0];
+
+    // Commissions for this shop
+    const { rows: commissions } = await db.query(`
+      SELECT id, commission_type, amount, status, month, paid_at, created_at
+        FROM agent_commissions
+       WHERE shop_id = $1
+       ORDER BY created_at DESC
+    `, [shopId]);
+
+    res.json({ ...info, commissions });
+  } catch (err) {
+    console.error('getShopAgentInfo error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   adminLogin, getDashboard, getFinancialSummary,
   listShops, createShop, getShop, updateShop, deleteShop,
   getShopUsers, changeUserPassword, addShopUser, deleteShopUser,
-  updateSubscription, getShopSales,
+  updateSubscription, getShopSales, getShopAgentInfo,
   listPayments, verifyPayment, rejectPayment, getPaymentProof,
   getAnalysis,
   getPlans, createPlan, updatePlan, deletePlan,

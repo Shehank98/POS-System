@@ -314,6 +314,7 @@ export const adminApi = {
   getAnalysis:      (params)            => adminClient.get('/admin/analysis',  { params }),
   getAuditLog:      (params)            => adminClient.get('/admin/audit-log', { params }),
   getShopUsers:     (shopId)            => adminClient.get(`/admin/shops/${shopId}/users`),
+  getShopAgentInfo: (shopId)            => adminClient.get(`/admin/shops/${shopId}/agent-info`),
   changeUserPw:     (shopId, userId, pw) => adminClient.put(`/admin/shops/${shopId}/users/${userId}/password`, { new_password: pw }),
   deleteShop:       (id)               => adminClient.delete(`/admin/shops/${id}`, { data: { confirm: 'DELETE' } }),
   addShopUser:      (id, data)         => adminClient.post(`/admin/shops/${id}/users`, data),
