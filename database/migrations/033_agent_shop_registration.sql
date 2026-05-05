@@ -21,9 +21,10 @@ ALTER TABLE sales_agents ADD CONSTRAINT sales_agents_approval_status_check
   CHECK (approval_status IN ('pending','active','rejected'));
 
 -- ── Agent registration invite tokens ─────────────────────────
+-- Token generated in application layer (see adminAgentController.generateInviteToken)
 CREATE TABLE IF NOT EXISTS agent_registration_tokens (
   id         SERIAL PRIMARY KEY,
-  token      VARCHAR(64) NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token      VARCHAR(64) NOT NULL UNIQUE,
   note       TEXT,
   used_at    TIMESTAMPTZ,
   used_by    INT REFERENCES sales_agents(id),

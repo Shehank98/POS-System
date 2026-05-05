@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const db     = require('../config/database');
 const { createAgentNotification, AGENT_TYPES } = require('./notificationController');
 const { recalculateRiskScore } = require('../services/riskScoringService');
@@ -446,12 +447,13 @@ async function setAgentRestriction(req, res) {
 // ── POST /api/admin/generate-agent-invite ────────────────────
 async function generateInviteToken(req, res) {
   const { note } = req.body;
+  const token = crypto.randomBytes(32).toString('hex'); // 64-char hex, no pgcrypto needed
   try {
     const { rows } = await db.query(
-      `INSERT INTO agent_registration_tokens (note)
-       VALUES ($1)
+      `INSERT INTO agent_registration_tokens (token, note)
+       VALUES ($1, $2)
        RETURNING token, note, expires_at, created_at`,
-      [note || null]
+      [token, note || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
