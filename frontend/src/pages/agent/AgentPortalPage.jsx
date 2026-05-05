@@ -457,24 +457,41 @@ function ShopQRModal({ shop, onClose }) {
 }
 
 // ── Shop Registration Form ────────────────────────────────────
+const MAPS_RE = /^https?:\/\/(www\.)?(maps\.google\.|google\.[a-z.]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl)/i;
+
 function ShopRegisterForm({ onDone, onClose }) {
   const [form, setForm] = useState({
     shop_name: '', owner_name: '', contact_number: '',
-    location_lat: '', location_lng: '', location_map_url: '',
+    location_map_url: '',
     br_number: '',
     email: '', username: '', password: '',
     shop_type: 'retail',
   });
-  const [saving, setSaving]   = useState(false);
-  const [result, setResult]   = useState(null);
+  const [mapUrlError, setMapUrlError] = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [result, setResult]           = useState(null);
 
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
-  const fc  = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+  const set = (k) => (e) => {
+    const v = e.target.value;
+    setForm((p) => ({ ...p, [k]: v }));
+    if (k === 'location_map_url') {
+      setMapUrlError(v && !MAPS_RE.test(v) ? 'Please enter a valid Google Maps link' : '');
+    }
+  };
+  const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.shop_name || !form.owner_name || !form.contact_number) {
       toast.error('Shop Name, Owner Name and Contact Number are required');
+      return;
+    }
+    if (!form.location_map_url) {
+      toast.error('Google Maps link is required');
+      return;
+    }
+    if (!MAPS_RE.test(form.location_map_url)) {
+      toast.error('Please enter a valid Google Maps link');
       return;
     }
     if (!form.email || !form.username || !form.password) {
@@ -483,11 +500,7 @@ function ShopRegisterForm({ onDone, onClose }) {
     }
     setSaving(true);
     try {
-      const { data } = await agentApi.registerShop({
-        ...form,
-        location_lat: form.location_lat ? parseFloat(form.location_lat) : undefined,
-        location_lng: form.location_lng ? parseFloat(form.location_lng) : undefined,
-      });
+      const { data } = await agentApi.registerShop(form);
       setResult(data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to register shop');
@@ -565,23 +578,25 @@ function ShopRegisterForm({ onDone, onClose }) {
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3">
+      <fieldset className="space-y-2">
         <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
           <MapPin className="w-3 h-3" /> Location
         </legend>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Google Maps Link (optional)</label>
-          <input value={form.location_map_url} onChange={set('location_map_url')} className={fc} placeholder="https://maps.google.com/..." />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
-            <input type="number" step="any" value={form.location_lat} onChange={set('location_lat')} className={fc} placeholder="6.9271" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
-            <input type="number" step="any" value={form.location_lng} onChange={set('location_lng')} className={fc} placeholder="79.8612" />
-          </div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Google Maps Link <span className="text-red-500">*</span>
+          </label>
+          <input
+            value={form.location_map_url}
+            onChange={set('location_map_url')}
+            required
+            className={`${fc} ${mapUrlError ? 'border-red-400 focus:ring-red-400' : ''}`}
+            placeholder="https://maps.google.com/maps?q=..."
+          />
+          {mapUrlError && <p className="text-xs text-red-500 mt-1">{mapUrlError}</p>}
+          <p className="text-xs text-gray-400 mt-1">
+            Open Google Maps → find the location → tap Share → Copy link
+          </p>
         </div>
       </fieldset>
 
@@ -721,16 +736,16 @@ function ShopsTab() {
                 </div>
 
                 {/* Location */}
-                {(s.location_lat || s.location_map_url) && (
-                  <div className="flex items-center gap-1 mt-2">
-                    <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                    {s.location_map_url ? (
-                      <a href={s.location_map_url} target="_blank" rel="noreferrer"
-                        className="text-xs text-blue-600 underline">View on map</a>
-                    ) : (
-                      <span className="text-xs text-gray-400">{s.location_lat}, {s.location_lng}</span>
-                    )}
-                  </div>
+                {s.location_map_url && (
+                  <a
+                    href={s.location_map_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-800 hover:underline w-fit"
+                  >
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    View on Google Maps
+                  </a>
                 )}
 
                 {s.subscription_end_date && (

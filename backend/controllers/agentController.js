@@ -442,6 +442,13 @@ async function registerShop(req, res) {
   if (!shop_name || !owner_name || !contact_number) {
     return res.status(400).json({ error: 'shop_name, owner_name, and contact_number are required' });
   }
+  if (!location_map_url) {
+    return res.status(400).json({ error: 'Google Maps link is required' });
+  }
+  const MAPS_RE = /^https?:\/\/(www\.)?(maps\.google\.|google\.[a-z.]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl)/i;
+  if (!MAPS_RE.test(location_map_url)) {
+    return res.status(400).json({ error: 'Please provide a valid Google Maps link' });
+  }
   if (!email || !username || !password) {
     return res.status(400).json({ error: 'email, username, and password are required for shop login' });
   }
