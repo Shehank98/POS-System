@@ -4,6 +4,7 @@ const helapos        = require('../services/helaposService');
 const { notifyShopQRPayment } = require('../websocket');
 const { sendToTopic } = require('../utils/fcm');
 const { fulfillBillingPayment } = require('./shopPaymentController');
+const { fulfillAgentDeposit }  = require('./agentController');
 
 // Prevent hammering HelaPOS — at most one getSaleStatus call per session per 12 s.
 // Key: reference (our UUID), Value: timestamp of last HelaPOS call.
@@ -113,7 +114,7 @@ async function handleWebhook(req, res) {
     // HelaPOS sends their internal qr_reference as the webhook "reference" field,
     // NOT the UUID we passed as "r". Match on either column.
     const { rows } = await db.query(
-      `SELECT id, shop_id, reference, qr_reference, payment_status, session_type, billing_proof_id
+      `SELECT id, shop_id, agent_id, reference, qr_reference, payment_status, session_type, billing_proof_id
          FROM qr_payment_sessions
         WHERE reference = $1 OR qr_reference = $1`,
       [ourRef]
@@ -137,6 +138,13 @@ async function handleWebhook(req, res) {
     );
 
     helaposCallCooldown.delete(session.reference);
+
+    // ── Agent deposit QR: credit agent balance ───────────────
+    if (session.session_type === 'agent_deposit' && payStatus === 2 && session.agent_id) {
+      fulfillAgentDeposit(session.id, session.agent_id, session.reference)
+        .catch((e) => console.error('[QR] webhook agent deposit fulfil error:', e.message));
+      return;
+    }
 
     // ── Billing QR: activate shop when paid ──────────────────
     if (session.session_type === 'billing' && payStatus === 2 && session.billing_proof_id) {

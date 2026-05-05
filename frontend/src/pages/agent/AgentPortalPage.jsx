@@ -6,7 +6,9 @@ import {
   User, Building2, Save, Bell, PhoneCall, CalendarClock,
   MapPin, QrCode, Upload, Eye, Copy, FileText, Download,
   Settings, Filter, ChevronUp, Search, Calendar,
+  PartyPopper, Smartphone, BadgeCheck, ArrowDownCircle,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { agentApi } from '../../api/client';
 import useAgentStore from '../../store/agentStore';
@@ -94,6 +96,17 @@ function DashboardTab() {
         <StatCard label="Approved Earn" value={fmtMoney(data.approved_earnings)} icon={Wallet} color="green" />
         <StatCard label="Pending Earn"  value={fmtMoney(data.pending_earnings)}  icon={Lock}   color="yellow" />
       </div>
+
+      {/* Account balance */}
+      {data.account_balance > 0 && (
+        <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-xl p-4 text-white flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-green-200">Account Balance</p>
+            <p className="text-2xl font-bold">{fmtMoney(data.account_balance)}</p>
+          </div>
+          <Wallet className="w-8 h-8 text-green-300 shrink-0" />
+        </div>
+      )}
 
       {/* Monthly target */}
       {data.monthly_target > 0 && (
@@ -869,7 +882,230 @@ function ShopsTab() {
 }
 
 // ── Payments Tab ──────────────────────────────────────────────
+// ── HelaPlay Deposit QR Panel ─────────────────────────────────
+function DepositQRPanel({ onPaid }) {
+  const [qrSession,   setQrSession]   = useState(null);   // { reference, qr_data, expires_at }
+  const [generating,  setGenerating]  = useState(false);
+  const [status,      setStatus]      = useState(0);       // 0=pending 2=paid -1=cancelled -2=expired
+  const [timeLeft,    setTimeLeft]    = useState(0);
+
+  const pollRef      = useRef(null);
+  const countdownRef = useRef(null);
+
+  const clearPolling = useCallback(() => {
+    clearInterval(pollRef.current);
+    clearInterval(countdownRef.current);
+  }, []);
+
+  useEffect(() => () => clearPolling(), [clearPolling]);
+
+  function startPolling(reference, expiresAt) {
+    clearPolling();
+    const expiryMs = new Date(expiresAt).getTime();
+
+    countdownRef.current = setInterval(() => {
+      const left = Math.max(0, Math.ceil((expiryMs - Date.now()) / 1000));
+      setTimeLeft(left);
+      if (left === 0) clearPolling();
+    }, 1000);
+
+    pollRef.current = setInterval(async () => {
+      if (Date.now() >= expiryMs) { clearPolling(); setStatus(-2); return; }
+      try {
+        const { data } = await agentApi.depositStatus(reference);
+        setStatus(data.payment_status);
+        if (data.payment_status === 2) {
+          clearPolling();
+          setTimeout(() => onPaid?.(), 2500);
+        } else if (data.payment_status !== 0) {
+          clearPolling();
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+  }
+
+  async function generateQR() {
+    setGenerating(true);
+    setStatus(0);
+    try {
+      const { data } = await agentApi.generateDepositQR();
+      setQrSession(data);
+      setTimeLeft(Math.ceil((new Date(data.expires_at) - Date.now()) / 1000));
+      startPolling(data.reference, data.expires_at);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to generate QR');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+  const seconds = String(timeLeft % 60).padStart(2, '0');
+
+  // Paid state
+  if (status === 2) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+        <PartyPopper className="w-12 h-12 text-green-500" />
+        <p className="text-lg font-bold text-green-700">Payment Received!</p>
+        <p className="text-sm text-gray-500">LKR 500 has been credited to your account balance.</p>
+      </div>
+    );
+  }
+
+  // Expired state
+  if (status === -2 || (qrSession && timeLeft === 0)) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <p className="text-sm text-gray-500">QR code expired.</p>
+        <button
+          onClick={generateQR}
+          className="min-h-[44px] px-6 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 transition-colors"
+        >
+          Generate New QR
+        </button>
+      </div>
+    );
+  }
+
+  // Live QR state
+  if (qrSession && qrSession.qr_data) {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm">
+          <QRCodeSVG value={qrSession.qr_data} size={220} level="M" />
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Loader2 className="w-4 h-4 text-green-600 animate-spin shrink-0" />
+          <span className="text-gray-600">Waiting for payment…</span>
+          <span className="font-mono font-semibold text-green-700">{minutes}:{seconds}</span>
+        </div>
+        <p className="text-xs text-gray-400 text-center">Scan with HelaPlay app to pay LKR 2,500</p>
+      </div>
+    );
+  }
+
+  // Initial state
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2 text-sm text-blue-800">
+        <div className="flex items-start gap-2">
+          <Smartphone className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>Open your HelaPlay app and scan the QR code</p>
+        </div>
+        <div className="flex items-start gap-2">
+          <BadgeCheck className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>Pay <strong>LKR 2,500</strong> — LKR 500 will be credited to your balance instantly</p>
+        </div>
+        <div className="flex items-start gap-2">
+          <ArrowDownCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>Your account balance is updated automatically after payment</p>
+        </div>
+      </div>
+      <button
+        onClick={generateQR}
+        disabled={generating}
+        className="w-full min-h-[48px] bg-green-700 hover:bg-green-800 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+      >
+        {generating
+          ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
+          : <><QrCode className="w-4 h-4" /> Generate QR Code — LKR 2,500</>
+        }
+      </button>
+    </div>
+  );
+}
+
+// ── My Account sub-tab ────────────────────────────────────────
+function MyAccountPanel() {
+  const [data,    setData]    = useState({ balance: 0, history: [] });
+  const [loading, setLoading] = useState(true);
+  const [showQR,  setShowQR]  = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: d } = await agentApi.depositHistory();
+      setData(d);
+    } catch { toast.error('Failed to load account data'); }
+    finally  { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  function handlePaid() {
+    setShowQR(false);
+    load();
+  }
+
+  if (loading) return <Spinner />;
+
+  const statusLabel = { pending: 'Pending', completed: 'Completed', failed: 'Failed' };
+  const statusColor = {
+    completed: 'bg-green-100 text-green-800',
+    pending:   'bg-yellow-100 text-yellow-800',
+    failed:    'bg-red-100 text-red-800',
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Balance card */}
+      <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-2xl p-5 text-white">
+        <p className="text-sm text-green-100 mb-1">Account Balance</p>
+        <p className="text-3xl font-bold">{fmtMoney(data.balance)}</p>
+        <p className="text-xs text-green-200 mt-1">Pay 2,500 → receive 500 credit</p>
+      </div>
+
+      {/* Top-up section */}
+      {showQR ? (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-gray-800 text-sm">HelaPlay QR Top-Up</p>
+            <button onClick={() => setShowQR(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+          </div>
+          <DepositQRPanel onPaid={handlePaid} />
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowQR(true)}
+          className="w-full min-h-[48px] border-2 border-dashed border-green-300 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+        >
+          <QrCode className="w-4 h-4" /> Top Up via HelaPlay QR
+        </button>
+      )}
+
+      {/* Deposit history */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Deposit History</p>
+        {data.history.length === 0
+          ? <Empty text="No deposits yet" />
+          : (
+            <div className="space-y-2">
+              {data.history.map((h) => (
+                <div key={h.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{fmtMoney(h.amount_paid)} paid</p>
+                    <p className="text-xs text-green-700 font-medium">+{fmtMoney(h.credited)} credited</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {fmtDate(h.paid_at || h.created_at)} · HelaPlay QR
+                    </p>
+                  </div>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusColor[h.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {statusLabel[h.status] || h.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </div>
+  );
+}
+
 function PaymentsTab() {
+  const [subTab, setSubTab] = useState('shop');  // 'shop' | 'account'
+
   const [payments, setPayments]   = useState([]);
   const [shops, setShops]         = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -891,7 +1127,7 @@ function PaymentsTab() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (subTab === 'shop') load(); }, [load, subTab]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -917,117 +1153,145 @@ function PaymentsTab() {
     }
   }
 
-  if (loading) return <Spinner />;
-
   const payStatusLabel = { pending_verification:'Pending', verified:'Verified', rejected:'Rejected' };
 
   return (
     <div className="space-y-4">
-      {/* Header row — stacks on small screens */}
-      <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:justify-between">
-        <h3 className="font-semibold text-gray-700 text-sm">Payment Submissions</h3>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center justify-center gap-1.5 min-h-[44px] px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
-        >
-          <Plus className="w-4 h-4" /> Submit Payment
-        </button>
+      {/* Sub-tab switcher */}
+      <div className="flex rounded-xl border border-gray-200 bg-gray-100 p-1 gap-1">
+        {[
+          { id: 'shop',    label: 'Shop Payments' },
+          { id: 'account', label: 'My Account'    },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`flex-1 min-h-[36px] rounded-lg text-sm font-medium transition-colors ${
+              subTab === t.id
+                ? 'bg-white text-green-800 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Submit form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
-          <h3 className="font-semibold text-yellow-800 text-sm">Submit Cash Payment</h3>
-          <p className="text-xs text-yellow-700">Payment will remain PENDING until admin verifies it.</p>
+      {/* My Account sub-tab */}
+      {subTab === 'account' && <MyAccountPanel />}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Select Shop *</label>
-            <select
-              required
-              value={form.shop_id}
-              onChange={(e) => setForm((p) => ({ ...p, shop_id: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+      {/* Shop Payments sub-tab */}
+      {subTab === 'shop' && (
+        <>
+          {/* Header row */}
+          <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:justify-between">
+            <h3 className="font-semibold text-gray-700 text-sm">Payment Submissions</h3>
+            <button
+              onClick={() => setShowForm((v) => !v)}
+              className="flex items-center justify-center gap-1.5 min-h-[44px] px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
             >
-              <option value="">— Choose shop —</option>
-              {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Amount (LKR) *</label>
-            <input
-              type="number" min="1" step="0.01" required
-              value={form.amount}
-              onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              placeholder="0.00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Payment Date *</label>
-            <input
-              type="date" required
-              max={todayStr()}
-              value={form.payment_date}
-              onChange={(e) => setForm((p) => ({ ...p, payment_date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
-            <textarea
-              rows={2}
-              value={form.notes}
-              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={() => setShowForm(false)}
-              className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit'}
+              <Plus className="w-4 h-4" /> Submit Payment
             </button>
           </div>
-        </form>
-      )}
 
-      {/* Payments list */}
-      {payments.length === 0
-        ? <Empty text="No payment submissions yet" />
-        : (
-          <div className="space-y-2">
-            {payments.map((p) => (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{p.shop_name}</p>
-                    <p className="text-sm font-bold text-green-700 mt-0.5">{fmtMoney(p.amount)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {p.payment_method?.toUpperCase()} · {fmtDate(p.payment_date)}
-                    </p>
-                  </div>
-                  <StatusBadge
-                    status={p.status}
-                    label={payStatusLabel[p.status] || p.status}
-                  />
-                </div>
-                {p.admin_note && (
-                  <p className="text-xs text-red-600 mt-2 border-t border-red-100 pt-2">
-                    Admin note: {p.admin_note}
-                  </p>
-                )}
+          {/* Submit form */}
+          {showForm && (
+            <form onSubmit={handleSubmit} className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
+              <h3 className="font-semibold text-yellow-800 text-sm">Submit Cash Payment</h3>
+              <p className="text-xs text-yellow-700">Payment will remain PENDING until admin verifies it.</p>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Select Shop *</label>
+                <select
+                  required
+                  value={form.shop_id}
+                  onChange={(e) => setForm((p) => ({ ...p, shop_id: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">— Choose shop —</option>
+                  {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
-            ))}
-          </div>
-        )
-      }
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Amount (LKR) *</label>
+                <input
+                  type="number" min="1" step="0.01" required
+                  value={form.amount}
+                  onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Date *</label>
+                <input
+                  type="date" required
+                  max={todayStr()}
+                  value={form.payment_date}
+                  onChange={(e) => setForm((p) => ({ ...p, payment_date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
+                <textarea
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving}
+                  className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+                  {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Payments list */}
+          {loading
+            ? <Spinner />
+            : payments.length === 0
+            ? <Empty text="No payment submissions yet" />
+            : (
+              <div className="space-y-2">
+                {payments.map((p) => (
+                  <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{p.shop_name}</p>
+                        <p className="text-sm font-bold text-green-700 mt-0.5">{fmtMoney(p.amount)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {p.payment_method?.toUpperCase()} · {fmtDate(p.payment_date)}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={p.status}
+                        label={payStatusLabel[p.status] || p.status}
+                      />
+                    </div>
+                    {p.admin_note && (
+                      <p className="text-xs text-red-600 mt-2 border-t border-red-100 pt-2">
+                        Admin note: {p.admin_note}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          }
+        </>
+      )}
     </div>
   );
 }

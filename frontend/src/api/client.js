@@ -282,6 +282,9 @@ export const agentApi = {
   renewals:             ()        => agentClient.get('/agents/me/renewals'),
   subscriptions:        ()        => agentClient.get('/agents/me/subscriptions'),
   saveShopNote:         (shopId, note) => agentClient.put(`/agents/me/shops/${shopId}/note`, { note }),
+  generateDepositQR:    ()        => agentClient.post('/agents/me/deposit/generate-qr'),
+  depositStatus:        (ref)     => agentClient.get(`/agents/me/deposit/status/${ref}`),
+  depositHistory:       ()        => agentClient.get('/agents/me/deposit/history'),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────

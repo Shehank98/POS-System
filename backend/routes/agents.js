@@ -34,6 +34,11 @@ router.put ('/me/bank-details',                  ctrl.updateBankDetails);
 router.get ('/me/renewals',                      ctrl.getRenewals);
 router.get ('/me/subscriptions',                 ctrl.getSubscriptions);
 router.put ('/me/shops/:shopId/note',            ctrl.saveShopNote);
+
+// Agent self-payment / deposit
+router.post('/me/deposit/generate-qr',           ctrl.generateDepositQR);
+router.get ('/me/deposit/status/:reference',     ctrl.getDepositQRStatus);
+router.get ('/me/deposit/history',               ctrl.getDepositHistory);
 router.get ('/me/plans',                         ctrl.listPlans);
 
 // Notifications

@@ -46,7 +46,8 @@ async function getDashboard(req, res) {
         (SELECT COUNT(*)                FROM agent_payment_submissions WHERE agent_id = $1 AND status = 'pending_verification') AS pending_submissions,
         (SELECT monthly_target          FROM sales_agents      WHERE id = $1)                                                  AS monthly_target,
         (SELECT total_collected         FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_collected,
-        (SELECT total_verified          FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_verified
+        (SELECT total_verified          FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_verified,
+        (SELECT COALESCE(balance,0)     FROM agent_wallet      WHERE agent_id = $1)                                            AS account_balance
     `, [agentId]);
 
     const { rows: expiring } = await db.query(`
@@ -744,10 +745,182 @@ async function saveShopNote(req, res) {
   }
 }
 
+// ── Agent deposit / self-payment ──────────────────────────────
+const { randomUUID } = require('crypto');
+const sysHelaPOS     = require('../services/systemHelaposService');
+
+const DEPOSIT_AMOUNT  = 2500;
+const DEPOSIT_CREDIT  = 500;
+const DEPOSIT_COOLDOWN = new Map(); // reference → last-poll timestamp
+
+// POST /api/agents/me/deposit/generate-qr
+async function generateDepositQR(req, res) {
+  const agentId = req.agent.id;
+  try {
+    // Cancel any existing pending deposit session for this agent
+    await db.query(
+      `UPDATE qr_payment_sessions
+          SET payment_status = -1, updated_at = NOW()
+        WHERE agent_id = $1 AND session_type = 'agent_deposit' AND payment_status = 0`,
+      [agentId]
+    );
+
+    const reference = randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    const { qr_data, qr_reference } = await sysHelaPOS.generateBillingQR(reference, DEPOSIT_AMOUNT);
+
+    // Create QR session (no shop_id for agent deposits)
+    await db.query(
+      `INSERT INTO qr_payment_sessions
+         (agent_id, reference, qr_reference, qr_data, amount, session_type, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'agent_deposit', $6)`,
+      [agentId, reference, qr_reference, qr_data, DEPOSIT_AMOUNT, expiresAt]
+    );
+
+    // Create pending self-payment record
+    await db.query(
+      `INSERT INTO agent_self_payments (agent_id, amount_paid, credited, reference, status)
+       VALUES ($1, $2, $3, $4, 'pending')
+       ON CONFLICT (reference) DO NOTHING`,
+      [agentId, DEPOSIT_AMOUNT, DEPOSIT_CREDIT, reference]
+    );
+
+    // Ensure wallet row exists
+    await db.query(
+      `INSERT INTO agent_wallet (agent_id) VALUES ($1) ON CONFLICT (agent_id) DO NOTHING`,
+      [agentId]
+    );
+
+    res.json({ reference, qr_data, expires_at: expiresAt, amount: DEPOSIT_AMOUNT });
+  } catch (err) {
+    console.error('generateDepositQR error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate QR' });
+  }
+}
+
+// GET /api/agents/me/deposit/status/:reference
+async function getDepositQRStatus(req, res) {
+  const agentId   = req.agent.id;
+  const { reference } = req.params;
+  try {
+    const { rows } = await db.query(
+      `SELECT id, reference, qr_reference, payment_status, expires_at, amount
+         FROM qr_payment_sessions
+        WHERE reference = $1 AND agent_id = $2 AND session_type = 'agent_deposit'`,
+      [reference, agentId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const session = rows[0];
+
+    if (session.payment_status !== 0) {
+      return res.json({ payment_status: session.payment_status, amount: session.amount });
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      return res.json({ payment_status: -2, amount: session.amount });
+    }
+
+    // Cooldown: one HelaPOS call per 12s
+    const lastCall = DEPOSIT_COOLDOWN.get(reference) || 0;
+    if (Date.now() - lastCall < 12_000) {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+    DEPOSIT_COOLDOWN.set(reference, Date.now());
+
+    try {
+      const { payment_status } = await sysHelaPOS.checkBillingQRStatus(reference, session.qr_reference);
+      if (payment_status === 2) {
+        await fulfillAgentDeposit(session.id, agentId, reference);
+      }
+      return res.json({ payment_status, amount: session.amount, expires_at: session.expires_at });
+    } catch {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+  } catch (err) {
+    console.error('getDepositQRStatus error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// GET /api/agents/me/deposit/history
+async function getDepositHistory(req, res) {
+  const agentId = req.agent.id;
+  try {
+    const [{ rows: history }, { rows: wallet }] = await Promise.all([
+      db.query(
+        `SELECT id, amount_paid, credited, reference, status, paid_at, created_at
+           FROM agent_self_payments
+          WHERE agent_id = $1
+          ORDER BY created_at DESC
+          LIMIT 50`,
+        [agentId]
+      ),
+      db.query(
+        `SELECT COALESCE(balance, 0) AS balance FROM agent_wallet WHERE agent_id = $1`,
+        [agentId]
+      ),
+    ]);
+    res.json({ balance: parseFloat(wallet[0]?.balance || 0), history });
+  } catch (err) {
+    console.error('getDepositHistory error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// Idempotent fulfillment — called by both webhook and status poll
+async function fulfillAgentDeposit(sessionId, agentId, reference) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Lock and check status atomically
+    const { rows } = await client.query(
+      `SELECT id, status FROM agent_self_payments WHERE reference = $1 FOR UPDATE`,
+      [reference]
+    );
+    if (!rows.length || rows[0].status !== 'pending') {
+      await client.query('ROLLBACK');
+      return; // already fulfilled or missing
+    }
+
+    // Mark payment completed
+    await client.query(
+      `UPDATE agent_self_payments SET status = 'completed', paid_at = NOW() WHERE reference = $1`,
+      [reference]
+    );
+
+    // Credit balance to agent wallet (upsert-safe)
+    await client.query(
+      `INSERT INTO agent_wallet (agent_id, balance, updated_at)
+            VALUES ($1, $2, NOW())
+       ON CONFLICT (agent_id)
+         DO UPDATE SET balance    = agent_wallet.balance + $2,
+                       updated_at = NOW()`,
+      [agentId, DEPOSIT_CREDIT]
+    );
+
+    // Mark QR session as paid
+    await client.query(
+      `UPDATE qr_payment_sessions SET payment_status = 2, updated_at = NOW()
+        WHERE id = $1 AND payment_status = 0`,
+      [sessionId]
+    );
+
+    await client.query('COMMIT');
+    DEPOSIT_COOLDOWN.delete(reference);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
   listPlans,
   uploadShopSelfie, registerShop, listShops, generateShopPaymentQR, listShopPayments,
   getSubscriptions, saveShopNote,
+  generateDepositQR, getDepositQRStatus, getDepositHistory, fulfillAgentDeposit,
 };
