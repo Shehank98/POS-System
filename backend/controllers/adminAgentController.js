@@ -587,6 +587,27 @@ async function saveSignedAgreementUrl(req, res) {
   }
 }
 
+// ── GET /api/admin/shops/map-data ────────────────────────────
+// Returns all shops with location + agent info for the map view
+async function getShopsMapData(req, res) {
+  try {
+    const { rows } = await db.query(`
+      SELECT s.id, s.name, s.owner_name, s.shop_type,
+             s.location_lat, s.location_lng, s.location_map_url,
+             s.shop_reference_id, s.activation_status, s.subscription_status,
+             s.district,
+             sa.id AS agent_id, sa.name AS agent_name, sa.district AS agent_district
+        FROM shops s
+        LEFT JOIN sales_agents sa ON sa.id = s.onboarded_by_agent_id
+       ORDER BY s.name ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('getShopsMapData error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
   listPendingPayments, listAllPayments, getFraudSummary,
@@ -595,5 +616,5 @@ module.exports = {
   listRiskScores, recalculateAgentRisk, setAgentRestriction,
   generateInviteToken, listPendingRegistrations, getAgentDocuments,
   approveAgentRegistration, rejectAgentRegistration, listInviteTokens,
-  saveSignedAgreementUrl,
+  saveSignedAgreementUrl, getShopsMapData,
 };

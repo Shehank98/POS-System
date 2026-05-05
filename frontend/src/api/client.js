@@ -362,6 +362,7 @@ export const adminApi = {
   approveAgent:               (id)     => adminClient.put(`/admin/agents/${id}/approve`),
   rejectAgent:                (id, data) => adminClient.put(`/admin/agents/${id}/reject`, data),
   saveSignedAgreementUrl:     (id, url)  => adminClient.put(`/admin/agents/${id}/signed-agreement`, { url }),
+  shopsMapData:               ()         => adminClient.get('/admin/shops/map-data'),
 
   // Shop payment proofs (activation)
   listShopPayments:       (params)     => adminClient.get('/admin/shop-payments', { params }),
