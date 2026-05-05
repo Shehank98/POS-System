@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Store, CreditCard, Wallet, LogOut,
   TrendingUp, Users, Clock, Lock, Plus, ChevronDown,
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw,
   User, Building2, Save, Bell, PhoneCall, CalendarClock,
+  MapPin, QrCode, Upload, Eye, Copy, FileText, Download,
+  Settings,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { agentApi } from '../../api/client';
@@ -403,20 +405,250 @@ function OnboardWizard({ onDone, onClose }) {
   );
 }
 
+// ── Shop QR Modal ─────────────────────────────────────────────
+function ShopQRModal({ shop, onClose }) {
+  const [qr,       setQr]       = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [proofId,  setProofId]  = useState(null);
+  const [reference, setRef]     = useState('');
+
+  useEffect(() => {
+    agentApi.generateShopQR(shop.id)
+      .then(({ data }) => {
+        setQr(data.qr_data_url);
+        setRef(data.reference);
+        setProofId(data.proof_id);
+      })
+      .catch(() => toast.error('Failed to generate QR code'))
+      .finally(() => setLoading(false));
+  }, [shop.id]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+        <h3 className="font-bold text-gray-900 mb-1">HelaPay QR – {shop.name}</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Ref: <span className="font-mono font-semibold">{shop.shop_reference_id}</span> · LKR 2,500.00
+        </p>
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+          </div>
+        ) : qr ? (
+          <div className="text-center">
+            <img src={qr} alt="Payment QR" className="mx-auto w-56 h-56 border rounded-xl p-2" />
+            <p className="text-xs text-gray-400 mt-2 font-mono break-all">{reference}</p>
+            <p className="text-xs text-green-700 mt-2 font-medium">
+              QR recorded — admin can verify payment once scanned
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-red-500 text-center py-6">Failed to generate QR</p>
+        )}
+        <button
+          onClick={onClose}
+          className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Shop Registration Form ────────────────────────────────────
+function ShopRegisterForm({ onDone, onClose }) {
+  const [form, setForm] = useState({
+    shop_name: '', owner_name: '', contact_number: '',
+    location_lat: '', location_lng: '', location_map_url: '',
+    br_number: '',
+    email: '', username: '', password: '',
+    shop_type: 'retail',
+  });
+  const [saving, setSaving]   = useState(false);
+  const [result, setResult]   = useState(null);
+
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+  const fc  = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.shop_name || !form.owner_name || !form.contact_number) {
+      toast.error('Shop Name, Owner Name and Contact Number are required');
+      return;
+    }
+    if (!form.email || !form.username || !form.password) {
+      toast.error('Shop login credentials are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await agentApi.registerShop({
+        ...form,
+        location_lat: form.location_lat ? parseFloat(form.location_lat) : undefined,
+        location_lng: form.location_lng ? parseFloat(form.location_lng) : undefined,
+      });
+      setResult(data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to register shop');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => toast.success('Copied!'));
+  }
+
+  if (result) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <h3 className="font-bold text-green-800">Shop Registered!</h3>
+        </div>
+        <p className="text-sm text-green-700">
+          Share these credentials with the shop owner. They can log in at{' '}
+          <strong>{window.location.origin}/login</strong>
+        </p>
+
+        <div className="bg-white rounded-xl border border-green-200 p-4 space-y-3">
+          <InfoRow label="Shop Reference" value={result.shop_reference_id} onCopy={() => copyToClipboard(result.shop_reference_id)} />
+          <InfoRow label="Shop Name"      value={result.name} />
+          <InfoRow label="Login Email"    value={result.email}               onCopy={() => copyToClipboard(result.email)} />
+          <InfoRow label="Username"       value={result.generated_username}  onCopy={() => copyToClipboard(result.generated_username)} />
+          <InfoRow label="Password"       value={result.generated_password}  onCopy={() => copyToClipboard(result.generated_password)} />
+          <p className="text-xs text-orange-600 font-medium">
+            Account is INACTIVE until payment of LKR 2,500 is verified by admin.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Close</button>
+          <button onClick={onDone} className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+            Register Another
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+      <h3 className="font-bold text-gray-800">Register New Shop</h3>
+
+      <fieldset className="space-y-3">
+        <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shop Info</legend>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Shop Name *</label>
+          <input value={form.shop_name} onChange={set('shop_name')} required className={fc} placeholder="e.g. Saman's Grocery" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Owner Name *</label>
+          <input value={form.owner_name} onChange={set('owner_name')} required className={fc} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Contact Number *</label>
+          <input value={form.contact_number} onChange={set('contact_number')} required className={fc} placeholder="+94 77 123 4567" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Shop Type</label>
+          <select value={form.shop_type} onChange={set('shop_type')} className={fc}>
+            <option value="retail">Retail</option>
+            <option value="car_wash">Car Wash</option>
+            <option value="clothing">Clothing</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Business Registration No. (optional)</label>
+          <input value={form.br_number} onChange={set('br_number')} className={fc} placeholder="e.g. PV12345" />
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+          <MapPin className="w-3 h-3" /> Location
+        </legend>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Google Maps Link (optional)</label>
+          <input value={form.location_map_url} onChange={set('location_map_url')} className={fc} placeholder="https://maps.google.com/..." />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+            <input type="number" step="any" value={form.location_lat} onChange={set('location_lat')} className={fc} placeholder="6.9271" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+            <input type="number" step="any" value={form.location_lng} onChange={set('location_lng')} className={fc} placeholder="79.8612" />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shop Login Credentials</legend>
+        <p className="text-xs text-gray-400">These will be used by the shop owner to log in.</p>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
+          <input type="email" value={form.email} onChange={set('email')} required className={fc} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Username *</label>
+          <input value={form.username} onChange={set('username')} required className={fc} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Password *</label>
+          <input type="text" value={form.password} onChange={set('password')} required minLength={6} className={fc} placeholder="min 6 characters" />
+        </div>
+      </fieldset>
+
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Registering…</> : 'Register Shop'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function InfoRow({ label, value, onCopy }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-gray-500 shrink-0">{label}</span>
+      <div className="flex items-center gap-1 min-w-0">
+        <span className="text-xs font-mono font-semibold text-gray-800 truncate">{value}</span>
+        {onCopy && (
+          <button onClick={onCopy} className="p-0.5 text-gray-400 hover:text-green-600 shrink-0">
+            <Copy className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Shops Tab ─────────────────────────────────────────────────
 function ShopsTab() {
-  const [shops, setShops]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery]     = useState('');
+  const [shops,    setShops]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [query,    setQuery]    = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [qrShop,   setQrShop]  = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await agentApi.customers();
-      setShops(Array.isArray(data) ? data : data.customers || []);
-    } catch { toast.error('Failed to load shops'); }
-    finally { setLoading(false); }
+      const { data } = await agentApi.shops();
+      setShops(Array.isArray(data) ? data : []);
+    } catch {
+      // Fall back to legacy customers endpoint
+      try {
+        const { data } = await agentApi.customers();
+        setShops(Array.isArray(data) ? data : data.customers || []);
+      } catch { toast.error('Failed to load shops'); }
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -425,14 +657,24 @@ function ShopsTab() {
     !query ||
     s.name?.toLowerCase().includes(query.toLowerCase()) ||
     s.owner_name?.toLowerCase().includes(query.toLowerCase()) ||
-    s.email?.toLowerCase().includes(query.toLowerCase())
+    s.email?.toLowerCase().includes(query.toLowerCase()) ||
+    s.shop_reference_id?.toLowerCase().includes(query.toLowerCase())
   );
 
   if (loading) return <Spinner />;
 
+  const activationBadge = (s) => {
+    if (s.activation_status === 'inactive') {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Inactive – Awaiting Payment</span>;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-4">
-      {/* Search + Onboard */}
+      {qrShop && <ShopQRModal shop={qrShop} onClose={() => setQrShop(null)} />}
+
+      {/* Search + Register */}
       <div className="flex gap-3">
         <input
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -444,13 +686,12 @@ function ShopsTab() {
           onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
         >
-          <Plus className="w-4 h-4" /> Onboard
+          <Plus className="w-4 h-4" /> Register
         </button>
       </div>
 
-      {/* Onboard wizard */}
       {showForm && (
-        <OnboardWizard
+        <ShopRegisterForm
           onDone={() => { setShowForm(false); load(); }}
           onClose={() => setShowForm(false)}
         />
@@ -458,23 +699,58 @@ function ShopsTab() {
 
       {/* Shop list */}
       {filtered.length === 0
-        ? <Empty text={query ? `No results for "${query}"` : 'No shops yet'} />
+        ? <Empty text={query ? `No results for "${query}"` : 'No shops yet. Register your first shop!'} />
         : (
           <div className="space-y-2">
             {filtered.map((s) => (
               <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{s.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-gray-900 truncate">{s.name}</p>
+                      {s.shop_reference_id && (
+                        <span className="text-xs font-mono text-gray-400">{s.shop_reference_id}</span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{s.owner_name}</p>
-                    <p className="text-xs text-gray-400">{s.email}</p>
+                    {s.contact_number && <p className="text-xs text-gray-400">{s.contact_number}</p>}
                   </div>
-                  <StatusBadge status={s.subscription_status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={s.subscription_status} />
+                    {activationBadge(s)}
+                  </div>
                 </div>
+
+                {/* Location */}
+                {(s.location_lat || s.location_map_url) && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <MapPin className="w-3 h-3 text-gray-400" />
+                    {s.location_map_url ? (
+                      <a href={s.location_map_url} target="_blank" rel="noreferrer"
+                        className="text-xs text-blue-600 underline">View on map</a>
+                    ) : (
+                      <span className="text-xs text-gray-400">{s.location_lat}, {s.location_lng}</span>
+                    )}
+                  </div>
+                )}
+
                 {s.subscription_end_date && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    Expires: {fmtDate(s.subscription_end_date)}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Expires: {fmtDate(s.subscription_end_date)}</p>
+                )}
+
+                {/* Actions for inactive shops */}
+                {s.activation_status === 'inactive' && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs text-orange-600 mb-2 font-medium">
+                      Payment required to activate this shop account (LKR 2,500)
+                    </p>
+                    <button
+                      onClick={() => setQrShop(s)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700"
+                    >
+                      <QrCode className="w-3 h-3" /> Generate HelaPay QR
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -720,23 +996,27 @@ function CommissionsTab() {
   );
 }
 
-// ── Profile / Bank Details Tab ────────────────────────────────
+// ── Profile / Settings Tab ────────────────────────────────────
 function ProfileTab() {
   const { agent } = useAgentStore();
+  const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({
     bank_name: '', bank_account: '', bank_branch: '', account_holder: '',
   });
-  const [loaded,  setLoaded]  = useState(false);
-  const [saving,  setSaving]  = useState(false);
+  const [loaded,  setLoaded]     = useState(false);
+  const [saving,  setSaving]     = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const agreementRef = useRef(null);
 
   useEffect(() => {
-    agentApi.me?.()
+    agentApi.me()
       .then(({ data }) => {
+        setProfile(data);
         setForm({
-          bank_name:       data.bank_name       || '',
-          bank_account:    data.bank_account    || '',
-          bank_branch:     data.bank_branch     || '',
-          account_holder:  data.account_holder  || '',
+          bank_name:      data.bank_name      || '',
+          bank_account:   data.bank_account   || '',
+          bank_branch:    data.bank_branch    || '',
+          account_holder: data.account_holder || '',
         });
       })
       .catch(() => {})
@@ -762,53 +1042,161 @@ function ProfileTab() {
     }
   }
 
+  async function handleAgreementUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('File must be under 10MB'); return; }
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          await agentApi.uploadSignedAgreement({ fileData: ev.target.result });
+          toast.success('Signed agreement uploaded');
+          const { data } = await agentApi.me();
+          setProfile(data);
+        } catch {
+          toast.error('Upload failed');
+        } finally {
+          setUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setUploading(false);
+      toast.error('Failed to read file');
+    }
+    if (agreementRef.current) agreementRef.current.value = '';
+  }
+
   if (!loaded) return <Spinner />;
 
-  const fieldCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+  const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+  const approvalColor = {
+    active:   'bg-green-100 text-green-800',
+    pending:  'bg-yellow-100 text-yellow-800',
+    rejected: 'bg-red-100 text-red-800',
+  }[profile?.approval_status || 'active'] || 'bg-gray-100 text-gray-600';
 
   return (
     <div className="space-y-5">
-      {/* Agent info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center shrink-0">
-          <User className="w-6 h-6 text-green-700" />
+      {/* Identity card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          {profile?.agent_photo_url ? (
+            <img src={profile.agent_photo_url} alt="Agent photo"
+              className="w-14 h-14 rounded-full object-cover border-2 border-green-200" />
+          ) : (
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+              <User className="w-7 h-7 text-green-700" />
+            </div>
+          )}
+          <div>
+            <p className="font-bold text-gray-900">{profile?.name || agent?.name}</p>
+            <p className="text-sm text-gray-500">{profile?.email || agent?.email}</p>
+            <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${approvalColor}`}>
+              {profile?.approval_status || 'active'}
+            </span>
+          </div>
         </div>
-        <div>
-          <p className="font-semibold text-gray-900">{agent?.name}</p>
-          <p className="text-sm text-gray-500">{agent?.email}</p>
-          {agent?.district && <p className="text-xs text-gray-400">{agent.district}</p>}
+
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div><p className="text-gray-400">Phone</p><p className="font-medium text-gray-700">{profile?.phone || '—'}</p></div>
+          <div><p className="text-gray-400">District</p><p className="font-medium text-gray-700">{profile?.district || '—'}</p></div>
+          <div><p className="text-gray-400">NIC Number</p><p className="font-medium text-gray-700">{profile?.nic_number || '—'}</p></div>
+          <div><p className="text-gray-400">Driving License</p><p className="font-medium text-gray-700">{profile?.driving_license_number || '—'}</p></div>
+          <div className="col-span-2"><p className="text-gray-400">Member Since</p>
+            <p className="font-medium text-gray-700">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) : '—'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Login credentials display */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Settings className="w-4 h-4 text-blue-700" />
+          <h3 className="font-semibold text-blue-800 text-sm">Account Credentials</h3>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-blue-600">Email / Login</span>
+            <span className="text-xs font-mono font-semibold text-blue-900">{profile?.email || agent?.email}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-blue-600">Portal URL</span>
+            <span className="text-xs font-mono text-blue-900">{window.location.origin}/agent/login</span>
+          </div>
+        </div>
+        <p className="text-xs text-blue-500 mt-2">To change your password, contact your admin.</p>
+      </div>
+
+      {/* Documents */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 className="font-semibold text-gray-800 text-sm mb-3">Uploaded Documents</h3>
+        <div className="space-y-2">
+          {[
+            { label: 'NIC Front',          url: profile?.nic_front_url },
+            { label: 'NIC Back',           url: profile?.nic_back_url },
+            { label: 'Agent Photo',        url: profile?.agent_photo_url },
+            { label: 'Bank Book',          url: profile?.bank_book_url },
+            { label: 'Signed Agreement',   url: profile?.signed_agreement_url },
+          ].map(({ label, url }) => (
+            <div key={label} className="flex items-center justify-between text-xs">
+              <span className="text-gray-500">{label}</span>
+              {url ? (
+                <a href={url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-green-700 font-medium hover:underline">
+                  <Eye className="w-3 h-3" /> View
+                </a>
+              ) : (
+                <span className="text-gray-300">Not uploaded</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Upload signed agreement */}
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500 mb-2">Upload signed agreement (if not done during registration):</p>
+          <input ref={agreementRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleAgreementUpload} />
+          <button
+            onClick={() => agreementRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-60"
+          >
+            {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+            {uploading ? 'Uploading…' : 'Upload Signed Agreement'}
+          </button>
         </div>
       </div>
 
       {/* Bank details form */}
       <form onSubmit={handleSave} className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-green-700" />
           <h3 className="font-semibold text-gray-800 text-sm">Bank Details</h3>
         </div>
-        <p className="text-xs text-gray-500">
-          Bank details are used for commission payouts. Ensure accuracy before saving.
-        </p>
+        <p className="text-xs text-gray-500">Used for commission payouts. Ensure accuracy.</p>
 
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Account Holder Name *</label>
           <input type="text" value={form.account_holder} onChange={set('account_holder')}
-            placeholder="Name as on bank account" className={fieldCls} />
+            placeholder="Name as on bank account" className={fc} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Bank Name *</label>
           <input type="text" value={form.bank_name} onChange={set('bank_name')}
-            placeholder="e.g. Bank of Ceylon" className={fieldCls} />
+            placeholder="e.g. Bank of Ceylon" className={fc} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Account Number *</label>
           <input type="text" value={form.bank_account} onChange={set('bank_account')}
-            placeholder="e.g. 0012345678" className={fieldCls} />
+            placeholder="e.g. 0012345678" className={fc} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
           <input type="text" value={form.bank_branch} onChange={set('bank_branch')}
-            placeholder="e.g. Colombo Main" className={fieldCls} />
+            placeholder="e.g. Colombo Main" className={fc} />
         </div>
 
         <button type="submit" disabled={saving}
@@ -982,7 +1370,7 @@ const TABS = [
   { id: 'renewals',    label: 'Renewals',    icon: CalendarClock,   component: RenewalsTab   },
   { id: 'payments',    label: 'Payments',    icon: CreditCard,      component: PaymentsTab   },
   { id: 'commissions', label: 'Commissions', icon: Wallet,          component: CommissionsTab},
-  { id: 'profile',     label: 'Profile',     icon: User,            component: ProfileTab    },
+  { id: 'profile',     label: 'Settings',    icon: Settings,        component: ProfileTab    },
 ];
 
 // ── Main Portal ───────────────────────────────────────────────

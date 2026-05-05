@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Loader2, MapPin,
   Phone, Mail, CreditCard, Store, Eye, EyeOff, Edit3,
   ToggleLeft, ToggleRight, AlertTriangle, ShieldAlert, Lock, LockOpen,
+  Link2, Copy, FileCheck, QrCode, CheckCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
@@ -507,25 +508,348 @@ function RiskScoresTab({ onAgentUpdated }) {
   );
 }
 
+// ── Agent Document Viewer Modal ───────────────────────────────
+function AgentDocModal({ agentId, onClose }) {
+  const [docs, setDocs]   = useState(null);
+  const [loading, setLd]  = useState(true);
+  const [acting,  setAct] = useState(false);
+  const [reason,  setRsn] = useState('');
+
+  useEffect(() => {
+    adminApi.getAgentDocuments(agentId)
+      .then(({ data }) => setDocs(data))
+      .catch(() => toast.error('Failed to load documents'))
+      .finally(() => setLd(false));
+  }, [agentId]);
+
+  async function approve() {
+    setAct(true);
+    try {
+      await adminApi.approveAgent(agentId);
+      toast.success('Agent approved and activated!');
+      onClose(true);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve');
+    } finally { setAct(false); }
+  }
+
+  async function reject() {
+    if (!reason.trim()) { toast.error('Provide a rejection reason'); return; }
+    setAct(true);
+    try {
+      await adminApi.rejectAgent(agentId, { reason });
+      toast.success('Agent registration rejected');
+      onClose(true);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reject');
+    } finally { setAct(false); }
+  }
+
+  function DocLink({ label, url }) {
+    if (!url) return <p className="text-xs text-gray-500">{label}: <em className="text-gray-400">Not uploaded</em></p>;
+    const isDataUri = url.startsWith('data:');
+    return (
+      <div className="flex items-center justify-between text-xs py-1">
+        <span className="text-gray-400">{label}</span>
+        <a href={url} target="_blank" rel="noreferrer"
+          className="text-indigo-400 underline hover:text-indigo-300 flex items-center gap-1">
+          <Eye className="w-3 h-3" /> {isDataUri ? 'View (inline)' : 'Open'}
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+      <div className="bg-gray-900 rounded-2xl border border-gray-700 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-400" /></div>
+        ) : docs ? (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold text-white">Agent Registration – {docs.name}</h2>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><p className="text-gray-500">Email</p><p className="text-white">{docs.email}</p></div>
+              <div><p className="text-gray-500">Phone</p><p className="text-white">{docs.phone || '—'}</p></div>
+              <div><p className="text-gray-500">NIC</p><p className="text-white">{docs.nic_number || '—'}</p></div>
+              <div><p className="text-gray-500">Driving License</p><p className="text-white">{docs.driving_license_number || '—'}</p></div>
+              <div><p className="text-gray-500">Bank</p><p className="text-white">{docs.bank_name || '—'}</p></div>
+              <div><p className="text-gray-500">Account</p><p className="text-white">{docs.bank_account || '—'}</p></div>
+              <div><p className="text-gray-500">Account Holder</p><p className="text-white">{docs.account_holder || '—'}</p></div>
+              <div><p className="text-gray-500">District</p><p className="text-white">{docs.district || '—'}</p></div>
+            </div>
+
+            <div className="bg-gray-800 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-semibold text-gray-300 mb-2">Documents</p>
+              <DocLink label="NIC Front"          url={docs.nic_front_url} />
+              <DocLink label="NIC Back"           url={docs.nic_back_url} />
+              <DocLink label="Agent Photo"        url={docs.agent_photo_url} />
+              <DocLink label="Bank Book"          url={docs.bank_book_url} />
+              <DocLink label="Signed Agreement"   url={docs.signed_agreement_url} />
+            </div>
+
+            {docs.approval_status === 'pending' && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Rejection reason (required if rejecting)</label>
+                  <input value={reason} onChange={(e) => setRsn(e.target.value)}
+                    placeholder="e.g. Documents unclear, resubmit…"
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={reject} disabled={acting}
+                    className="flex-1 py-2 bg-red-800 hover:bg-red-700 text-red-100 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1">
+                    {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />} Reject
+                  </button>
+                  <button onClick={approve} disabled={acting}
+                    className="flex-1 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1">
+                    {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Approve
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {docs.approval_status !== 'pending' && (
+              <div className={`text-center text-sm font-medium py-2 rounded-lg ${docs.approval_status === 'active' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+                Status: {docs.approval_status}
+                {docs.rejection_reason && <p className="text-xs mt-1 opacity-75">{docs.rejection_reason}</p>}
+              </div>
+            )}
+          </div>
+        ) : <p className="text-gray-400 text-center py-10">Failed to load</p>}
+
+        <button onClick={() => onClose(false)} className="mt-4 w-full py-2 border border-gray-700 rounded-lg text-sm text-gray-400 hover:bg-gray-800">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Invite Token Generator ────────────────────────────────────
+function InviteTokenSection() {
+  const [tokens,  setTokens]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [note,    setNote]    = useState('');
+  const [gen,     setGen]     = useState(false);
+
+  const load = useCallback(() => {
+    adminApi.listInviteTokens()
+      .then(({ data }) => setTokens(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function generate() {
+    setGen(true);
+    try {
+      await adminApi.generateInviteToken({ note });
+      toast.success('Invite link generated');
+      setNote('');
+      load();
+    } catch {
+      toast.error('Failed to generate token');
+    } finally { setGen(false); }
+  }
+
+  function copyLink(token) {
+    const url = `${window.location.origin}/agent/register?token=${token}`;
+    navigator.clipboard.writeText(url).then(() => toast.success('Link copied!'));
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-gray-800 rounded-xl p-4">
+        <h3 className="font-semibold text-white text-sm mb-3">Generate Registration Invite</h3>
+        <div className="flex gap-2">
+          <input value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note (e.g. 'For Colombo region')"
+            className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button onClick={generate} disabled={gen}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-1">
+            {gen ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Generate
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {loading ? <Loader2 className="w-5 h-5 animate-spin text-indigo-400 mx-auto" /> : tokens.map((t) => (
+          <div key={t.id} className="bg-gray-800 rounded-xl p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono text-gray-300 truncate">{t.token}</p>
+                {t.note && <p className="text-xs text-gray-500 mt-0.5">{t.note}</p>}
+                <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                  <span>Expires: {new Date(t.expires_at).toLocaleDateString()}</span>
+                  {t.used_at ? (
+                    <span className="text-orange-400">Used by {t.used_by_name || 'unknown'}</span>
+                  ) : (
+                    <span className="text-green-400">Available</span>
+                  )}
+                </div>
+              </div>
+              {!t.used_at && (
+                <button onClick={() => copyLink(t.token)}
+                  className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-400 hover:text-white shrink-0">
+                  <Copy className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Shop Payment Proofs Tab ───────────────────────────────────
+function ShopPaymentsTab() {
+  const [proofs,   setProofs]   = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [filter,   setFilter]   = useState('pending');
+  const [acting,   setActing]   = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    adminApi.listShopPayments({ status: filter })
+      .then(({ data }) => setProofs(data))
+      .catch(() => toast.error('Failed to load proofs'))
+      .finally(() => setLoading(false));
+  }, [filter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function verify(id, isHelaPay) {
+    setActing(id);
+    try {
+      if (isHelaPay) {
+        await adminApi.verifyHelaPay(id);
+      } else {
+        await adminApi.verifyShopPayment(id);
+      }
+      toast.success('Payment verified — shop activated!');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to verify');
+    } finally { setActing(null); }
+  }
+
+  async function reject(id) {
+    const reason = window.prompt('Rejection reason (optional):') ?? '';
+    setActing(id);
+    try {
+      await adminApi.rejectShopPayment(id, { admin_note: reason });
+      toast.success('Payment rejected');
+      load();
+    } catch {
+      toast.error('Failed to reject');
+    } finally { setActing(null); }
+  }
+
+  const statusMap = {
+    pending:  { label: 'Pending',  cls: 'bg-yellow-100 text-yellow-700' },
+    verified: { label: 'Verified', cls: 'bg-green-100  text-green-700' },
+    rejected: { label: 'Rejected', cls: 'bg-red-100    text-red-700'   },
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {['pending','verified','rejected'].map((s) => (
+          <button key={s} onClick={() => setFilter(s)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+              filter === s ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-400" /></div>
+      ) : proofs.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">No {filter} shop payments</div>
+      ) : (
+        <div className="space-y-3">
+          {proofs.map((p) => (
+            <div key={p.id} className="bg-gray-800 rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <p className="font-semibold text-white">{p.shop_name}</p>
+                    {p.shop_reference_id && <span className="text-xs font-mono text-gray-400">{p.shop_reference_id}</span>}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusMap[p.status]?.cls || ''}`}>
+                      {statusMap[p.status]?.label || p.status}
+                    </span>
+                    {p.activation_status === 'inactive' && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900 text-orange-300">Inactive</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400">{p.owner_name}</p>
+                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-1">
+                    {p.agent_name && <span>Agent: {p.agent_name}</span>}
+                    <span className="capitalize">{p.payment_method?.replace('_', ' ')}</span>
+                    <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                    {p.month_paid_for && <span>Month: {new Date(p.month_paid_for).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}</span>}
+                  </div>
+                  {p.admin_note && <p className="text-xs text-red-400 mt-1">Note: {p.admin_note}</p>}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-lg font-bold text-white">LKR {Number(p.amount || 0).toLocaleString()}</p>
+                  {p.proof_url && (
+                    <a href={p.proof_url} target="_blank" rel="noreferrer"
+                      className="text-xs text-indigo-400 underline block mt-1">View proof</a>
+                  )}
+                  {p.qr_reference && (
+                    <p className="text-xs text-gray-500 font-mono mt-1">{p.qr_reference.slice(0, 20)}…</p>
+                  )}
+                  {p.status === 'pending' && (
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => reject(p.id)} disabled={acting === p.id}
+                        className="px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs rounded-lg disabled:opacity-50">
+                        Reject
+                      </button>
+                      <button onClick={() => verify(p.id, p.payment_method === 'agent_helaPay')} disabled={acting === p.id}
+                        className="px-2 py-1 bg-green-700 hover:bg-green-600 text-white text-xs rounded-lg flex items-center gap-1 disabled:opacity-50">
+                        {acting === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
+                        Verify & Activate
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AgentsPage() {
   const [tab, setTab]                   = useState('agents');
   const [agents, setAgents]             = useState([]);
   const [pending, setPending]           = useState([]);
+  const [pendingReg, setPendingReg]     = useState([]);
   const [loading, setLoading]           = useState(true);
-  const [agentModal, setAgentModal]     = useState(null); // null | 'new' | agent object
+  const [agentModal, setAgentModal]     = useState(null);
   const [detailAgent, setDetailAgent]   = useState(null);
   const [rejectModal, setRejectModal]   = useState(null);
   const [verifying, setVerifying]       = useState(null);
+  const [docModal,   setDocModal]       = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, p] = await Promise.all([
+      const [a, p, r] = await Promise.all([
         adminApi.listAgents(),
         adminApi.pendingAgentPayments(),
+        adminApi.agentRegistrations(),
       ]);
       setAgents(a.data);
       setPending(p.data);
+      setPendingReg(r.data);
     } catch {
       toast.error('Failed to load data');
     } finally {
@@ -593,9 +917,12 @@ export default function AgentsPage() {
       {/* Tabs */}
       <div className="flex border-b border-gray-700 mb-5 overflow-x-auto">
         {[
-          { key: 'agents',      label: 'Agents'           },
-          { key: 'payments',    label: `Pending Payments${pending.length > 0 ? ` (${pending.length})` : ''}` },
-          { key: 'risk_scores', label: 'Risk Scores' },
+          { key: 'agents',       label: 'Agents'           },
+          { key: 'registrations',label: `Registrations${pendingReg.length > 0 ? ` (${pendingReg.length})` : ''}` },
+          { key: 'shop_payments',label: 'Shop Payments'    },
+          { key: 'invite',       label: 'Invite Links'     },
+          { key: 'payments',     label: `Cash Payments${pending.length > 0 ? ` (${pending.length})` : ''}` },
+          { key: 'risk_scores',  label: 'Risk Scores'      },
         ].map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -669,6 +996,45 @@ export default function AgentsPage() {
             </div>
           ))}
         </div>
+
+      ) : tab === 'registrations' ? (
+
+        /* ── Pending agent registrations ── */
+        <div className="space-y-3">
+          {pendingReg.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <FileCheck className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No pending agent registrations.</p>
+            </div>
+          ) : pendingReg.map((ag) => (
+            <div key={ag.id} className="bg-gray-800 rounded-2xl p-4 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white">{ag.name}</p>
+                <p className="text-sm text-gray-400">{ag.email}</p>
+                <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                  <span>{ag.phone}</span>
+                  {ag.district && <span>{ag.district}</span>}
+                  <span>NIC: {ag.nic_number || '—'}</span>
+                  <span>Applied: {new Date(ag.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setDocModal(ag.id)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg font-medium"
+              >
+                <Eye className="w-3.5 h-3.5" /> Review
+              </button>
+            </div>
+          ))}
+        </div>
+
+      ) : tab === 'shop_payments' ? (
+
+        <ShopPaymentsTab />
+
+      ) : tab === 'invite' ? (
+
+        <InviteTokenSection />
 
       ) : tab === 'risk_scores' ? (
 
@@ -745,6 +1111,13 @@ export default function AgentsPage() {
           agent={detailAgent}
           onClose={() => setDetailAgent(null)}
           onEdit={() => { setAgentModal(detailAgent); setDetailAgent(null); }}
+        />
+      )}
+
+      {docModal && (
+        <AgentDocModal
+          agentId={docModal}
+          onClose={(refreshed) => { setDocModal(null); if (refreshed) loadData(); }}
         />
       )}
     </div>

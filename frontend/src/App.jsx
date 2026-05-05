@@ -26,6 +26,7 @@ import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AgentsPage from './pages/admin/AgentsPage';
 import AgentLoginPage from './pages/agent/AgentLoginPage';
+import AgentRegistrationPage from './pages/agent/AgentRegistrationPage';
 import AgentPortalPage from './pages/agent/AgentPortalPage';
 
 // Clothing module
@@ -105,7 +106,8 @@ export default function App() {
         <Route path="/qr-display" element={<QRDisplayPage />} />
 
         {/* ── Agent portal ──────────────────────────────────── */}
-        <Route path="/agent/login" element={<AgentLoginPage />} />
+        <Route path="/agent/login"    element={<AgentLoginPage />} />
+        <Route path="/agent/register" element={<AgentRegistrationPage />} />
         <Route
           path="/agent"
           element={

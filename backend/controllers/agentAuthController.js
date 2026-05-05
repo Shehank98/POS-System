@@ -11,13 +11,23 @@ async function login(req, res) {
   try {
     const { rows } = await db.query(
       `SELECT id, name, email, phone, password_hash, district, monthly_target,
-              bank_name, bank_account, bank_branch, account_holder, is_active
+              bank_name, bank_account, bank_branch, account_holder,
+              is_active, approval_status,
+              nic_number, driving_license_number,
+              nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+              signed_agreement_url, agreement_generated_at
          FROM sales_agents WHERE email = $1`,
       [email.toLowerCase().trim()]
     );
     if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
 
     const agent = rows[0];
+    if (agent.approval_status === 'pending') {
+      return res.status(403).json({ error: 'Your account is pending admin approval. You will be notified once approved.', approval_status: 'pending' });
+    }
+    if (agent.approval_status === 'rejected') {
+      return res.status(403).json({ error: 'Your account registration was rejected. Please contact admin.', approval_status: 'rejected' });
+    }
     if (!agent.is_active) {
       return res.status(403).json({ error: 'Account deactivated. Contact admin.' });
     }
@@ -33,16 +43,25 @@ async function login(req, res) {
     res.json({
       token,
       agent: {
-        id:              agent.id,
-        name:            agent.name,
-        email:           agent.email,
-        phone:           agent.phone,
-        district:        agent.district,
-        monthly_target:  agent.monthly_target,
-        bank_name:       agent.bank_name,
-        bank_account:    agent.bank_account,
-        bank_branch:     agent.bank_branch,
-        account_holder:  agent.account_holder,
+        id:                      agent.id,
+        name:                    agent.name,
+        email:                   agent.email,
+        phone:                   agent.phone,
+        district:                agent.district,
+        monthly_target:          agent.monthly_target,
+        bank_name:               agent.bank_name,
+        bank_account:            agent.bank_account,
+        bank_branch:             agent.bank_branch,
+        account_holder:          agent.account_holder,
+        approval_status:         agent.approval_status,
+        nic_number:              agent.nic_number,
+        driving_license_number:  agent.driving_license_number,
+        nic_front_url:           agent.nic_front_url,
+        nic_back_url:            agent.nic_back_url,
+        agent_photo_url:         agent.agent_photo_url,
+        bank_book_url:           agent.bank_book_url,
+        signed_agreement_url:    agent.signed_agreement_url,
+        agreement_generated_at:  agent.agreement_generated_at,
       },
     });
   } catch (err) {
@@ -56,7 +75,10 @@ async function getMe(req, res) {
   try {
     const { rows } = await db.query(
       `SELECT id, name, email, phone, district, monthly_target,
-              bank_name, bank_account, bank_branch, account_holder, created_at
+              bank_name, bank_account, bank_branch, account_holder, created_at,
+              approval_status, nic_number, driving_license_number,
+              nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+              signed_agreement_url, agreement_generated_at
          FROM sales_agents WHERE id = $1`,
       [req.agent.id]
     );

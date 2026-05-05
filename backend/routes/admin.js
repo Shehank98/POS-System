@@ -73,4 +73,20 @@ router.get ('/agent-risk-scores',           agentCtrl.listRiskScores);
 router.put ('/agent-risk-scores/:agentId/recalculate', agentCtrl.recalculateAgentRisk);
 router.put ('/agent-risk-scores/:agentId/restrict',    agentCtrl.setAgentRestriction);
 
+// ── Agent Registration & Approval ────────────────────────────
+const shopPayCtrl = require('../controllers/shopPaymentController');
+
+router.post('/generate-agent-invite',       agentCtrl.generateInviteToken);
+router.get ('/invite-tokens',               agentCtrl.listInviteTokens);
+router.get ('/agent-registrations',         agentCtrl.listPendingRegistrations);
+router.get ('/agents/:id/documents',        agentCtrl.getAgentDocuments);
+router.put ('/agents/:id/approve',          agentCtrl.approveAgentRegistration);
+router.put ('/agents/:id/reject',           agentCtrl.rejectAgentRegistration);
+
+// ── Shop Payment Proofs (LKR 2500/month activation) ──────────
+router.get ('/shop-payments',               shopPayCtrl.adminListShopPayments);
+router.put ('/shop-payments/:id/verify',    shopPayCtrl.adminVerifyShopPayment);
+router.put ('/shop-payments/:id/reject',    shopPayCtrl.adminRejectShopPayment);
+router.put ('/shop-payments/:id/helaPay-verify', shopPayCtrl.adminVerifyHelaPay);
+
 module.exports = router;

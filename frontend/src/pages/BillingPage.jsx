@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
-import { paymentsApi } from '../api/client';
+import { paymentsApi, shopPayApi } from '../api/client';
 
 // ── Plan tier fallback (used until API responds) ──────────────
 const PLAN_COLORS = ['gray', 'primary', 'purple'];
@@ -407,6 +407,125 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
 }
 
 // ── Main page ─────────────────────────────────────────────────
+// ── Inactive Shop Payment Form ────────────────────────────────
+function InactiveShopBilling({ user }) {
+  const [proofs,     setProofs]     = useState([]);
+  const [fileData,   setFileData]   = useState(null);
+  const [fileName,   setFileName]   = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    shopPayApi.myProofs()
+      .then(({ data }) => setProofs(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error('File must be under 8MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => { setFileData(ev.target.result); setFileName(file.name); };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!fileData) { toast.error('Please upload a payment proof image'); return; }
+    setSubmitting(true);
+    try {
+      await shopPayApi.uploadProof({ fileData });
+      toast.success('Payment proof submitted! Admin will review and activate your account.');
+      setFileData(null);
+      setFileName('');
+      if (fileRef.current) fileRef.current.value = '';
+      const { data } = await shopPayApi.myProofs();
+      setProofs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit proof');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const statusColor = { pending: 'text-yellow-600', verified: 'text-green-600', rejected: 'text-red-600' };
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      {/* Banner */}
+      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 text-center">
+        <AlertTriangle className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-orange-900 mb-2">Account Activation Required</h2>
+        <p className="text-sm text-orange-700 mb-1">
+          Your shop account is currently <strong>inactive</strong>.
+          To activate it, please pay <strong>LKR 2,500</strong> for the first month and upload the payment slip below.
+        </p>
+        <p className="text-xs text-orange-500">Your account will be activated once the payment is verified by admin.</p>
+      </div>
+
+      {/* Upload form */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+        <h3 className="font-bold text-gray-800">Upload Payment Proof</h3>
+        <p className="text-sm text-gray-500">
+          Transfer <strong>LKR 2,500</strong> to the company bank account and upload the bank transfer receipt here.
+        </p>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 space-y-1">
+          <p className="font-semibold text-gray-800">Bank Transfer Details</p>
+          <p>Bank: <strong>Contact your agent for bank details</strong></p>
+          <p>Amount: <strong>LKR 2,500.00</strong></p>
+          <p>Reference: <strong>{user?.shop_reference_id || 'Your Shop ID'}</strong></p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Slip / Receipt *</label>
+            <div
+              onClick={() => fileRef.current?.click()}
+              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors
+                ${fileData ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-green-400 hover:bg-green-50'}`}
+            >
+              <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf" onChange={handleFileChange} />
+              {fileData ? (
+                <><CheckCircle2 className="w-8 h-8 text-green-500 mb-2" /><p className="text-sm text-green-700 font-medium">{fileName}</p></>
+              ) : (
+                <><Upload className="w-8 h-8 text-gray-400 mb-2" /><p className="text-sm text-gray-500">Click to upload bank slip</p><p className="text-xs text-gray-400">JPG, PNG, or PDF · max 8MB</p></>
+              )}
+            </div>
+          </div>
+
+          <button type="submit" disabled={!fileData || submitting}
+            className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2">
+            {submitting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting…</> : <><Upload className="w-4 h-4" /> Submit Payment Proof</>}
+          </button>
+        </form>
+      </div>
+
+      {/* Previous submissions */}
+      {proofs.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <h3 className="font-semibold text-gray-800 text-sm mb-3">Previous Submissions</h3>
+          <div className="space-y-2">
+            {proofs.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
+                <div>
+                  <p className="font-medium text-gray-700">LKR {Number(p.amount || 0).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString()}</p>
+                  {p.admin_note && <p className="text-xs text-red-500 mt-0.5">Admin: {p.admin_note}</p>}
+                </div>
+                <span className={`text-xs font-semibold capitalize ${statusColor[p.status] || 'text-gray-500'}`}>
+                  {p.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BillingPage() {
   const user = useAuthStore((s) => s.user);
 
@@ -482,6 +601,11 @@ export default function BillingPage() {
         {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}
       </div>
     );
+  }
+
+  // Inactive shop — show activation payment form only
+  if (user?.activation_status === 'inactive') {
+    return <InactiveShopBilling user={user} />;
   }
 
   return (

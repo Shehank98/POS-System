@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import { getSubscriptionState, recordRunTimestamp } from '../utils/subscriptionGuard';
 
@@ -25,7 +26,13 @@ function BlockingOverlay({ icon, title, message, showRetry, onRetry }) {
 export default function SubscriptionGuard({ children }) {
   const user        = useAuthStore((s) => s.user);
   const refreshUser = useAuthStore((s) => s.refreshUser);
+  const location    = useLocation();
   const [state, setState] = useState(null);
+
+  // Inactive shops (awaiting first payment) can only access /billing
+  if (user?.activation_status === 'inactive' && !location.pathname.startsWith('/billing')) {
+    return <Navigate to="/billing" replace />;
+  }
 
   const check = useCallback(async () => {
     await recordRunTimestamp();

@@ -426,8 +426,219 @@ async function listPlans(req, res) {
   }
 }
 
+// ── POST /api/agents/me/shops/register ───────────────────────
+// Full shop registration with location, owner details, reference ID
+async function registerShop(req, res) {
+  const agentId = req.agent.id;
+  const {
+    shop_name, owner_name, contact_number,
+    location_lat, location_lng, location_map_url,
+    br_number,
+    // Login credentials for the shop owner
+    email, username, password,
+    shop_type = 'retail',
+  } = req.body;
+
+  if (!shop_name || !owner_name || !contact_number) {
+    return res.status(400).json({ error: 'shop_name, owner_name, and contact_number are required' });
+  }
+  if (!email || !username || !password) {
+    return res.status(400).json({ error: 'email, username, and password are required for shop login' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Generate unique shop reference ID
+    const refResult = await client.query(`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM shops`);
+    const nextId    = refResult.rows[0].next_id;
+    const shopRefId = `SHP-${String(nextId).padStart(6, '0')}`;
+
+    const { rows: shopRows } = await client.query(
+      `INSERT INTO shops
+         (name, owner_name, email, phone, contact_number,
+          location_lat, location_lng, location_map_url,
+          br_number, shop_reference_id,
+          subscription_status, activation_status,
+          onboarded_by_agent_id, shop_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending_payment','inactive',$11,$12)
+       RETURNING id, name, owner_name, email, shop_reference_id, activation_status,
+                 subscription_status, contact_number, location_lat, location_lng,
+                 location_map_url, br_number, created_at`,
+      [
+        shop_name.trim(), owner_name.trim(),
+        email.toLowerCase().trim(), contact_number, contact_number,
+        location_lat   || null, location_lng   || null, location_map_url || null,
+        br_number      || null, shopRefId,
+        agentId, shop_type,
+      ]
+    );
+    const shop = shopRows[0];
+
+    // Create owner login account
+    const passwordHash = await bcrypt.hash(password, 10);
+    await client.query(
+      `INSERT INTO users (shop_id, username, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, 'owner')`,
+      [shop.id, username.trim(), email.toLowerCase().trim(), passwordHash]
+    );
+
+    // Signup commission (locked until first payment verified)
+    await client.query(
+      `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status)
+       VALUES ($1, $2, 'signup', 500, 'locked')`,
+      [agentId, shop.id]
+    );
+
+    await client.query(
+      `INSERT INTO agent_wallet (agent_id) VALUES ($1) ON CONFLICT (agent_id) DO NOTHING`,
+      [agentId]
+    );
+
+    await client.query('COMMIT');
+
+    // Admin notification (non-blocking)
+    db.query(`SELECT name FROM sales_agents WHERE id = $1`, [agentId])
+      .then(({ rows }) => {
+        const agentName = rows[0]?.name || `Agent #${agentId}`;
+        createAdminNotification(
+          ADMIN_TYPES.SHOP_ONBOARDED,
+          'New Shop Registered',
+          `${agentName} registered shop "${shop_name}" (Ref: ${shopRefId})`,
+          'high',
+          { agent_id: agentId, shop_id: shop.id, shop_reference_id: shopRefId }
+        );
+      })
+      .catch(() => {});
+
+    res.status(201).json({
+      ...shop,
+      generated_username: username.trim(),
+      generated_password: password,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') {
+      const detail = err.detail || '';
+      if (detail.includes('username')) return res.status(409).json({ error: 'That username is already taken' });
+      if (detail.includes('email'))    return res.status(409).json({ error: 'A shop with this email already exists' });
+      return res.status(409).json({ error: 'Duplicate entry' });
+    }
+    console.error('agent registerShop error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+}
+
+// ── GET /api/agents/me/shops ──────────────────────────────────
+// List shops registered by this agent (with new fields)
+async function listShops(req, res) {
+  const agentId = req.agent.id;
+  try {
+    const { rows } = await db.query(`
+      SELECT s.id, s.name, s.owner_name, s.email, s.contact_number,
+             s.shop_reference_id, s.activation_status,
+             s.location_lat, s.location_lng, s.location_map_url,
+             s.br_number, s.subscription_status, s.subscription_end_date,
+             s.plan_id, sp.name AS plan_name, s.created_at,
+             (SELECT COUNT(*) FROM shop_payment_proofs WHERE shop_id = s.id AND status = 'pending') AS pending_proofs
+        FROM shops s
+        LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
+       WHERE s.onboarded_by_agent_id = $1
+       ORDER BY s.created_at DESC
+    `, [agentId]);
+    res.json(rows);
+  } catch (err) {
+    console.error('agent listShops error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── POST /api/agents/me/shops/:shopId/payment-qr ─────────────
+// Agent generates a HelaPay QR for a specific shop payment
+async function generateShopPaymentQR(req, res) {
+  const agentId = req.agent.id;
+  const shopId  = parseInt(req.params.shopId, 10);
+  const qrcode  = require('qrcode');
+
+  try {
+    // Verify shop belongs to this agent
+    const { rows } = await db.query(
+      `SELECT id, name, shop_reference_id FROM shops
+        WHERE id = $1 AND onboarded_by_agent_id = $2`,
+      [shopId, agentId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    const shop = rows[0];
+
+    const amount    = 2500;
+    const reference = `${shop.shop_reference_id}-${Date.now()}`;
+
+    // QR payload for HelaPay / LankaQR (standard format)
+    const qrPayload = JSON.stringify({
+      merchant:  'BillFlow',
+      reference,
+      shop_ref:  shop.shop_reference_id,
+      shop_name: shop.name,
+      amount,
+      currency:  'LKR',
+    });
+
+    const qrDataUrl = await qrcode.toDataURL(qrPayload, { width: 300, margin: 2 });
+
+    // Record as pending proof
+    const { rows: proofRows } = await db.query(
+      `INSERT INTO shop_payment_proofs
+         (shop_id, agent_id, amount, payment_method, qr_reference, month_paid_for, status)
+       VALUES ($1, $2, $3, 'agent_helaPay', $4, DATE_TRUNC('month', NOW()), 'pending')
+       RETURNING id`,
+      [shopId, agentId, amount, reference]
+    );
+
+    res.json({
+      qr_data_url: qrDataUrl,
+      reference,
+      amount,
+      shop_name:      shop.name,
+      shop_reference: shop.shop_reference_id,
+      proof_id:       proofRows[0].id,
+    });
+  } catch (err) {
+    console.error('generateShopPaymentQR error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/agents/me/shops/:shopId/payments ─────────────────
+async function listShopPayments(req, res) {
+  const agentId = req.agent.id;
+  const shopId  = parseInt(req.params.shopId, 10);
+  try {
+    const check = await db.query(
+      `SELECT id FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2`,
+      [shopId, agentId]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+
+    const { rows } = await db.query(
+      `SELECT * FROM shop_payment_proofs WHERE shop_id = $1 ORDER BY created_at DESC`,
+      [shopId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('listShopPayments error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
   listPlans,
+  registerShop, listShops, generateShopPaymentQR, listShopPayments,
 };

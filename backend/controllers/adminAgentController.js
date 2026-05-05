@@ -443,10 +443,135 @@ async function setAgentRestriction(req, res) {
   }
 }
 
+// ── POST /api/admin/generate-agent-invite ────────────────────
+async function generateInviteToken(req, res) {
+  const { note } = req.body;
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO agent_registration_tokens (note)
+       VALUES ($1)
+       RETURNING token, note, expires_at, created_at`,
+      [note || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('generateInviteToken error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/admin/agent-registrations ───────────────────────
+// Returns agents with approval_status = 'pending'
+async function listPendingRegistrations(req, res) {
+  try {
+    const { rows } = await db.query(`
+      SELECT id, name, email, phone, district,
+             nic_number, driving_license_number,
+             nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+             signed_agreement_url, bank_name, bank_account, bank_branch,
+             account_holder, approval_status, rejection_reason, created_at
+        FROM sales_agents
+       WHERE approval_status = 'pending'
+       ORDER BY created_at ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('listPendingRegistrations error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/admin/agents/:id/documents ──────────────────────
+async function getAgentDocuments(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, email, phone, district,
+              nic_number, driving_license_number,
+              nic_front_url, nic_back_url, agent_photo_url, bank_book_url,
+              signed_agreement_url, agreement_generated_at,
+              bank_name, bank_account, bank_branch, account_holder,
+              approval_status, rejection_reason, created_at
+         FROM sales_agents WHERE id = $1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('getAgentDocuments error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/agents/:id/approve ────────────────────────
+async function approveAgentRegistration(req, res) {
+  const agentId = parseInt(req.params.id, 10);
+  try {
+    const { rows, rowCount } = await db.query(
+      `UPDATE sales_agents
+          SET approval_status = 'active', is_active = TRUE, rejection_reason = NULL
+        WHERE id = $1
+        RETURNING id, name, email, approval_status`,
+      [agentId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Agent not found' });
+
+    // Ensure wallet row exists
+    await db.query(
+      `INSERT INTO agent_wallet (agent_id) VALUES ($1) ON CONFLICT DO NOTHING`, [agentId]
+    );
+
+    res.json({ message: 'Agent approved and account activated', agent: rows[0] });
+  } catch (err) {
+    console.error('approveAgentRegistration error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/admin/agents/:id/reject ─────────────────────────
+async function rejectAgentRegistration(req, res) {
+  const { reason } = req.body;
+  const agentId = parseInt(req.params.id, 10);
+  try {
+    const { rows, rowCount } = await db.query(
+      `UPDATE sales_agents
+          SET approval_status = 'rejected', is_active = FALSE,
+              rejection_reason = $1
+        WHERE id = $2
+        RETURNING id, name, email, approval_status`,
+      [reason || null, agentId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ message: 'Agent registration rejected', agent: rows[0] });
+  } catch (err) {
+    console.error('rejectAgentRegistration error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/admin/invite-tokens ─────────────────────────────
+async function listInviteTokens(req, res) {
+  try {
+    const { rows } = await db.query(`
+      SELECT t.id, t.token, t.note, t.expires_at, t.used_at, t.created_at,
+             sa.name AS used_by_name, sa.email AS used_by_email
+        FROM agent_registration_tokens t
+        LEFT JOIN sales_agents sa ON sa.id = t.used_by
+       ORDER BY t.created_at DESC
+       LIMIT 100
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('listInviteTokens error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
   listPendingPayments, listAllPayments, getFraudSummary,
   verifyPayment, rejectPayment,
   listCommissions, markPayout,
   listRiskScores, recalculateAgentRisk, setAgentRestriction,
+  generateInviteToken, listPendingRegistrations, getAgentDocuments,
+  approveAgentRegistration, rejectAgentRegistration, listInviteTokens,
 };

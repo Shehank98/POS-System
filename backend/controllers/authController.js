@@ -47,7 +47,9 @@ const USER_SHOP_COLS = `
   COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
   COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
   COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
-  COALESCE(s.grace_period_days,            5)     AS grace_period_days
+  COALESCE(s.grace_period_days,            5)     AS grace_period_days,
+  COALESCE(s.activation_status, 'active')        AS activation_status,
+  s.shop_reference_id
 `;
 
 // Records a login session for security tracking (best-effort, non-blocking)
@@ -221,6 +223,9 @@ async function login(req, res) {
         exchanges_enabled:              user.exchanges_enabled,
         branches_enabled:               user.branches_enabled,
         car_service_products_enabled:   user.car_service_products_enabled,
+        // Shop registration fields
+        activation_status:   user.activation_status || 'active',
+        shop_reference_id:   user.shop_reference_id || null,
       },
     });
   } catch (err) {

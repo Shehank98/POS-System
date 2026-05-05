@@ -260,17 +260,25 @@ agentClient.interceptors.response.use(
 );
 
 export const agentApi = {
-  login:         (data) => agentClient.post('/agent-auth/login', data),
-  me:            ()     => agentClient.get('/agent-auth/me'),
-  dashboard:     ()     => agentClient.get('/agents/me/dashboard'),
-  customers:     ()     => agentClient.get('/agents/me/customers'),
-  onboard:       (data) => agentClient.post('/agents/me/customers', data),
-  payments:      ()     => agentClient.get('/agents/me/payments'),
-  submitPayment: (data) => agentClient.post('/agents/me/payments', data),
-  commissions:   ()     => agentClient.get('/agents/me/commissions'),
-  bankDetails:   (data) => agentClient.put('/agents/me/bank-details', data),
-  plans:         ()     => agentClient.get('/agents/me/plans'),
-  renewals:      ()     => agentClient.get('/agents/me/renewals'),
+  login:                (data)    => agentClient.post('/agent-auth/login', data),
+  me:                   ()        => agentClient.get('/agent-auth/me'),
+  uploadSignedAgreement:(data)    => agentClient.post('/agent-auth/upload-signed-agreement', data),
+  dashboard:            ()        => agentClient.get('/agents/me/dashboard'),
+  // Legacy customers (onboarding)
+  customers:            ()        => agentClient.get('/agents/me/customers'),
+  onboard:              (data)    => agentClient.post('/agents/me/customers', data),
+  // New shop registration flow
+  shops:                ()        => agentClient.get('/agents/me/shops'),
+  registerShop:         (data)    => agentClient.post('/agents/me/shops/register', data),
+  generateShopQR:       (shopId)  => agentClient.post(`/agents/me/shops/${shopId}/payment-qr`),
+  shopPayments:         (shopId)  => agentClient.get(`/agents/me/shops/${shopId}/payments`),
+  // Payments (agent cash collection)
+  payments:             ()        => agentClient.get('/agents/me/payments'),
+  submitPayment:        (data)    => agentClient.post('/agents/me/payments', data),
+  commissions:          ()        => agentClient.get('/agents/me/commissions'),
+  bankDetails:          (data)    => agentClient.put('/agents/me/bank-details', data),
+  plans:                ()        => agentClient.get('/agents/me/plans'),
+  renewals:             ()        => agentClient.get('/agents/me/renewals'),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────
@@ -344,6 +352,26 @@ export const adminApi = {
   listRiskScores:         ()           => adminClient.get('/admin/agent-risk-scores'),
   recalculateRisk:        (agentId)    => adminClient.put(`/admin/agent-risk-scores/${agentId}/recalculate`),
   setAgentRestriction:    (agentId, data) => adminClient.put(`/admin/agent-risk-scores/${agentId}/restrict`, data),
+
+  // Agent registration & approval
+  generateInviteToken:        (data)   => adminClient.post('/admin/generate-agent-invite', data),
+  listInviteTokens:           ()       => adminClient.get('/admin/invite-tokens'),
+  agentRegistrations:         ()       => adminClient.get('/admin/agent-registrations'),
+  getAgentDocuments:          (id)     => adminClient.get(`/admin/agents/${id}/documents`),
+  approveAgent:               (id)     => adminClient.put(`/admin/agents/${id}/approve`),
+  rejectAgent:                (id, data) => adminClient.put(`/admin/agents/${id}/reject`, data),
+
+  // Shop payment proofs (activation)
+  listShopPayments:       (params)     => adminClient.get('/admin/shop-payments', { params }),
+  verifyShopPayment:      (id)         => adminClient.put(`/admin/shop-payments/${id}/verify`),
+  rejectShopPayment:      (id, data)   => adminClient.put(`/admin/shop-payments/${id}/reject`, data),
+  verifyHelaPay:          (id)         => adminClient.put(`/admin/shop-payments/${id}/helaPay-verify`),
+};
+
+// ── Shop payment proofs (shop owner) ─────────────────────────
+export const shopPayApi = {
+  uploadProof: (data)  => client.post('/shop-payments/upload-proof', data),
+  myProofs:    ()      => client.get('/shop-payments/my-proofs'),
 };
 
 export default client;
