@@ -140,13 +140,14 @@ async function adminVerifyShopPayment(req, res) {
       [proofId]
     );
 
-    // Unlock signup commission for the agent who registered this shop
+    // Unlock onboarding commission for the agent who registered this shop
     if (proof.agent_id) {
       await client.query(
         `UPDATE agent_commissions
             SET status = 'approved'
           WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'signup' AND status = 'locked'`,
+            AND commission_type = 'onboarding'
+            AND status IN ('pending', 'locked')`,
         [proof.agent_id, proof.shop_id]
       );
     }
@@ -222,7 +223,8 @@ async function adminVerifyHelaPay(req, res) {
         `UPDATE agent_commissions
             SET status = 'approved'
           WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'signup' AND status = 'locked'`,
+            AND commission_type = 'onboarding'
+            AND status IN ('pending', 'locked')`,
         [proof.agent_id, proof.shop_id]
       );
     }
@@ -395,23 +397,23 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
       [shopId]
     );
 
-    // Unlock agent signup commission
+    // Unlock agent onboarding commission + create monthly commission
     if (proof.agent_id) {
       await client.query(
         `UPDATE agent_commissions
             SET status = 'approved'
           WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'signup' AND status = 'locked'`,
+            AND commission_type = 'onboarding'
+            AND status IN ('pending', 'locked')`,
         [proof.agent_id, shopId]
       );
 
-      // Create monthly recurring commission for this payment
       const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
       await client.query(
         `INSERT INTO agent_commissions
-           (agent_id, shop_id, commission_type, amount, month, status, payment_submission_id)
-         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'locked', NULL)
-         ON CONFLICT DO NOTHING`,
+           (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_method)
+         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE, 'helaPay')
+         ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
         [proof.agent_id, shopId, currentMonth]
       );
     }

@@ -372,7 +372,7 @@ async function verifyPayment(req, res) {
 
     // Extend subscription
     const { rows: shopRows } = await client.query(
-      `SELECT * FROM shops WHERE id = $1`, [payment.shop_id]
+      `SELECT s.*, s.onboarded_by_agent_id AS agent_id FROM shops s WHERE s.id = $1`, [payment.shop_id]
     );
     const shop = shopRows[0];
     let newEnd = shop.subscription_end_date
@@ -385,6 +385,30 @@ async function verifyPayment(req, res) {
       `UPDATE shops SET subscription_status = 'active', subscription_end_date = $1 WHERE id = $2`,
       [newEnd, payment.shop_id]
     );
+
+    // Unlock onboarding commission if this is the first payment (still pending)
+    if (shop.agent_id) {
+      await client.query(
+        `UPDATE agent_commissions
+            SET status = 'approved'
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'onboarding'
+            AND status IN ('pending', 'locked')`,
+        [shop.agent_id, payment.shop_id]
+      );
+
+      // Create monthly commission for this subscription payment
+      const paymentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      await client.query(
+        `INSERT INTO agent_commissions
+           (agent_id, shop_id, commission_type, amount, month, status, earned_date,
+            payment_method, transaction_reference)
+         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE,
+                 'bank_transfer', $4::TEXT)
+         ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+        [shop.agent_id, payment.shop_id, paymentMonth, String(payment.id)]
+      );
+    }
 
     await client.query('COMMIT');
 

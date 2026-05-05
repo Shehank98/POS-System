@@ -40,9 +40,9 @@ async function getDashboard(req, res) {
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'active')  AS active_customers,
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status != 'active') AS inactive_customers,
         (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'pending_payment') AS pending_payment_shops,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'approved')                    AS approved_earnings,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'locked')                     AS pending_earnings,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'paid')                       AS total_paid,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'approved')                           AS approved_earnings,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status IN ('pending','locked'))               AS pending_earnings,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'paid')                              AS total_paid,
         (SELECT COUNT(*)                FROM agent_payment_submissions WHERE agent_id = $1 AND status = 'pending_verification') AS pending_submissions,
         (SELECT monthly_target          FROM sales_agents      WHERE id = $1)                                                  AS monthly_target,
         (SELECT total_collected         FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_collected,
@@ -158,10 +158,10 @@ async function onboardCustomer(req, res) {
       [shop.id, username.trim(), passwordHash]
     );
 
-    // Signup commission locked until first payment verified
+    // Onboarding commission (pending until first payment verified)
     await client.query(
-      `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status)
-       VALUES ($1, $2, 'signup', 500, 'locked')`,
+      `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status, earned_date)
+       VALUES ($1, $2, 'onboarding', 500, 'pending', CURRENT_DATE)`,
       [agentId, shop.id]
     );
 
@@ -525,10 +525,10 @@ async function registerShop(req, res) {
       [shop.id, username.trim(), email.toLowerCase().trim(), passwordHash]
     );
 
-    // Signup commission (locked until first payment verified)
+    // Onboarding commission (pending until first payment verified)
     await client.query(
-      `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status)
-       VALUES ($1, $2, 'signup', 500, 'locked')`,
+      `INSERT INTO agent_commissions (agent_id, shop_id, commission_type, amount, status, earned_date)
+       VALUES ($1, $2, 'onboarding', 500, 'pending', CURRENT_DATE)`,
       [agentId, shop.id]
     );
 
