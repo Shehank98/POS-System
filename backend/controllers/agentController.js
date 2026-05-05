@@ -686,9 +686,68 @@ async function listShopPayments(req, res) {
   }
 }
 
+// ── GET /api/agents/me/subscriptions ─────────────────────────
+// All onboarded shops with subscription details, last payment, follow-up note
+async function getSubscriptions(req, res) {
+  const agentId = req.agent.id;
+  try {
+    const { rows } = await db.query(`
+      SELECT
+        s.id, s.name, s.owner_name, s.phone, s.email,
+        s.activation_status, s.subscription_status, s.subscription_end_date,
+        sp.name AS plan_name,
+        (
+          SELECT MAX(spp.created_at)
+            FROM shop_payment_proofs spp
+           WHERE spp.shop_id = s.id AND spp.status = 'verified'
+        ) AS last_payment_date,
+        COALESCE(asn.note, '') AS follow_up_note
+      FROM shops s
+      LEFT JOIN subscription_plans sp  ON sp.id  = s.plan_id
+      LEFT JOIN agent_shop_notes   asn ON asn.shop_id = s.id AND asn.agent_id = $1
+      WHERE s.onboarded_by_agent_id = $1
+      ORDER BY s.name ASC
+    `, [agentId]);
+    res.json(rows);
+  } catch (err) {
+    console.error('agent getSubscriptions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── PUT /api/agents/me/shops/:shopId/note ─────────────────────
+async function saveShopNote(req, res) {
+  const agentId = req.agent.id;
+  const shopId  = parseInt(req.params.shopId, 10);
+  const { note } = req.body;
+  if (typeof note !== 'string') return res.status(400).json({ error: 'note is required' });
+
+  try {
+    // Verify shop belongs to this agent
+    const { rows } = await db.query(
+      `SELECT id FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2`,
+      [shopId, agentId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+
+    await db.query(`
+      INSERT INTO agent_shop_notes (agent_id, shop_id, note, updated_at)
+           VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (agent_id, shop_id)
+        DO UPDATE SET note = EXCLUDED.note, updated_at = NOW()
+    `, [agentId, shopId, note.trim()]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('saveShopNote error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
   listPlans,
   uploadShopSelfie, registerShop, listShops, generateShopPaymentQR, listShopPayments,
+  getSubscriptions, saveShopNote,
 };

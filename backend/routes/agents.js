@@ -32,6 +32,8 @@ router.get ('/me/commissions',                   ctrl.listCommissions);
 // Profile
 router.put ('/me/bank-details',                  ctrl.updateBankDetails);
 router.get ('/me/renewals',                      ctrl.getRenewals);
+router.get ('/me/subscriptions',                 ctrl.getSubscriptions);
+router.put ('/me/shops/:shopId/note',            ctrl.saveShopNote);
 router.get ('/me/plans',                         ctrl.listPlans);
 
 // Notifications

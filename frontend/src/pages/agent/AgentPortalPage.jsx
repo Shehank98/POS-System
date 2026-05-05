@@ -1565,145 +1565,324 @@ function Empty({ text }) {
   return <p className="text-center text-gray-400 py-16 text-sm px-4">{text}</p>;
 }
 
-// ── Renewals Tab ──────────────────────────────────────────────
+// ── Subscriptions / Renewals Tab ──────────────────────────────
 function RenewalsTab() {
-  const [renewals, setRenewals] = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [shops,   setShops]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusF, setStatusF] = useState('all');   // all | active | expired | inactive
+  const [search,  setSearch]  = useState('');
+  const [noteOpen,  setNoteOpen]  = useState(null); // shop id with open note editor
+  const [noteText,  setNoteText]  = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await agentApi.renewals();
-      setRenewals(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load renewals'); }
+      const { data } = await agentApi.subscriptions();
+      setShops(Array.isArray(data) ? data : []);
+    } catch { toast.error('Failed to load subscriptions'); }
     finally  { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Spinner />;
-
-  const expiring = renewals.filter(
-    (s) => s.subscription_status === 'active' && s.subscription_end_date
-  ).sort((a, b) => new Date(a.subscription_end_date) - new Date(b.subscription_end_date));
-
-  const expired = renewals.filter((s) => s.subscription_status === 'expired');
-
   function daysUntil(dateStr) {
+    if (!dateStr) return null;
     const diff = new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0);
     return Math.ceil(diff / 86400000);
   }
-  function daysSince(dateStr) {
-    const diff = new Date().setHours(0,0,0,0) - new Date(dateStr).setHours(0,0,0,0);
-    return Math.ceil(diff / 86400000);
+
+  const filtered = useMemo(() => {
+    let list = shops;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((s) => s.name?.toLowerCase().includes(q) || s.owner_name?.toLowerCase().includes(q));
+    }
+    if (statusF !== 'all') {
+      list = list.filter((s) => {
+        if (statusF === 'active')   return s.subscription_status === 'active';
+        if (statusF === 'expired')  return s.subscription_status === 'expired';
+        if (statusF === 'inactive') return s.activation_status !== 'active';
+        return true;
+      });
+    }
+    return list;
+  }, [shops, search, statusF]);
+
+  const expiringSoon = useMemo(
+    () => shops.filter((s) => {
+      const d = daysUntil(s.subscription_end_date);
+      return d !== null && d <= 7 && s.subscription_status === 'active';
+    }).length,
+    [shops]
+  );
+  const expiredCount = shops.filter((s) => s.subscription_status === 'expired').length;
+  const activeCount  = shops.filter((s) => s.subscription_status === 'active').length;
+
+  function openNote(shop) {
+    setNoteOpen(shop.id);
+    setNoteText(shop.follow_up_note || '');
+  }
+  function closeNote() { setNoteOpen(null); setNoteText(''); }
+
+  async function saveNote(shopId) {
+    setNoteSaving(true);
+    try {
+      await agentApi.saveShopNote(shopId, noteText);
+      setShops((prev) => prev.map((s) => s.id === shopId ? { ...s, follow_up_note: noteText } : s));
+      toast.success('Note saved');
+      closeNote();
+    } catch { toast.error('Failed to save note'); }
+    finally  { setNoteSaving(false); }
   }
 
-  const urgencyColor = (days) => {
-    if (days <= 0)  return 'text-red-600 bg-red-50 border-red-200';
-    if (days <= 3)  return 'text-red-500 bg-red-50 border-red-200';
-    if (days <= 7)  return 'text-orange-600 bg-orange-50 border-orange-200';
-    return 'text-yellow-700 bg-yellow-50 border-yellow-200';
-  };
-
-  function handleCall(phone) {
-    if (phone) window.open(`tel:${phone}`);
+  function urgencyRowClass(days) {
+    if (days === null) return '';
+    if (days <= 0) return 'border-l-4 border-l-red-500';
+    if (days <= 3) return 'border-l-4 border-l-red-400';
+    if (days <= 7) return 'border-l-4 border-l-orange-400';
+    return '';
   }
 
-  if (renewals.length === 0) return <Empty text="No shops requiring renewal attention" />;
+  function renewalLabel(s) {
+    const days = daysUntil(s.subscription_end_date);
+    if (days === null) return <span className="text-gray-400">—</span>;
+    if (days < 0)  return <span className="text-red-600 font-semibold">Expired {Math.abs(days)}d ago</span>;
+    if (days === 0) return <span className="text-red-600 font-semibold">Expires today</span>;
+    if (days === 1) return <span className="text-orange-600 font-semibold">Tomorrow</span>;
+    if (days <= 7) return <span className="text-orange-600 font-semibold">In {days} days</span>;
+    return <span className="text-gray-600">In {days} days</span>;
+  }
+
+  if (loading) return <Spinner />;
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* Summary badges */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-orange-700">{expiring.length}</p>
-          <p className="text-xs text-orange-600 mt-0.5">Expiring Soon</p>
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+          <p className="text-xl sm:text-2xl font-bold text-green-700">{activeCount}</p>
+          <p className="text-[10px] sm:text-xs text-green-600 mt-0.5">Active</p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-red-700">{expired.length}</p>
-          <p className="text-xs text-red-600 mt-0.5">Not Renewed</p>
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
+          <p className="text-xl sm:text-2xl font-bold text-orange-700">{expiringSoon}</p>
+          <p className="text-[10px] sm:text-xs text-orange-600 mt-0.5">Expiring ≤7d</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+          <p className="text-xl sm:text-2xl font-bold text-red-700">{expiredCount}</p>
+          <p className="text-[10px] sm:text-xs text-red-600 mt-0.5">Expired</p>
         </div>
       </div>
 
-      {/* Expiring soon section */}
-      {expiring.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-            <CalendarClock className="w-4 h-4 text-orange-500 shrink-0" /> Expiring Soon
-          </h3>
-          <div className="space-y-2">
-            {expiring.map((s) => {
-              const days = daysUntil(s.subscription_end_date);
-              return (
-                <div key={s.id} className={`rounded-xl border p-4 ${urgencyColor(days)}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs opacity-75 truncate">{s.owner_name}</p>
-                      <p className="text-xs mt-0.5 font-medium">
-                        {days <= 0
-                          ? 'Expires today!'
-                          : days === 1
-                          ? 'Expires tomorrow'
-                          : `Expires in ${days} days`}
-                        {' — '}{fmtDate(s.subscription_end_date)}
-                      </p>
-                    </div>
-                    {s.phone && (
-                      <button
-                        onClick={() => handleCall(s.phone)}
-                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/60 hover:bg-white transition-colors"
-                        title="Call shop"
-                      >
-                        <PhoneCall className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search shops…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
-      )}
+        <select
+          value={statusF} onChange={(e) => setStatusF(e.target.value)}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        >
+          <option value="all">All Shops ({shops.length})</option>
+          <option value="active">Active ({activeCount})</option>
+          <option value="expired">Expired ({expiredCount})</option>
+          <option value="inactive">Not Activated</option>
+        </select>
+      </div>
 
-      {/* Not renewed section */}
-      {expired.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-            <Bell className="w-4 h-4 text-red-500 shrink-0" /> Not Renewed (Expired)
-          </h3>
-          <div className="space-y-2">
-            {expired.map((s) => {
-              const since = s.subscription_end_date ? daysSince(s.subscription_end_date) : null;
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600 w-1/4">Shop</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Plan</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">End Date</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Renewal</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Last Payment</th>
+              <th className="text-right px-4 py-3 font-semibold text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center text-gray-400 py-10 text-sm">No shops found</td>
+              </tr>
+            )}
+            {filtered.map((s) => {
+              const days = daysUntil(s.subscription_end_date);
+              const followUpRequired = days !== null && days <= 7 && s.subscription_status === 'active';
               return (
-                <div key={s.id} className="bg-white rounded-xl border border-red-200 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{s.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{s.owner_name}</p>
-                      {since !== null && (
-                        <p className="text-xs text-red-600 mt-0.5">
-                          Expired {since === 0 ? 'today' : `${since} day${since > 1 ? 's' : ''} ago`}
-                          {s.subscription_end_date ? ` — ${fmtDate(s.subscription_end_date)}` : ''}
-                        </p>
-                      )}
-                    </div>
-                    {s.phone && (
-                      <button
-                        onClick={() => handleCall(s.phone)}
-                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
-                        title="Call shop"
-                      >
-                        <PhoneCall className="w-4 h-4" />
-                      </button>
+                <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${urgencyRowClass(days)}`}>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900 truncate max-w-[180px]">{s.name}</div>
+                    <div className="text-xs text-gray-500 truncate">{s.owner_name}</div>
+                    {followUpRequired && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-orange-700 bg-orange-100 rounded px-1.5 py-0.5">
+                        <Bell className="w-2.5 h-2.5" /> Follow-up Required
+                      </span>
                     )}
-                  </div>
-                </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{s.plan_name || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusChip(s.subscription_status)}`}>
+                      {s.subscription_status?.replace(/_/g, ' ') || '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{fmtDate(s.subscription_end_date)}</td>
+                  <td className="px-4 py-3 text-xs">{renewalLabel(s)}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{fmtDate(s.last_payment_date)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {s.phone && (
+                        <button
+                          onClick={() => window.open(`tel:${s.phone}`)}
+                          className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 hover:text-green-700 transition-colors"
+                          title="Call"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openNote(s)}
+                        className={`min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg transition-colors ${s.follow_up_note ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                        title={s.follow_up_note ? 'Edit note' : 'Add note'}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               );
             })}
+          </tbody>
+        </table>
+        {filtered.length > 0 && (
+          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+            {filtered.length} shop{filtered.length !== 1 ? 's' : ''}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-2">
+        {filtered.length === 0 && <Empty text="No shops found" />}
+        {filtered.map((s) => {
+          const days = daysUntil(s.subscription_end_date);
+          const followUpRequired = days !== null && days <= 7 && s.subscription_status === 'active';
+          const borderClass = days !== null && days <= 7 ? 'border-l-4 border-l-orange-400' : days !== null && days <= 0 ? 'border-l-4 border-l-red-500' : '';
+          return (
+            <div key={s.id} className={`bg-white rounded-xl border border-gray-200 p-4 ${borderClass}`}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-gray-900 truncate">{s.name}</p>
+                    {followUpRequired && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-100 rounded px-1.5 py-0.5 shrink-0">
+                        <Bell className="w-2.5 h-2.5" /> Follow-up
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">{s.owner_name}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {s.phone && (
+                    <button
+                      onClick={() => window.open(`tel:${s.phone}`)}
+                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openNote(s)}
+                    className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg transition-colors ${s.follow_up_note ? 'text-green-700 bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                <div>
+                  <span className="text-gray-400">Plan: </span>
+                  {s.plan_name || '—'}
+                </div>
+                <div>
+                  <span className="text-gray-400">Status: </span>
+                  <span className={`inline-block font-semibold px-1.5 py-0.5 rounded-full text-[10px] ${statusChip(s.subscription_status)}`}>
+                    {s.subscription_status?.replace(/_/g, ' ') || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400">End: </span>
+                  {fmtDate(s.subscription_end_date)}
+                </div>
+                <div>
+                  <span className="text-gray-400">Renewal: </span>
+                  {renewalLabel(s)}
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-400">Last payment: </span>
+                  {fmtDate(s.last_payment_date)}
+                </div>
+                {s.follow_up_note && (
+                  <div className="col-span-2 mt-1 text-green-700 bg-green-50 rounded p-2 italic">
+                    "{s.follow_up_note}"
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Note editor modal */}
+      {noteOpen !== null && (() => {
+        const shop = shops.find((s) => s.id === noteOpen);
+        if (!shop) return null;
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+              <div className="p-4 border-b border-gray-100">
+                <p className="font-semibold text-gray-900">Follow-up Note</p>
+                <p className="text-xs text-gray-500">{shop.name}</p>
+              </div>
+              <div className="p-4">
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  rows={4}
+                  placeholder="Add a follow-up note for this shop…"
+                  className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  autoFocus
+                />
+              </div>
+              <div className="p-4 pt-0 flex gap-2">
+                <button
+                  onClick={closeNote}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => saveNote(noteOpen)}
+                  disabled={noteSaving}
+                  className="flex-1 py-2.5 bg-green-700 hover:bg-green-800 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                >
+                  {noteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1712,7 +1891,7 @@ function RenewalsTab() {
 const TABS = [
   { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, component: DashboardTab  },
   { id: 'shops',       label: 'Shops',       icon: Store,           component: ShopsTab      },
-  { id: 'renewals',    label: 'Renewals',    icon: CalendarClock,   component: RenewalsTab   },
+  { id: 'renewals',    label: 'Subscriptions', icon: CalendarClock,   component: RenewalsTab   },
   { id: 'payments',    label: 'Payments',    icon: CreditCard,      component: PaymentsTab   },
   { id: 'commissions', label: 'Commissions', icon: Wallet,          component: CommissionsTab},
   { id: 'profile',     label: 'Settings',    icon: Settings,        component: ProfileTab    },

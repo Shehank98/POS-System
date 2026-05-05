@@ -280,6 +280,8 @@ export const agentApi = {
   bankDetails:          (data)    => agentClient.put('/agents/me/bank-details', data),
   plans:                ()        => agentClient.get('/agents/me/plans'),
   renewals:             ()        => agentClient.get('/agents/me/renewals'),
+  subscriptions:        ()        => agentClient.get('/agents/me/subscriptions'),
+  saveShopNote:         (shopId, note) => agentClient.put(`/agents/me/shops/${shopId}/note`, { note }),
 };
 
 // ── Admin API (uses separate admin token) ────────────────────
