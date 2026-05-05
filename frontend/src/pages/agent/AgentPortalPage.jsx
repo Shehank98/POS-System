@@ -36,7 +36,7 @@ function statusChip(status) {
 
 function StatusBadge({ status, label }) {
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusChip(status)}`}>
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize whitespace-nowrap ${statusChip(status)}`}>
       {label || status?.replace('_', ' ')}
     </span>
   );
@@ -52,12 +52,12 @@ function StatCard({ label, value, icon: Icon, color = 'green' }) {
   };
   const c = colors[color] || colors.green;
   return (
-    <div className={`${c.bg} rounded-xl p-4 border border-white`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className={`w-4 h-4 ${c.icon}`} />
-        <span className="text-xs text-gray-500 font-medium">{label}</span>
+    <div className={`${c.bg} rounded-xl p-3 sm:p-4 border border-white`}>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon className={`w-4 h-4 shrink-0 ${c.icon}`} />
+        <span className="text-xs text-gray-500 font-medium leading-tight">{label}</span>
       </div>
-      <p className={`text-lg font-bold ${c.val} truncate`}>{value}</p>
+      <p className={`text-base sm:text-lg font-bold ${c.val} truncate`}>{value}</p>
     </div>
   );
 }
@@ -86,22 +86,22 @@ function DashboardTab() {
     : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Total Shops"   value={data.total_customers}  icon={Store}      color="green" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <StatCard label="Total Shops"   value={data.total_customers}  icon={Store}       color="green" />
         <StatCard label="Active Shops"  value={data.active_customers} icon={CheckCircle} color="blue" />
-        <StatCard label="Approved Earn" value={fmtMoney(data.approved_earnings)} icon={Wallet}  color="green" />
-        <StatCard label="Pending Earn"  value={fmtMoney(data.pending_earnings)}  icon={Lock}    color="yellow" />
+        <StatCard label="Approved Earn" value={fmtMoney(data.approved_earnings)} icon={Wallet} color="green" />
+        <StatCard label="Pending Earn"  value={fmtMoney(data.pending_earnings)}  icon={Lock}   color="yellow" />
       </div>
 
       {/* Monthly target */}
       {data.monthly_target > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <span className="text-sm font-semibold text-gray-700">Monthly Target</span>
-            <span className="text-sm text-gray-500">
-              {data.active_customers} / {data.monthly_target} active shops
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              {data.active_customers} / {data.monthly_target}
             </span>
           </div>
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -116,8 +116,8 @@ function DashboardTab() {
 
       {/* Pending submissions alert */}
       {data.pending_submissions > 0 && (
-        <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+        <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
           <p className="text-sm text-yellow-800">
             <strong>{data.pending_submissions}</strong> payment submission(s) awaiting admin verification
           </p>
@@ -128,13 +128,13 @@ function DashboardTab() {
       {data.expiring_soon?.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> Expiring Soon (within 3 days)
+            <AlertCircle className="w-4 h-4 shrink-0" /> Expiring Soon (within 3 days)
           </h3>
           <div className="space-y-2">
             {data.expiring_soon.map((s, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-800">{s.name}</span>
-                <span className="text-red-600">{fmtDate(s.subscription_end_date)}</span>
+              <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                <span className="font-medium text-gray-800 truncate">{s.name}</span>
+                <span className="text-red-600 whitespace-nowrap shrink-0">{fmtDate(s.subscription_end_date)}</span>
               </div>
             ))}
           </div>
@@ -227,7 +227,7 @@ function OnboardWizard({ onDone, onClose }) {
                              'text-gray-400'
           }`}>
             <span className="inline-flex items-center gap-1">
-              <span className={`w-4 h-4 rounded-full text-[10px] inline-flex items-center justify-center font-bold ${
+              <span className={`w-4 h-4 rounded-full text-[10px] inline-flex items-center justify-center font-bold shrink-0 ${
                 i + 1 < step ? 'bg-green-600 text-white' : i + 1 === step ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-500'
               }`}>{i + 1}</span>
               <span className="hidden sm:inline">{label}</span>
@@ -252,7 +252,7 @@ function OnboardWizard({ onDone, onClose }) {
                 <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
                 <input type={f.type} value={form[f.key]}
                   onChange={(e) => set(f.key, e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             ))}
             <div>
@@ -260,7 +260,7 @@ function OnboardWizard({ onDone, onClose }) {
               <select
                 value={form.shop_type}
                 onChange={(e) => set('shop_type', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 {SHOP_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -283,7 +283,7 @@ function OnboardWizard({ onDone, onClose }) {
                 <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
                 <input type={f.type} value={form[f.key]}
                   onChange={(e) => set(f.key, e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             ))}
           </>
@@ -308,7 +308,7 @@ function OnboardWizard({ onDone, onClose }) {
                         onChange={() => set('plan_id', p.id)}
                         className="mt-0.5 accent-green-700" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
                           <span className="font-semibold text-sm text-gray-800">{p.name}</span>
                           <span className="text-sm font-bold text-green-700">LKR {Number(p.base_monthly_price).toLocaleString()}/mo</span>
                         </div>
@@ -324,7 +324,7 @@ function OnboardWizard({ onDone, onClose }) {
                 {MONTH_OPTS.map((o) => (
                   <button key={o.v} type="button"
                     onClick={() => set('subscription_months', o.v)}
-                    className={`py-2 text-xs rounded-lg border font-medium transition-colors ${
+                    className={`py-2.5 text-xs rounded-lg border font-medium transition-colors ${
                       form.subscription_months === o.v
                         ? 'bg-green-700 text-white border-green-700'
                         : 'border-gray-300 text-gray-600 hover:border-green-400'
@@ -376,11 +376,11 @@ function OnboardWizard({ onDone, onClose }) {
         <div className="flex gap-2 pt-1">
           {step > 1
             ? <button type="button" onClick={() => setStep((s) => s - 1)}
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
                 Back
               </button>
             : <button type="button" onClick={onClose}
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
                 Cancel
               </button>
           }
@@ -391,11 +391,11 @@ function OnboardWizard({ onDone, onClose }) {
                   (step === 2 && (!form.username || form.password.length < 6))
                 }
                 onClick={() => setStep((s) => s + 1)}
-                className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
                 Next
               </button>
             : <button type="button" disabled={saving} onClick={handleSubmit}
-                className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+                className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Onboard Shop'}
               </button>
           }
@@ -425,8 +425,8 @@ function ShopQRModal({ shop, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-        <h3 className="font-bold text-gray-900 mb-1">HelaPay QR – {shop.name}</h3>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6">
+        <h3 className="font-bold text-gray-900 mb-1 truncate">HelaPay QR – {shop.name}</h3>
         <p className="text-xs text-gray-500 mb-4">
           Ref: <span className="font-mono font-semibold">{shop.shop_reference_id}</span> · LKR 2,500.00
         </p>
@@ -436,7 +436,7 @@ function ShopQRModal({ shop, onClose }) {
           </div>
         ) : qr ? (
           <div className="text-center">
-            <img src={qr} alt="Payment QR" className="mx-auto w-56 h-56 border rounded-xl p-2" />
+            <img src={qr} alt="Payment QR" className="mx-auto w-52 h-52 sm:w-56 sm:h-56 border rounded-xl p-2" />
             <p className="text-xs text-gray-400 mt-2 font-mono break-all">{reference}</p>
             <p className="text-xs text-green-700 mt-2 font-medium">
               QR recorded — admin can verify payment once scanned
@@ -447,7 +447,7 @@ function ShopQRModal({ shop, onClose }) {
         )}
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+          className="mt-4 w-full min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
         >
           Close
         </button>
@@ -469,7 +469,7 @@ function ShopRegisterForm({ onDone, onClose }) {
   const [result, setResult]   = useState(null);
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
-  const fc  = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+  const fc  = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -502,9 +502,9 @@ function ShopRegisterForm({ onDone, onClose }) {
 
   if (result) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-4">
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
+          <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <h3 className="font-bold text-green-800">Shop Registered!</h3>
         </div>
         <p className="text-sm text-green-700">
@@ -524,8 +524,8 @@ function ShopRegisterForm({ onDone, onClose }) {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Close</button>
-          <button onClick={onDone} className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+          <button onClick={onClose} className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Close</button>
+          <button onClick={onDone} className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
             Register Another
           </button>
         </div>
@@ -534,7 +534,7 @@ function ShopRegisterForm({ onDone, onClose }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+    <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4">
       <h3 className="font-bold text-gray-800">Register New Shop</h3>
 
       <fieldset className="space-y-3">
@@ -603,8 +603,8 @@ function ShopRegisterForm({ onDone, onClose }) {
       </fieldset>
 
       <div className="flex gap-2 pt-1">
-        <button type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+        <button type="button" onClick={onClose} className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button type="submit" disabled={saving} className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Registering…</> : 'Register Shop'}
         </button>
       </div>
@@ -619,7 +619,7 @@ function InfoRow({ label, value, onCopy }) {
       <div className="flex items-center gap-1 min-w-0">
         <span className="text-xs font-mono font-semibold text-gray-800 truncate">{value}</span>
         {onCopy && (
-          <button onClick={onCopy} className="p-0.5 text-gray-400 hover:text-green-600 shrink-0">
+          <button onClick={onCopy} className="p-1 text-gray-400 hover:text-green-600 shrink-0 min-h-[44px] min-w-[32px] flex items-center justify-center">
             <Copy className="w-3 h-3" />
           </button>
         )}
@@ -642,7 +642,6 @@ function ShopsTab() {
       const { data } = await agentApi.shops();
       setShops(Array.isArray(data) ? data : []);
     } catch {
-      // Fall back to legacy customers endpoint
       try {
         const { data } = await agentApi.customers();
         setShops(Array.isArray(data) ? data : data.customers || []);
@@ -665,26 +664,26 @@ function ShopsTab() {
 
   const activationBadge = (s) => {
     if (s.activation_status === 'inactive') {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Inactive – Awaiting Payment</span>;
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 whitespace-nowrap">Awaiting Payment</span>;
     }
     return null;
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {qrShop && <ShopQRModal shop={qrShop} onClose={() => setQrShop(null)} />}
 
-      {/* Search + Register */}
-      <div className="flex gap-3">
+      {/* Search + Register — stack on very small screens */}
+      <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
         <input
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="flex-1 min-h-[44px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           placeholder="Search shops…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
+          className="flex items-center justify-center gap-1.5 min-h-[44px] px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" /> Register
         </button>
@@ -709,13 +708,13 @@ function ShopsTab() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-gray-900 truncate">{s.name}</p>
                       {s.shop_reference_id && (
-                        <span className="text-xs font-mono text-gray-400">{s.shop_reference_id}</span>
+                        <span className="text-xs font-mono text-gray-400 shrink-0">{s.shop_reference_id}</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500">{s.owner_name}</p>
+                    <p className="text-sm text-gray-500 truncate">{s.owner_name}</p>
                     {s.contact_number && <p className="text-xs text-gray-400">{s.contact_number}</p>}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-1 shrink-0">
                     <StatusBadge status={s.subscription_status} />
                     {activationBadge(s)}
                   </div>
@@ -724,7 +723,7 @@ function ShopsTab() {
                 {/* Location */}
                 {(s.location_lat || s.location_map_url) && (
                   <div className="flex items-center gap-1 mt-2">
-                    <MapPin className="w-3 h-3 text-gray-400" />
+                    <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
                     {s.location_map_url ? (
                       <a href={s.location_map_url} target="_blank" rel="noreferrer"
                         className="text-xs text-blue-600 underline">View on map</a>
@@ -742,13 +741,13 @@ function ShopsTab() {
                 {s.activation_status === 'inactive' && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <p className="text-xs text-orange-600 mb-2 font-medium">
-                      Payment required to activate this shop account (LKR 2,500)
+                      Payment required to activate this shop (LKR 2,500)
                     </p>
                     <button
                       onClick={() => setQrShop(s)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700"
+                      className="flex items-center gap-1.5 min-h-[44px] px-4 py-2 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700"
                     >
-                      <QrCode className="w-3 h-3" /> Generate HelaPay QR
+                      <QrCode className="w-3.5 h-3.5" /> Generate HelaPay QR
                     </button>
                   </div>
                 )}
@@ -816,11 +815,12 @@ function PaymentsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Header row — stacks on small screens */}
+      <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:justify-between">
         <h3 className="font-semibold text-gray-700 text-sm">Payment Submissions</h3>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
+          className="flex items-center justify-center gap-1.5 min-h-[44px] px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800"
         >
           <Plus className="w-4 h-4" /> Submit Payment
         </button>
@@ -838,7 +838,7 @@ function PaymentsTab() {
               required
               value={form.shop_id}
               onChange={(e) => setForm((p) => ({ ...p, shop_id: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">— Choose shop —</option>
               {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -852,7 +852,7 @@ function PaymentsTab() {
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               placeholder="0.00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
@@ -863,7 +863,7 @@ function PaymentsTab() {
               max={todayStr()}
               value={form.payment_date}
               onChange={(e) => setForm((p) => ({ ...p, payment_date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
@@ -879,11 +879,11 @@ function PaymentsTab() {
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={() => setShowForm(false)}
-              className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+              className="flex-1 min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
               Cancel
             </button>
             <button type="submit" disabled={saving}
-              className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+              className="flex-1 min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
               {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit'}
             </button>
           </div>
@@ -898,8 +898,8 @@ function PaymentsTab() {
             {payments.map((p) => (
               <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-900">{p.shop_name}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{p.shop_name}</p>
                     <p className="text-sm font-bold text-green-700 mt-0.5">{fmtMoney(p.amount)}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {p.payment_method?.toUpperCase()} · {fmtDate(p.payment_date)}
@@ -957,15 +957,15 @@ function CommissionsTab() {
         <h4 className="text-sm font-semibold text-gray-600 mb-2">{title}</h4>
         <div className="space-y-2">
           {items.map((c) => (
-            <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">{c.shop_name}</p>
+            <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">{c.shop_name}</p>
                 <p className="text-xs text-gray-400 capitalize">
                   {c.commission_type}
                   {c.month ? ` · ${new Date(c.month).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}` : ''}
                 </p>
               </div>
-              <p className={`font-bold text-sm ${color}`}>{fmtMoney(c.amount)}</p>
+              <p className={`font-bold text-sm shrink-0 ${color}`}>{fmtMoney(c.amount)}</p>
             </div>
           ))}
         </div>
@@ -974,12 +974,12 @@ function CommissionsTab() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Approved"    value={fmtMoney(totalApproved)} icon={CheckCircle} color="green" />
-        <StatCard label="Paid Out"    value={fmtMoney(totalPaid)}     icon={Wallet}      color="blue" />
-        <StatCard label="Locked"      value={fmtMoney(totalLocked)}   icon={Lock}        color="yellow" />
+    <div className="space-y-4 sm:space-y-5">
+      {/* Summary — 3 cols on all sizes, smaller text on mobile */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatCard label="Approved"  value={fmtMoney(totalApproved)} icon={CheckCircle} color="green" />
+        <StatCard label="Paid Out"  value={fmtMoney(totalPaid)}     icon={Wallet}      color="blue" />
+        <StatCard label="Locked"    value={fmtMoney(totalLocked)}   icon={Lock}        color="yellow" />
       </div>
 
       {list.length === 0
@@ -1003,8 +1003,8 @@ function ProfileTab() {
   const [form, setForm] = useState({
     bank_name: '', bank_account: '', bank_branch: '', account_holder: '',
   });
-  const [loaded,  setLoaded]     = useState(false);
-  const [saving,  setSaving]     = useState(false);
+  const [loaded,    setLoaded]    = useState(false);
+  const [saving,    setSaving]    = useState(false);
   const [uploading, setUploading] = useState(false);
   const agreementRef = useRef(null);
 
@@ -1071,7 +1071,7 @@ function ProfileTab() {
 
   if (!loaded) return <Spinner />;
 
-  const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+  const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
   const approvalColor = {
     active:   'bg-green-100 text-green-800',
     pending:  'bg-yellow-100 text-yellow-800',
@@ -1079,21 +1079,21 @@ function ProfileTab() {
   }[profile?.approval_status || 'active'] || 'bg-gray-100 text-gray-600';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {/* Identity card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
         <div className="flex items-center gap-3 mb-4">
           {profile?.agent_photo_url ? (
             <img src={profile.agent_photo_url} alt="Agent photo"
-              className="w-14 h-14 rounded-full object-cover border-2 border-green-200" />
+              className="w-14 h-14 rounded-full object-cover border-2 border-green-200 shrink-0" />
           ) : (
             <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center shrink-0">
               <User className="w-7 h-7 text-green-700" />
             </div>
           )}
-          <div>
-            <p className="font-bold text-gray-900">{profile?.name || agent?.name}</p>
-            <p className="text-sm text-gray-500">{profile?.email || agent?.email}</p>
+          <div className="min-w-0">
+            <p className="font-bold text-gray-900 truncate">{profile?.name || agent?.name}</p>
+            <p className="text-sm text-gray-500 truncate">{profile?.email || agent?.email}</p>
             <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${approvalColor}`}>
               {profile?.approval_status || 'active'}
             </span>
@@ -1103,28 +1103,29 @@ function ProfileTab() {
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div><p className="text-gray-400">Phone</p><p className="font-medium text-gray-700">{profile?.phone || '—'}</p></div>
           <div><p className="text-gray-400">District</p><p className="font-medium text-gray-700">{profile?.district || '—'}</p></div>
-          <div><p className="text-gray-400">NIC Number</p><p className="font-medium text-gray-700">{profile?.nic_number || '—'}</p></div>
+          <div><p className="text-gray-400">NIC Number</p><p className="font-medium text-gray-700 break-all">{profile?.nic_number || '—'}</p></div>
           <div><p className="text-gray-400">Driving License</p><p className="font-medium text-gray-700">{profile?.driving_license_number || '—'}</p></div>
-          <div className="col-span-2"><p className="text-gray-400">Member Since</p>
+          <div className="col-span-2">
+            <p className="text-gray-400">Member Since</p>
             <p className="font-medium text-gray-700">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) : '—'}</p>
           </div>
         </div>
       </div>
 
-      {/* Login credentials display */}
+      {/* Login credentials */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Settings className="w-4 h-4 text-blue-700" />
+          <Settings className="w-4 h-4 text-blue-700 shrink-0" />
           <h3 className="font-semibold text-blue-800 text-sm">Account Credentials</h3>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-blue-600">Email / Login</span>
-            <span className="text-xs font-mono font-semibold text-blue-900">{profile?.email || agent?.email}</span>
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-xs text-blue-600 shrink-0">Email / Login</span>
+            <span className="text-xs font-mono font-semibold text-blue-900 text-right break-all">{profile?.email || agent?.email}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-blue-600">Portal URL</span>
-            <span className="text-xs font-mono text-blue-900">{window.location.origin}/agent/login</span>
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-xs text-blue-600 shrink-0">Portal URL</span>
+            <span className="text-xs font-mono text-blue-900 text-right break-all">{window.location.origin}/agent/login</span>
           </div>
         </div>
         <p className="text-xs text-blue-500 mt-2">To change your password, contact your admin.</p>
@@ -1135,17 +1136,17 @@ function ProfileTab() {
         <h3 className="font-semibold text-gray-800 text-sm mb-3">Uploaded Documents</h3>
         <div className="space-y-2">
           {[
-            { label: 'NIC Front',          url: profile?.nic_front_url },
-            { label: 'NIC Back',           url: profile?.nic_back_url },
-            { label: 'Agent Photo',        url: profile?.agent_photo_url },
-            { label: 'Bank Book',          url: profile?.bank_book_url },
-            { label: 'Signed Agreement',   url: profile?.signed_agreement_url },
+            { label: 'NIC Front',        url: profile?.nic_front_url },
+            { label: 'NIC Back',         url: profile?.nic_back_url },
+            { label: 'Agent Photo',      url: profile?.agent_photo_url },
+            { label: 'Bank Book',        url: profile?.bank_book_url },
+            { label: 'Signed Agreement', url: profile?.signed_agreement_url },
           ].map(({ label, url }) => (
-            <div key={label} className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">{label}</span>
+            <div key={label} className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-gray-500 shrink-0">{label}</span>
               {url ? (
                 <a href={url} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1 text-green-700 font-medium hover:underline">
+                  className="flex items-center gap-1 text-green-700 font-medium hover:underline min-h-[32px]">
                   <Eye className="w-3 h-3" /> View
                 </a>
               ) : (
@@ -1162,7 +1163,7 @@ function ProfileTab() {
           <button
             onClick={() => agreementRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-60"
+            className="flex items-center gap-1.5 min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-60"
           >
             {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
             {uploading ? 'Uploading…' : 'Upload Signed Agreement'}
@@ -1173,7 +1174,7 @@ function ProfileTab() {
       {/* Bank details form */}
       <form onSubmit={handleSave} className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
         <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-green-700" />
+          <Building2 className="w-4 h-4 text-green-700 shrink-0" />
           <h3 className="font-semibold text-gray-800 text-sm">Bank Details</h3>
         </div>
         <p className="text-xs text-gray-500">Used for commission payouts. Ensure accuracy.</p>
@@ -1200,7 +1201,7 @@ function ProfileTab() {
         </div>
 
         <button type="submit" disabled={saving}
-          className="w-full py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
+          className="w-full min-h-[44px] bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-60 flex items-center justify-center gap-2">
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Bank Details</>}
         </button>
       </form>
@@ -1217,7 +1218,7 @@ function Spinner() {
   );
 }
 function Empty({ text }) {
-  return <p className="text-center text-gray-400 py-16 text-sm">{text}</p>;
+  return <p className="text-center text-gray-400 py-16 text-sm px-4">{text}</p>;
 }
 
 // ── Renewals Tab ──────────────────────────────────────────────
@@ -1267,7 +1268,7 @@ function RenewalsTab() {
   if (renewals.length === 0) return <Empty text="No shops requiring renewal attention" />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {/* Summary badges */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
@@ -1284,7 +1285,7 @@ function RenewalsTab() {
       {expiring.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-            <CalendarClock className="w-4 h-4 text-orange-500" /> Expiring Soon
+            <CalendarClock className="w-4 h-4 text-orange-500 shrink-0" /> Expiring Soon
           </h3>
           <div className="space-y-2">
             {expiring.map((s) => {
@@ -1294,7 +1295,7 @@ function RenewalsTab() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs opacity-75">{s.owner_name}</p>
+                      <p className="text-xs opacity-75 truncate">{s.owner_name}</p>
                       <p className="text-xs mt-0.5 font-medium">
                         {days <= 0
                           ? 'Expires today!'
@@ -1307,7 +1308,7 @@ function RenewalsTab() {
                     {s.phone && (
                       <button
                         onClick={() => handleCall(s.phone)}
-                        className="shrink-0 p-2 rounded-lg bg-white/60 hover:bg-white transition-colors"
+                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/60 hover:bg-white transition-colors"
                         title="Call shop"
                       >
                         <PhoneCall className="w-4 h-4" />
@@ -1325,7 +1326,7 @@ function RenewalsTab() {
       {expired.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-            <Bell className="w-4 h-4 text-red-500" /> Not Renewed (Expired)
+            <Bell className="w-4 h-4 text-red-500 shrink-0" /> Not Renewed (Expired)
           </h3>
           <div className="space-y-2">
             {expired.map((s) => {
@@ -1335,7 +1336,7 @@ function RenewalsTab() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{s.name}</p>
-                      <p className="text-xs text-gray-500">{s.owner_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{s.owner_name}</p>
                       {since !== null && (
                         <p className="text-xs text-red-600 mt-0.5">
                           Expired {since === 0 ? 'today' : `${since} day${since > 1 ? 's' : ''} ago`}
@@ -1346,7 +1347,7 @@ function RenewalsTab() {
                     {s.phone && (
                       <button
                         onClick={() => handleCall(s.phone)}
-                        className="shrink-0 p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
                         title="Call shop"
                       >
                         <PhoneCall className="w-4 h-4" />
@@ -1384,42 +1385,43 @@ export default function AgentPortalPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-gradient-to-r from-green-800 to-green-700 text-white shadow-md">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="font-bold text-lg leading-tight">{agent?.name || 'Agent Portal'}</p>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-bold text-base sm:text-lg leading-tight truncate">{agent?.name || 'Agent Portal'}</p>
             {agent?.district && (
-              <p className="text-green-200 text-xs">{agent.district}</p>
+              <p className="text-green-200 text-xs truncate">{agent.district}</p>
             )}
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 text-green-200 hover:text-white text-sm transition-colors"
+            className="flex items-center gap-1.5 text-green-200 hover:text-white text-sm transition-colors shrink-0 min-h-[44px] px-2"
           >
-            <LogOut className="w-4 h-4" /> Sign Out
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
 
-        {/* Tab bar */}
-        <div className="max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto pb-0">
+        {/* Tab bar — icons only on xs, icons + label on sm+ */}
+        <div className="max-w-5xl mx-auto px-2 sm:px-4 flex overflow-x-auto scrollbar-none pb-0">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors shrink-0 min-h-[48px] ${
                 activeTab === t.id
                   ? 'border-white text-white'
                   : 'border-transparent text-green-200 hover:text-white'
               }`}
             >
-              <t.icon className="w-4 h-4" />
-              {t.label}
+              <t.icon className="w-4 h-4 sm:w-4 sm:h-4" />
+              <span className="text-[10px] sm:text-sm leading-tight">{t.label}</span>
             </button>
           ))}
         </div>
       </header>
 
       {/* Content */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6">
         <ActiveComponent />
       </main>
     </div>
