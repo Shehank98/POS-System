@@ -3,6 +3,9 @@ const agentAuth = require('../middleware/agentAuth');
 const ctrl      = require('../controllers/agentController');
 const notifCtrl = require('../controllers/notificationController');
 
+// Public: selfie upload before shop registration (no auth needed)
+router.post('/shops/upload-selfie', ctrl.uploadShopSelfie);
+
 router.use(agentAuth);
 
 // Dashboard

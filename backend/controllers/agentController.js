@@ -2,6 +2,33 @@ const bcrypt = require('bcryptjs');
 const db     = require('../config/database');
 const { createAdminNotification, ADMIN_TYPES } = require('./notificationController');
 const { recalculateRiskScore } = require('../services/riskScoringService');
+const { uploadFile } = require('../utils/storageService');
+
+// ── POST /api/agents/shops/upload-selfie (public) ─────────────
+async function uploadShopSelfie(req, res) {
+  const { fileData, ref } = req.body;
+  if (!fileData) return res.status(400).json({ error: 'fileData is required' });
+
+  const mime = fileData.match(/^data:(image\/[a-zA-Z]+);base64,/)?.[1] || '';
+  if (!['image/jpeg', 'image/jpg', 'image/png'].includes(mime)) {
+    return res.status(400).json({ error: 'Only JPG and PNG images are accepted' });
+  }
+  const base64 = fileData.replace(/^data:[^;]+;base64,/, '');
+  const sizeBytes = Math.ceil(base64.length * 0.75);
+  if (sizeBytes > 5 * 1024 * 1024) {
+    return res.status(400).json({ error: 'File must be under 5MB' });
+  }
+
+  try {
+    const ext  = mime.includes('png') ? 'png' : 'jpg';
+    const dest = `shops/selfies/${ref || 'tmp'}_${Date.now()}.${ext}`;
+    const url  = await uploadFile(fileData, dest, mime);
+    res.json({ url });
+  } catch (err) {
+    console.error('uploadShopSelfie error:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+}
 
 // ── GET /api/agents/me/dashboard ──────────────────────────────
 async function getDashboard(req, res) {
@@ -433,6 +460,7 @@ async function registerShop(req, res) {
   const {
     shop_name, owner_name, contact_number,
     location_lat, location_lng, location_map_url,
+    selfie_url,
     br_number,
     // Login credentials for the shop owner
     email, username, password,
@@ -448,6 +476,9 @@ async function registerShop(req, res) {
   const MAPS_RE = /^https?:\/\/(www\.)?(maps\.google\.|google\.[a-z.]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl)/i;
   if (!MAPS_RE.test(location_map_url)) {
     return res.status(400).json({ error: 'Please provide a valid Google Maps link' });
+  }
+  if (!selfie_url) {
+    return res.status(400).json({ error: 'Shop selfie is required' });
   }
   if (!email || !username || !password) {
     return res.status(400).json({ error: 'email, username, and password are required for shop login' });
@@ -469,18 +500,18 @@ async function registerShop(req, res) {
       `INSERT INTO shops
          (name, owner_name, email, phone, contact_number,
           location_lat, location_lng, location_map_url,
-          br_number, shop_reference_id,
+          selfie_url, br_number, shop_reference_id,
           subscription_status, activation_status,
           onboarded_by_agent_id, shop_type)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending_payment','inactive',$11,$12)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending_payment','inactive',$12,$13)
        RETURNING id, name, owner_name, email, shop_reference_id, activation_status,
-                 subscription_status, contact_number, location_lat, location_lng,
-                 location_map_url, br_number, created_at`,
+                 subscription_status, contact_number, location_map_url,
+                 selfie_url, br_number, created_at`,
       [
         shop_name.trim(), owner_name.trim(),
         email.toLowerCase().trim(), contact_number, contact_number,
-        location_lat   || null, location_lng   || null, location_map_url || null,
-        br_number      || null, shopRefId,
+        location_lat || null, location_lng || null, location_map_url,
+        selfie_url, br_number || null, shopRefId,
         agentId, shop_type,
       ]
     );
@@ -551,7 +582,7 @@ async function listShops(req, res) {
       SELECT s.id, s.name, s.owner_name, s.email, s.contact_number,
              s.shop_reference_id, s.activation_status,
              s.location_lat, s.location_lng, s.location_map_url,
-             s.br_number, s.subscription_status, s.subscription_end_date,
+             s.selfie_url, s.br_number, s.subscription_status, s.subscription_end_date,
              s.plan_id, sp.name AS plan_name, s.created_at,
              (SELECT COUNT(*) FROM shop_payment_proofs WHERE shop_id = s.id AND status = 'pending') AS pending_proofs
         FROM shops s
@@ -647,5 +678,5 @@ module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
   listPlans,
-  registerShop, listShops, generateShopPaymentQR, listShopPayments,
+  uploadShopSelfie, registerShop, listShops, generateShopPaymentQR, listShopPayments,
 };

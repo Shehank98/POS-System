@@ -458,8 +458,10 @@ function ShopQRModal({ shop, onClose }) {
 
 // ── Shop Registration Form ────────────────────────────────────
 const MAPS_RE = /^https?:\/\/(www\.)?(maps\.google\.|google\.[a-z.]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl)/i;
+const MAX_SELFIE_BYTES = 5 * 1024 * 1024;
 
 function ShopRegisterForm({ onDone, onClose }) {
+  const selfieRef = useRef(null);
   const [form, setForm] = useState({
     shop_name: '', owner_name: '', contact_number: '',
     location_map_url: '',
@@ -467,6 +469,9 @@ function ShopRegisterForm({ onDone, onClose }) {
     email: '', username: '', password: '',
     shop_type: 'retail',
   });
+  const [selfie, setSelfie]           = useState(null);   // { preview, url } after upload
+  const [selfieUploading, setSelfieU] = useState(false);
+  const [selfieError, setSelfieErr]   = useState('');
   const [mapUrlError, setMapUrlError] = useState('');
   const [saving, setSaving]           = useState(false);
   const [result, setResult]           = useState(null);
@@ -479,6 +484,38 @@ function ShopRegisterForm({ onDone, onClose }) {
     }
   };
   const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+
+  async function handleSelfieChange(e) {
+    const file = e.target.files?.[0];
+    if (selfieRef.current) selfieRef.current.value = '';
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      setSelfieErr('Only JPG and PNG images are accepted');
+      return;
+    }
+    if (file.size > MAX_SELFIE_BYTES) {
+      setSelfieErr('Image must be under 5MB');
+      return;
+    }
+    setSelfieErr('');
+    setSelfieU(true);
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const fileData = ev.target.result;
+        const { data } = await agentApi.uploadShopSelfie({ fileData, ref: form.shop_name || 'shop' });
+        setSelfie({ preview: fileData, url: data.url });
+        toast.success('Selfie uploaded');
+      } catch (err) {
+        setSelfieErr(err.response?.data?.error || 'Upload failed — try again');
+      } finally {
+        setSelfieU(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -494,13 +531,17 @@ function ShopRegisterForm({ onDone, onClose }) {
       toast.error('Please enter a valid Google Maps link');
       return;
     }
+    if (!selfie?.url) {
+      toast.error('Please upload a selfie with the shop clearly visible');
+      return;
+    }
     if (!form.email || !form.username || !form.password) {
       toast.error('Shop login credentials are required');
       return;
     }
     setSaving(true);
     try {
-      const { data } = await agentApi.registerShop(form);
+      const { data } = await agentApi.registerShop({ ...form, selfie_url: selfie.url });
       setResult(data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to register shop');
@@ -598,6 +639,58 @@ function ShopRegisterForm({ onDone, onClose }) {
             Open Google Maps → find the location → tap Share → Copy link
           </p>
         </div>
+      </fieldset>
+
+      {/* Selfie upload */}
+      <fieldset className="space-y-2">
+        <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+          <User className="w-3 h-3" /> Selfie
+        </legend>
+        <p className="text-xs text-gray-400">
+          Take a photo of yourself standing in front of the shop — the shop signage must be clearly visible.
+        </p>
+
+        <input
+          ref={selfieRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png"
+          className="hidden"
+          onChange={handleSelfieChange}
+        />
+
+        {selfie?.preview ? (
+          <div className="space-y-2">
+            <img
+              src={selfie.preview}
+              alt="Shop selfie preview"
+              className="w-full max-h-48 object-cover rounded-xl border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={() => { setSelfie(null); setSelfieErr(''); }}
+              className="text-xs text-red-500 hover:underline"
+            >
+              Remove & re-upload
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => selfieRef.current?.click()}
+            disabled={selfieUploading}
+            className={`flex items-center justify-center gap-2 w-full min-h-[56px] border-2 border-dashed rounded-xl text-sm transition-colors disabled:opacity-60 ${
+              selfieError
+                ? 'border-red-400 text-red-500 bg-red-50'
+                : 'border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-600 hover:bg-green-50'
+            }`}
+          >
+            {selfieUploading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+              : <><Upload className="w-4 h-4" /> Selfie with Shop <span className="text-red-500">*</span></>
+            }
+          </button>
+        )}
+        {selfieError && <p className="text-xs text-red-500">{selfieError}</p>}
       </fieldset>
 
       <fieldset className="space-y-3">

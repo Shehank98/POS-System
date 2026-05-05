@@ -827,14 +827,28 @@ function ShopPaymentsTab() {
                   </div>
                   {p.admin_note && <p className="text-xs text-red-400 mt-1">Note: {p.admin_note}</p>}
                 </div>
-                <div className="text-right shrink-0">
+                <div className="shrink-0 flex flex-col items-end gap-2">
+                  {p.shop_selfie_url && (
+                    <a href={p.shop_selfie_url} target="_blank" rel="noreferrer" title="Shop selfie — click to enlarge">
+                      <img
+                        src={p.shop_selfie_url}
+                        alt="Shop selfie"
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-600 hover:border-purple-400 transition-colors"
+                      />
+                    </a>
+                  )}
+                <div className="text-right space-y-1">
                   <p className="text-lg font-bold text-white">LKR {Number(p.amount || 0).toLocaleString()}</p>
+                  {p.shop_selfie_url && (
+                    <a href={p.shop_selfie_url} target="_blank" rel="noreferrer"
+                      className="text-xs text-purple-400 underline block">Shop selfie</a>
+                  )}
                   {p.proof_url && (
                     <a href={p.proof_url} target="_blank" rel="noreferrer"
-                      className="text-xs text-indigo-400 underline block mt-1">View proof</a>
+                      className="text-xs text-indigo-400 underline block">View proof</a>
                   )}
                   {p.qr_reference && (
-                    <p className="text-xs text-gray-500 font-mono mt-1">{p.qr_reference.slice(0, 20)}…</p>
+                    <p className="text-xs text-gray-500 font-mono">{p.qr_reference.slice(0, 20)}…</p>
                   )}
                   {p.status === 'pending' && (
                     <div className="flex gap-2 mt-2">
@@ -849,6 +863,7 @@ function ShopPaymentsTab() {
                       </button>
                     </div>
                   )}
+                </div>
                 </div>
               </div>
             </div>

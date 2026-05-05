@@ -81,6 +81,7 @@ async function adminListShopPayments(req, res) {
     const { rows } = await db.query(`
       SELECT spp.*,
              s.name AS shop_name, s.owner_name, s.shop_reference_id, s.activation_status,
+             s.selfie_url AS shop_selfie_url,
              sa.name AS agent_name
         FROM shop_payment_proofs spp
         JOIN shops s ON s.id = spp.shop_id

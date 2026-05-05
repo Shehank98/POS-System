@@ -269,6 +269,7 @@ export const agentApi = {
   onboard:              (data)    => agentClient.post('/agents/me/customers', data),
   // New shop registration flow
   shops:                ()        => agentClient.get('/agents/me/shops'),
+  uploadShopSelfie:     (data)    => agentClient.post('/agents/shops/upload-selfie', data),
   registerShop:         (data)    => agentClient.post('/agents/me/shops/register', data),
   generateShopQR:       (shopId)  => agentClient.post(`/agents/me/shops/${shopId}/payment-qr`),
   shopPayments:         (shopId)  => agentClient.get(`/agents/me/shops/${shopId}/payments`),
