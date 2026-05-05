@@ -3,6 +3,7 @@ import {
   Car, LayoutDashboard, ClipboardList, CalendarDays,
   Wrench, Package, Users, Settings, CreditCard,
   LogOut, MoreHorizontal, Plus, PanelLeftClose, PanelLeftOpen,
+  AlertTriangle,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
@@ -40,6 +41,8 @@ export default function CarWashLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isInactive = user?.activation_status != null && user.activation_status !== 'active';
+
   const [moreOpen,   setMoreOpen]   = useState(false);
   const [collapsed,  setCollapsed]  = useState(
     () => localStorage.getItem('cwSidebarCollapsed') === 'true'
@@ -59,7 +62,10 @@ export default function CarWashLayout() {
     navigate('/login');
   }
 
-  const moreActive = MORE_NAV.some((n) => location.pathname.startsWith(n.to));
+  const roleFilter = ({ roles }) => !roles || roles.includes(user?.role);
+  const visibleNav    = isInactive ? NAV.filter((n) => n.to === '/carwash/billing') : NAV.filter(roleFilter);
+  const visibleMoreNav = isInactive ? [] : MORE_NAV.filter(roleFilter);
+  const moreActive = visibleMoreNav.some((n) => location.pathname.startsWith(n.to));
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -100,8 +106,8 @@ export default function CarWashLayout() {
 
         {/* Nav */}
         <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? 'px-1' : 'px-2'}`}>
-          {/* New Job shortcut */}
-          {!collapsed && (
+          {/* New Job shortcut — hidden when inactive */}
+          {!isInactive && !collapsed && (
             <NavLink
               to="/carwash/jobs/new"
               className="flex items-center gap-2 mx-1 mb-3 px-3 py-2 bg-blue-600 hover:bg-blue-700
@@ -110,7 +116,7 @@ export default function CarWashLayout() {
               <Plus className="w-4 h-4" /> New Job
             </NavLink>
           )}
-          {collapsed && (
+          {!isInactive && collapsed && (
             <NavLink
               to="/carwash/jobs/new"
               title="New Job"
@@ -121,27 +127,24 @@ export default function CarWashLayout() {
             </NavLink>
           )}
 
-          {NAV
-            .filter(({ roles }) => !roles || roles.includes(user?.role))
-            .map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/carwash/dashboard'}
-                title={collapsed ? label : undefined}
-                className={({ isActive }) =>
-                  `flex items-center rounded-lg text-sm font-medium transition-colors
-                   ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}
-                   ${isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'}`
-                }
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                {!collapsed && label}
-              </NavLink>
-            ))
-          }
+          {visibleNav.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/carwash/dashboard'}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) =>
+                `flex items-center rounded-lg text-sm font-medium transition-colors
+                 ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}
+                 ${isActive
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'}`
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {!collapsed && label}
+            </NavLink>
+          ))}
         </nav>
 
         {/* Footer */}
@@ -190,13 +193,15 @@ export default function CarWashLayout() {
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell />
-          <NavLink
-            to="/carwash/jobs/new"
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white
-                       text-xs font-semibold rounded-lg"
-          >
-            <Plus className="w-3.5 h-3.5" /> New Job
-          </NavLink>
+          {!isInactive && (
+            <NavLink
+              to="/carwash/jobs/new"
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white
+                         text-xs font-semibold rounded-lg"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Job
+            </NavLink>
+          )}
         </div>
       </div>
 
@@ -204,40 +209,59 @@ export default function CarWashLayout() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t
                       border-gray-200 safe-area-bottom">
         <div className="flex h-14">
-        {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/carwash/dashboard'}
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
-               transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                {label}
-              </>
-            )}
-          </NavLink>
-        ))}
+          {isInactive ? (
+            <NavLink
+              to="/carwash/billing"
+              className={({ isActive }) =>
+                `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
+                 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500'}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <CreditCard className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                  Billing
+                </>
+              )}
+            </NavLink>
+          ) : (
+            <>
+              {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/carwash/dashboard'}
+                  className={({ isActive }) =>
+                    `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
+                     transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                      {label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
 
-        {/* More button */}
-        <button
-          onClick={() => setMoreOpen((v) => !v)}
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
-                      font-medium transition-colors
-                      ${moreActive ? 'text-blue-600' : 'text-gray-500'}`}
-        >
-          <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-blue-600' : 'text-gray-400'}`} />
-          More
-        </button>
-        </div>{/* close inner h-14 flex */}
-      </div>{/* close safe-area-bottom wrapper */}
+              {/* More button */}
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
+                            font-medium transition-colors
+                            ${moreActive ? 'text-blue-600' : 'text-gray-500'}`}
+              >
+                <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                More
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── "More" bottom sheet ───────────────────────────────── */}
-      {moreOpen && (
+      {moreOpen && !isInactive && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-black/30"
           onClick={() => setMoreOpen(false)}
@@ -251,24 +275,21 @@ export default function CarWashLayout() {
               <div className="w-8 h-1 bg-gray-200 rounded-full" />
             </div>
             <nav className="px-2 space-y-0.5">
-              {MORE_NAV
-                .filter(({ roles }) => !roles || roles.includes(user?.role))
-                .map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
-                       transition-colors ${isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50'}`
-                    }
-                  >
-                    <Icon className="w-5 h-5 shrink-0 text-gray-400" />
-                    {label}
-                  </NavLink>
-                ))
-              }
+              {visibleMoreNav.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                     transition-colors ${isActive
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-50'}`
+                  }
+                >
+                  <Icon className="w-5 h-5 shrink-0 text-gray-400" />
+                  {label}
+                </NavLink>
+              ))}
             </nav>
             <div className="px-2 pt-2 mt-1 border-t border-gray-100">
               <button
@@ -285,6 +306,18 @@ export default function CarWashLayout() {
 
       {/* ── Main content ──────────────────────────────────────── */}
       <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pb-0 pb-safe-tab">
+
+        {/* Activation required banner */}
+        {isInactive && (
+          <div className="bg-amber-500 text-white px-4 py-3 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold">Complete payment to activate your account</p>
+              <p className="text-xs opacity-90">Your account is pending activation. Upload a payment proof on the Billing page to get started.</p>
+            </div>
+          </div>
+        )}
+
         <SubscriptionStatusBar billingPath="/carwash/billing" />
         <div className="max-w-4xl mx-auto px-4 py-6">
           <Outlet />

@@ -38,6 +38,7 @@ const shopPaymentRoutes   = require('./routes/shopPayments');
 
 const { runDailyChecks }        = require('./controllers/notificationController');
 const { cancelStalePreOrders }  = require('./controllers/preOrderController');
+const activationGuard           = require('./middleware/activationGuard');
 
 const app = express();
 
@@ -51,6 +52,9 @@ app.use(express.json({ limit: '20mb' })); // allow base64 document uploads (regi
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+// ── Activation guard (blocks inactive shop accounts from non-billing routes) ──
+app.use(activationGuard);
 
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/auth',          authRoutes);

@@ -29,9 +29,12 @@ export default function SubscriptionGuard({ children }) {
   const location    = useLocation();
   const [state, setState] = useState(null);
 
-  // Inactive shops (awaiting first payment) can only access /billing
-  if (user?.activation_status === 'inactive' && !location.pathname.startsWith('/billing')) {
-    return <Navigate to="/billing" replace />;
+  // Unactivated shops can only access billing (covers 'inactive' and any future non-active states)
+  const isInactive = user?.activation_status != null && user.activation_status !== 'active';
+  const onBilling  = location.pathname === '/billing' || location.pathname === '/carwash/billing';
+  if (isInactive && !onBilling) {
+    const billingPath = user?.shop_type === 'car_wash' ? '/carwash/billing' : '/billing';
+    return <Navigate to={billingPath} replace />;
   }
 
   const check = useCallback(async () => {

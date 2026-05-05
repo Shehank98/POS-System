@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Receipt, Menu, X, CreditCard,
   ClipboardList, BarChart2, MoreHorizontal, TrendingUp,
   PanelLeftClose, PanelLeftOpen, QrCode, Users,
-  RotateCcw, GitBranch,
+  RotateCcw, GitBranch, AlertTriangle,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/authStore';
@@ -63,14 +63,20 @@ export default function Layout() {
   const location    = useLocation();
 
   const isClothing = user?.shop_type === 'clothing';
+  const isInactive = user?.activation_status != null && user.activation_status !== 'active';
+
   const featureFilter = ({ roles, feature }) =>
     (!roles || roles.includes(user?.role)) &&
     (!feature || user?.[feature] !== false);
 
   const baseFiltered     = isClothing ? NAV_BASE.filter((n) => n.to !== '/analytics')      : NAV_BASE;
   const moreBaseFiltered = isClothing ? MORE_NAV_BASE.filter((n) => n.to !== '/analytics') : MORE_NAV_BASE;
-  const NAV      = isClothing ? [...baseFiltered,     ...NAV_CLOTHING] : baseFiltered;
-  const MORE_NAV = isClothing ? [...moreBaseFiltered, ...NAV_CLOTHING] : moreBaseFiltered;
+  const fullNAV      = isClothing ? [...baseFiltered,     ...NAV_CLOTHING] : baseFiltered;
+  const fullMORE_NAV = isClothing ? [...moreBaseFiltered, ...NAV_CLOTHING] : moreBaseFiltered;
+
+  // Inactive shops see only the Billing nav item
+  const NAV      = isInactive ? fullNAV.filter((n) => n.to === '/billing') : fullNAV.filter(featureFilter);
+  const MORE_NAV = isInactive ? []                                          : fullMORE_NAV.filter(featureFilter);
 
   // Desktop hamburger (kept for very narrow viewports or overflow)
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -277,41 +283,61 @@ export default function Layout() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t
                       border-gray-200 safe-area-bottom">
         <div className="flex h-14">
-          {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
+          {isInactive ? (
+            /* Inactive: show only Billing tab */
             <NavLink
-              key={to}
-              to={to}
+              to="/billing"
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
-                 transition-colors ${isActive
-                  ? 'text-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'}`
+                 transition-colors ${isActive ? 'text-primary-600' : 'text-gray-500'}`
               }
             >
               {({ isActive }) => (
                 <>
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
-                  {label}
+                  <CreditCard className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                  Billing
                 </>
               )}
             </NavLink>
-          ))}
+          ) : (
+            <>
+              {BOTTOM_TABS.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium
+                     transition-colors ${isActive
+                      ? 'text-primary-600'
+                      : 'text-gray-500 hover:text-gray-700'}`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                      {label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
 
-          {/* More button */}
-          <button
-            onClick={() => setMoreOpen((v) => !v)}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
-                        font-medium transition-colors
-                        ${moreActive ? 'text-primary-600' : 'text-gray-500'}`}
-          >
-            <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-primary-600' : 'text-gray-400'}`} />
-            More
-          </button>
+              {/* More button */}
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px]
+                            font-medium transition-colors
+                            ${moreActive ? 'text-primary-600' : 'text-gray-500'}`}
+              >
+                <MoreHorizontal className={`w-5 h-5 ${moreActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                More
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* ── "More" bottom sheet ───────────────────────────────── */}
-      {moreOpen && (
+      {moreOpen && !isInactive && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-black/30"
           onClick={() => setMoreOpen(false)}
@@ -375,6 +401,18 @@ export default function Layout() {
       <main className={`flex-1 min-w-0 pt-14 pb-safe-tab md:pt-0 md:pb-0
                         transition-all duration-300 ease-in-out
                         ${collapsed ? 'md:ml-14' : 'md:ml-56'}`}>
+
+        {/* Activation required banner */}
+        {isInactive && (
+          <div className="bg-amber-500 text-white px-4 py-3 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold">Complete payment to activate your account</p>
+              <p className="text-xs opacity-90">Your account is pending activation. Upload a payment proof on the Billing page to get started.</p>
+            </div>
+          </div>
+        )}
+
         <SubscriptionStatusBar />
         <div className="max-w-6xl mx-auto px-4 py-6">
           <Outlet />

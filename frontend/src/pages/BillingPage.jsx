@@ -603,8 +603,8 @@ export default function BillingPage() {
     );
   }
 
-  // Inactive shop — show activation payment form only
-  if (user?.activation_status === 'inactive') {
+  // Unactivated shop — show activation payment form only
+  if (user?.activation_status != null && user.activation_status !== 'active') {
     return <InactiveShopBilling user={user} />;
   }
 
