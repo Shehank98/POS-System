@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   LayoutDashboard, Store, CreditCard, Wallet, LogOut,
   TrendingUp, Users, Clock, Lock, Plus, ChevronDown,
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw,
   User, Building2, Save, Bell, PhoneCall, CalendarClock,
   MapPin, QrCode, Upload, Eye, Copy, FileText, Download,
-  Settings,
+  Settings, Filter, ChevronUp, Search, Calendar,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { agentApi } from '../../api/client';
@@ -1033,9 +1033,30 @@ function PaymentsTab() {
 }
 
 // ── Commissions Tab ───────────────────────────────────────────
+const COMM_STATUS_OPTS = [
+  { value: '',         label: 'All Statuses' },
+  { value: 'pending',  label: 'Pending'  },
+  { value: 'approved', label: 'Approved' },
+  { value: 'paid',     label: 'Paid'     },
+];
+const COMM_TYPE_OPTS = [
+  { value: '',            label: 'All Types'   },
+  { value: 'onboarding',  label: 'Onboarding' },
+  { value: 'monthly',     label: 'Monthly'    },
+];
+
 function CommissionsTab() {
-  const [list, setList]       = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [list,     setList]     = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  // Filters
+  const [statusF,  setStatusF]  = useState('');
+  const [typeF,    setTypeF]    = useState('');
+  const [shopQ,    setShopQ]    = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
+  // Table sort
+  const [sortCol,  setSortCol]  = useState('earned_date');
+  const [sortAsc,  setSortAsc]  = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1048,58 +1069,273 @@ function CommissionsTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Spinner />;
+  // ── Derived summary (all rows, no filters) ───────────────────
+  const totalAll      = list.reduce((s, c) => s + Number(c.amount), 0);
+  const totalPending  = list.filter((c) => ['pending','locked'].includes(c.status))
+                            .reduce((s, c) => s + Number(c.amount), 0);
+  const totalApproved = list.filter((c) => c.status === 'approved')
+                            .reduce((s, c) => s + Number(c.amount), 0);
+  const totalPaid     = list.filter((c) => c.status === 'paid')
+                            .reduce((s, c) => s + Number(c.amount), 0);
 
-  const approved = list.filter((c) => c.status === 'approved');
-  const locked   = list.filter((c) => c.status === 'locked');
-  const paid     = list.filter((c) => c.status === 'paid');
+  // ── Filtered + sorted rows ───────────────────────────────────
+  const filtered = useMemo(() => {
+    let rows = list;
 
-  const totalApproved = approved.reduce((s, c) => s + Number(c.amount), 0);
-  const totalPaid     = paid.reduce((s, c) => s + Number(c.amount), 0);
-  const totalLocked   = locked.reduce((s, c) => s + Number(c.amount), 0);
+    if (statusF) {
+      rows = rows.filter((c) =>
+        statusF === 'pending'
+          ? ['pending','locked'].includes(c.status)
+          : c.status === statusF
+      );
+    }
+    if (typeF)   rows = rows.filter((c) => c.commission_type === typeF);
+    if (shopQ)   rows = rows.filter((c) => c.shop_name?.toLowerCase().includes(shopQ.toLowerCase()));
+    if (dateFrom) rows = rows.filter((c) => {
+      const d = c.earned_date || c.created_at;
+      return d && new Date(d) >= new Date(dateFrom);
+    });
+    if (dateTo)  rows = rows.filter((c) => {
+      const d = c.earned_date || c.created_at;
+      return d && new Date(d) <= new Date(dateTo + 'T23:59:59');
+    });
 
-  function CommSection({ title, items, color }) {
-    if (!items.length) return null;
-    return (
-      <div>
-        <h4 className="text-sm font-semibold text-gray-600 mb-2">{title}</h4>
-        <div className="space-y-2">
-          {items.map((c) => (
-            <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">{c.shop_name}</p>
-                <p className="text-xs text-gray-400 capitalize">
-                  {c.commission_type}
-                  {c.month ? ` · ${new Date(c.month).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}` : ''}
-                </p>
-              </div>
-              <p className={`font-bold text-sm shrink-0 ${color}`}>{fmtMoney(c.amount)}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return [...rows].sort((a, b) => {
+      let av, bv;
+      if (sortCol === 'amount') {
+        av = Number(a.amount); bv = Number(b.amount);
+      } else if (sortCol === 'earned_date') {
+        av = new Date(a.earned_date || a.created_at || 0);
+        bv = new Date(b.earned_date || b.created_at || 0);
+      } else if (sortCol === 'paid_at') {
+        av = new Date(a.paid_at || 0); bv = new Date(b.paid_at || 0);
+      } else {
+        av = (a[sortCol] || '').toString().toLowerCase();
+        bv = (b[sortCol] || '').toString().toLowerCase();
+      }
+      if (av < bv) return sortAsc ? -1 : 1;
+      if (av > bv) return sortAsc ?  1 : -1;
+      return 0;
+    });
+  }, [list, statusF, typeF, shopQ, dateFrom, dateTo, sortCol, sortAsc]);
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortAsc((v) => !v);
+    else { setSortCol(col); setSortAsc(false); }
   }
 
+  function SortIcon({ col }) {
+    if (sortCol !== col) return <ChevronDown className="w-3 h-3 opacity-30" />;
+    return sortAsc
+      ? <ChevronUp   className="w-3 h-3 text-primary-600" />
+      : <ChevronDown className="w-3 h-3 text-primary-600" />;
+  }
+
+  function clearFilters() {
+    setStatusF(''); setTypeF(''); setShopQ(''); setDateFrom(''); setDateTo('');
+  }
+
+  const hasFilters = statusF || typeF || shopQ || dateFrom || dateTo;
+
+  const COMM_STATUS_COLOR = {
+    pending:  'bg-yellow-100 text-yellow-800',
+    locked:   'bg-yellow-100 text-yellow-800',
+    approved: 'bg-green-100 text-green-800',
+    paid:     'bg-blue-100 text-blue-800',
+  };
+  const COMM_TYPE_COLOR = {
+    onboarding: 'bg-purple-100 text-purple-700',
+    monthly:    'bg-indigo-100 text-indigo-700',
+  };
+
+  if (loading) return <Spinner />;
+
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* Summary — 3 cols on all sizes, smaller text on mobile */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <StatCard label="Approved"  value={fmtMoney(totalApproved)} icon={CheckCircle} color="green" />
-        <StatCard label="Paid Out"  value={fmtMoney(totalPaid)}     icon={Wallet}      color="blue" />
-        <StatCard label="Locked"    value={fmtMoney(totalLocked)}   icon={Lock}        color="yellow" />
+    <div className="space-y-4">
+
+      {/* ── Summary cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <StatCard label="Total Earned"  value={fmtMoney(totalAll)}      icon={TrendingUp}  color="green"  />
+        <StatCard label="Pending"       value={fmtMoney(totalPending)}   icon={Lock}        color="yellow" />
+        <StatCard label="Approved"      value={fmtMoney(totalApproved)}  icon={CheckCircle} color="green"  />
+        <StatCard label="Paid Out"      value={fmtMoney(totalPaid)}      icon={Wallet}      color="blue"   />
       </div>
 
-      {list.length === 0
-        ? <Empty text="No commissions yet" />
-        : (
-          <>
-            <CommSection title="Approved" items={approved} color="text-green-700" />
-            <CommSection title="Locked (awaiting verification)" items={locked} color="text-yellow-700" />
-            <CommSection title="Paid" items={paid} color="text-blue-700" />
-          </>
-        )
-      }
+      {/* ── Filters ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 space-y-3">
+        {/* Row 1: shop search + type + status */}
+        <div className="flex flex-wrap gap-2">
+          {/* Shop search */}
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search shop…"
+              value={shopQ}
+              onChange={(e) => setShopQ(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+          </div>
+
+          {/* Type filter */}
+          <select
+            value={typeF}
+            onChange={(e) => setTypeF(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+          >
+            {COMM_TYPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+
+          {/* Status filter */}
+          <select
+            value={statusF}
+            onChange={(e) => setStatusF(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+          >
+            {COMM_STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        {/* Row 2: date range */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+          />
+          <span className="text-xs text-gray-400">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+          />
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="ml-auto text-xs text-gray-400 hover:text-red-500 flex items-center gap-1"
+            >
+              <XCircle className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+        </div>
+
+        {/* Result count */}
+        <p className="text-xs text-gray-400">
+          Showing {filtered.length} of {list.length} commissions
+          {hasFilters && ' (filtered)'}
+        </p>
+      </div>
+
+      {/* ── Table (desktop) / Cards (mobile) ── */}
+      {filtered.length === 0 ? (
+        <Empty text={hasFilters ? 'No commissions match your filters' : 'No commissions yet'} />
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {[
+                      { col: 'shop_name',    label: 'Shop Name'   },
+                      { col: 'commission_type', label: 'Type'     },
+                      { col: 'amount',       label: 'Amount'      },
+                      { col: 'earned_date',  label: 'Earned Date' },
+                      { col: 'status',       label: 'Status'      },
+                      { col: 'paid_at',      label: 'Paid Date'   },
+                    ].map(({ col, label }) => (
+                      <th
+                        key={col}
+                        onClick={() => toggleSort(col)}
+                        className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide
+                                   cursor-pointer select-none hover:text-gray-800 whitespace-nowrap"
+                      >
+                        <span className="flex items-center gap-1">
+                          {label} <SortIcon col={col} />
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filtered.map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900 max-w-[180px] truncate">
+                        {c.shop_name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize
+                                         ${COMM_TYPE_COLOR[c.commission_type] || 'bg-gray-100 text-gray-600'}`}>
+                          {c.commission_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">
+                        {fmtMoney(c.amount)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                        {fmtDate(c.earned_date || c.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize
+                                         ${COMM_STATUS_COLOR[c.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {c.status === 'pending' || c.status === 'locked' ? 'pending' : c.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                        {c.paid_at ? fmtDate(c.paid_at) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table footer: total of visible rows */}
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm">
+              <span className="text-gray-500">{filtered.length} records</span>
+              <span className="font-bold text-gray-900">
+                Total: {fmtMoney(filtered.reduce((s, c) => s + Number(c.amount), 0))}
+              </span>
+            </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {filtered.map((c) => (
+              <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-gray-900 text-sm leading-snug truncate">{c.shop_name}</p>
+                  <p className="font-bold text-gray-900 text-sm shrink-0">{fmtMoney(c.amount)}</p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize
+                                   ${COMM_TYPE_COLOR[c.commission_type] || 'bg-gray-100 text-gray-600'}`}>
+                    {c.commission_type}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize
+                                   ${COMM_STATUS_COLOR[c.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {c.status === 'pending' || c.status === 'locked' ? 'pending' : c.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>Earned: {fmtDate(c.earned_date || c.created_at)}</span>
+                  {c.paid_at && <span>Paid: {fmtDate(c.paid_at)}</span>}
+                </div>
+              </div>
+            ))}
+
+            {/* Mobile footer */}
+            <div className="bg-white border border-gray-200 rounded-xl p-3 flex justify-between text-sm font-semibold text-gray-700">
+              <span>Total ({filtered.length})</span>
+              <span>{fmtMoney(filtered.reduce((s, c) => s + Number(c.amount), 0))}</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

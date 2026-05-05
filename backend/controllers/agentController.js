@@ -384,11 +384,23 @@ async function listCommissions(req, res) {
   const agentId = req.agent.id;
   try {
     const { rows } = await db.query(`
-      SELECT ac.*, s.name AS shop_name
+      SELECT ac.id,
+             ac.shop_id,
+             ac.commission_type,
+             ac.amount,
+             ac.status,
+             ac.month,
+             ac.earned_date,
+             ac.paid_at,
+             ac.payment_method,
+             ac.transaction_reference,
+             ac.notes,
+             ac.created_at,
+             s.name AS shop_name
         FROM agent_commissions ac
         JOIN shops s ON s.id = ac.shop_id
        WHERE ac.agent_id = $1
-       ORDER BY ac.created_at DESC
+       ORDER BY COALESCE(ac.earned_date, ac.created_at::DATE) DESC, ac.id DESC
     `, [agentId]);
     res.json(rows);
   } catch (err) {
