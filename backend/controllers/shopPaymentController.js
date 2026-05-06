@@ -159,15 +159,16 @@ async function adminVerifyShopPayment(req, res) {
       hasUnlockableOnboarding = obRows.length > 0;
     }
 
-    // Activate shop
+    // Activate shop — extend from current end date if in the future, else from now
     await client.query(
       `UPDATE shops
           SET activation_status   = 'active',
               subscription_status = 'active',
-              subscription_end_date = GREATEST(
-                COALESCE(subscription_end_date, NOW()),
-                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
-              ) + INTERVAL '1 month'
+              subscription_end_date = CASE
+                WHEN subscription_end_date IS NOT NULL AND subscription_end_date > NOW()
+                  THEN subscription_end_date + INTERVAL '1 month'
+                ELSE NOW() + INTERVAL '1 month'
+              END
         WHERE id = $1`,
       [proof.shop_id]
     );
@@ -288,10 +289,11 @@ async function adminVerifyHelaPay(req, res) {
       `UPDATE shops
           SET activation_status   = 'active',
               subscription_status = 'active',
-              subscription_end_date = GREATEST(
-                COALESCE(subscription_end_date, NOW()),
-                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
-              ) + INTERVAL '1 month'
+              subscription_end_date = CASE
+                WHEN subscription_end_date IS NOT NULL AND subscription_end_date > NOW()
+                  THEN subscription_end_date + INTERVAL '1 month'
+                ELSE NOW() + INTERVAL '1 month'
+              END
         WHERE id = $1`,
       [proof.shop_id]
     );
@@ -499,15 +501,16 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
       [qrReference, proofId]
     );
 
-    // Activate shop
+    // Activate shop — extend from current end date if in the future, else from now
     await client.query(
       `UPDATE shops
           SET activation_status   = 'active',
               subscription_status = 'active',
-              subscription_end_date = GREATEST(
-                COALESCE(subscription_end_date, NOW()),
-                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
-              ) + INTERVAL '1 month'
+              subscription_end_date = CASE
+                WHEN subscription_end_date IS NOT NULL AND subscription_end_date > NOW()
+                  THEN subscription_end_date + INTERVAL '1 month'
+                ELSE NOW() + INTERVAL '1 month'
+              END
         WHERE id = $1`,
       [shopId]
     );

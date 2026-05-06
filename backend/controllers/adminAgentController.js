@@ -218,16 +218,14 @@ async function verifyPayment(req, res) {
       [submissionId]
     );
 
-    // Extend subscription starting from the NEXT calendar month if the shop
-    // was just signed up this month (prevents charging for signup month twice).
-    // Rule: new end date = MAX(current end date, start of next month) + 1 month
     await client.query(
       `UPDATE shops
           SET subscription_status   = 'active',
-              subscription_end_date = GREATEST(
-                COALESCE(subscription_end_date, NOW()),
-                DATE_TRUNC('month', NOW()) + INTERVAL '1 month'
-              ) + INTERVAL '1 month'
+              subscription_end_date = CASE
+                WHEN subscription_end_date IS NOT NULL AND subscription_end_date > NOW()
+                  THEN subscription_end_date + INTERVAL '1 month'
+                ELSE NOW() + INTERVAL '1 month'
+              END
         WHERE id = $1`,
       [sub.shop_id]
     );
