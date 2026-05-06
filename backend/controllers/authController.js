@@ -332,7 +332,9 @@ async function getMe(req, res) {
               COALESCE(s.exchanges_enabled,             TRUE)  AS exchanges_enabled,
               COALESCE(s.branches_enabled,             TRUE)  AS branches_enabled,
               COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
-              COALESCE(s.grace_period_days,            5)     AS grace_period_days
+              COALESCE(s.grace_period_days,            5)     AS grace_period_days,
+              COALESCE(s.activation_status, 'active')        AS activation_status,
+              s.shop_reference_id
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,
@@ -349,6 +351,8 @@ async function getMe(req, res) {
       in_grace_period:      sub.inGracePeriod,
       grace_days_remaining: sub.graceDaysRemaining,
       days_until_expiry:    sub.daysUntilExpiry,
+      activation_status:    row.activation_status || 'active',
+      shop_reference_id:    row.shop_reference_id || null,
     });
   } catch (err) {
     console.error('getMe error:', err);
