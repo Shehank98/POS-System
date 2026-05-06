@@ -8,10 +8,14 @@ ALTER TABLE shops ADD COLUMN IF NOT EXISTS selfie_image_path     VARCHAR(500);
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS subscription_end_date DATE;
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS last_payment_date     DATE;
 
--- Backfill subscription_end_date from existing subscription data where possible
-UPDATE shops
-   SET subscription_end_date = (subscription_end_date::DATE)
- WHERE subscription_end_date IS NOT NULL;
+-- Backfill last_payment_date from the most recent verified shop_payment_proof
+UPDATE shops s
+   SET last_payment_date = (
+     SELECT MAX(spp.created_at)::DATE
+       FROM shop_payment_proofs spp
+      WHERE spp.shop_id = s.id AND spp.status = 'verified'
+   )
+ WHERE s.last_payment_date IS NULL;
 
 -- ── sales_agents: account_balance ────────────────────────────
 -- Denormalised balance for quick reads; kept in sync by webhook handler.
@@ -28,15 +32,19 @@ UPDATE sales_agents sa
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS agent_id           INT REFERENCES sales_agents(id) ON DELETE SET NULL;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS transaction_id     VARCHAR(100);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS helapay_reference  VARCHAR(100);
+-- payment_method was not in the original schema — add it with sensible default
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method     VARCHAR(30) NOT NULL DEFAULT 'bank_transfer';
 
--- Expand payment_method to include 'helapay' and 'bank_transfer'
+-- Add check constraint (safe to drop-and-recreate; column now guaranteed to exist)
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check;
 ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check
   CHECK (payment_method IN ('qr','cash','card','mobile','other','helapay','bank_transfer'));
 
 CREATE INDEX IF NOT EXISTS idx_payments_agent_id          ON payments(agent_id) WHERE agent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payments_transaction_id    ON payments(transaction_id) WHERE transaction_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_payments_helapay_reference ON payments(helapay_reference) WHERE helapay_reference IS NOT NULL;
+-- Partial unique index: prevents double-recording the same HelaPlay transaction
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_helapay_reference_unique
+  ON payments(helapay_reference) WHERE helapay_reference IS NOT NULL;
 
 -- ── webhook_logs: full audit trail of every inbound webhook ──
 CREATE TABLE IF NOT EXISTS webhook_logs (

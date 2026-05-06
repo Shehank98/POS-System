@@ -191,12 +191,12 @@ async function fulfillShopPaymentDirect(shopId, amount, transactionId, reference
       [nextMonth.toISOString().slice(0, 10), shopId]
     );
 
-    // Record in payments table
+    // Record in payments table (idempotent via unique helapay_reference)
     await client.query(
       `INSERT INTO payments
          (shop_id, amount, payment_method, transaction_id, helapay_reference, status, created_at)
        VALUES ($1, $2, 'helapay', $3, $4, 'verified', NOW())
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (helapay_reference) WHERE helapay_reference IS NOT NULL DO NOTHING`,
       [shopId, amount, transactionId || null, reference || null]
     );
 

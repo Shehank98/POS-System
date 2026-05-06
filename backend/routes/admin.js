@@ -15,7 +15,8 @@ router.get('/dashboard',                    ctrl.getDashboard);
 router.get('/financial-summary',            ctrl.getFinancialSummary);
 router.get('/analysis',                     ctrl.getAnalysis);
 
-// Shop management
+// Shop management — static sub-paths MUST come before /:id to avoid capture
+router.get('/shops/map-data',               agentCtrl.getShopsMapData);
 router.get('/shops',                        ctrl.listShops);
 router.post('/shops',                       ctrl.createShop);
 router.get('/shops/:id',                          ctrl.getShop);
@@ -88,9 +89,9 @@ router.put ('/agents/:id/approve',                 agentCtrl.approveAgentRegistr
 router.put ('/agents/:id/reject',                  agentCtrl.rejectAgentRegistration);
 router.put ('/agents/:id/signed-agreement',        agentCtrl.saveSignedAgreementUrl);
 
-// ── Shops by Agent / Shop Map ─────────────────────────────────
+// ── Shops by Agent ────────────────────────────────────────────
 router.get ('/shops-by-agent',              agentCtrl.getShopsByAgent);
-router.get ('/shops/map-data',              agentCtrl.getShopsMapData);
+// Note: /shops/map-data is registered near the top before /shops/:id
 
 // ── Shop Payment Proofs (LKR 2500/month activation) ──────────
 router.get ('/shop-payments',               shopPayCtrl.adminListShopPayments);

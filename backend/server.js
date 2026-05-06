@@ -59,6 +59,7 @@ app.use('/api/webhooks', (req, _res, next) => {
   req.on('end',  () => {
     req.rawBody = data;
     try { req.body = JSON.parse(data || '{}'); } catch { req.body = {}; }
+    req._body = true; // tell body-parser/express.json to skip — stream already consumed
     next();
   });
 });
