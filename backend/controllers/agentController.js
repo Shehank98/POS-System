@@ -601,6 +601,7 @@ async function listShops(req, res) {
         FROM shops s
         LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
        WHERE s.onboarded_by_agent_id = $1
+         AND COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY s.created_at DESC
     `, [agentId]);
     res.json(rows);
