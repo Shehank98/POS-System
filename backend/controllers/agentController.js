@@ -818,7 +818,6 @@ async function saveShopNote(req, res) {
 // ── Agent deposit / self-payment ──────────────────────────────
 const { randomUUID } = require('crypto');
 const sysHelaPOS     = require('../services/systemHelaposService');
-const { randomUUID } = require('crypto');
 
 const DEPOSIT_AMOUNT  = 2500;
 const DEPOSIT_CREDIT  = 500;
