@@ -477,7 +477,7 @@ function ShopRegisterForm({ onDone, onClose }) {
   const selfieRef = useRef(null);
   const [form, setForm] = useState({
     shop_name: '', owner_name: '', contact_number: '',
-    location_map_url: '',
+    location_map_url: '', district: '',
     br_number: '',
     email: '', username: '', password: '',
     shop_type: 'retail',
@@ -651,6 +651,18 @@ function ShopRegisterForm({ onDone, onClose }) {
           <p className="text-xs text-gray-400 mt-1">
             Open Google Maps → find the location → tap Share → Copy link
           </p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">District</label>
+          <select value={form.district} onChange={set('district')} className={fc}>
+            <option value="">Select district…</option>
+            {['Ampara','Anuradhapura','Badulla','Batticaloa','Colombo',
+              'Galle','Gampaha','Hambantota','Jaffna','Kalutara',
+              'Kandy','Kegalle','Kilinochchi','Kurunegala','Mannar',
+              'Matale','Matara','Monaragala','Mullaitivu','Nuwara Eliya',
+              'Polonnaruwa','Puttalam','Ratnapura','Trincomalee','Vavuniya',
+            ].map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
         </div>
       </fieldset>
 

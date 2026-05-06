@@ -474,7 +474,7 @@ async function registerShop(req, res) {
     shop_name, owner_name, contact_number,
     location_lat, location_lng, location_map_url,
     selfie_url,
-    br_number,
+    br_number, district,
     // Login credentials for the shop owner
     email, username, password,
     shop_type = 'retail',
@@ -513,18 +513,18 @@ async function registerShop(req, res) {
       `INSERT INTO shops
          (name, owner_name, email, phone, contact_number,
           location_lat, location_lng, location_map_url,
-          selfie_url, br_number, shop_reference_id,
+          selfie_url, br_number, district, shop_reference_id,
           subscription_status, activation_status,
           onboarded_by_agent_id, shop_type)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending_payment','inactive',$12,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending_payment','inactive',$13,$14)
        RETURNING id, name, owner_name, email, shop_reference_id, activation_status,
                  subscription_status, contact_number, location_map_url,
-                 selfie_url, br_number, created_at`,
+                 selfie_url, br_number, district, created_at`,
       [
         shop_name.trim(), owner_name.trim(),
         email.toLowerCase().trim(), contact_number, contact_number,
         location_lat || null, location_lng || null, location_map_url,
-        selfie_url, br_number || null, shopRefId,
+        selfie_url, br_number || null, district || null, shopRefId,
         agentId, shop_type,
       ]
     );
@@ -595,7 +595,7 @@ async function listShops(req, res) {
       SELECT s.id, s.name, s.owner_name, s.email, s.contact_number,
              s.shop_reference_id, s.activation_status,
              s.location_lat, s.location_lng, s.location_map_url,
-             s.selfie_url, s.br_number, s.subscription_status, s.subscription_end_date,
+             s.selfie_url, s.br_number, s.district, s.subscription_status, s.subscription_end_date,
              s.plan_id, sp.name AS plan_name, s.created_at,
              (SELECT COUNT(*) FROM shop_payment_proofs WHERE shop_id = s.id AND status = 'pending') AS pending_proofs
         FROM shops s
