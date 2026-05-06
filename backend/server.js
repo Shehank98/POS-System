@@ -35,6 +35,7 @@ const carwashPublicRoutes = require('./routes/carwashPublic');
 const clothingRoutes      = require('./routes/clothing');
 const qrPaymentRoutes     = require('./routes/qrPayments');
 const shopPaymentRoutes   = require('./routes/shopPayments');
+const webhookRoutes       = require('./routes/webhooks');
 
 const { runDailyChecks }        = require('./controllers/notificationController');
 const { cancelStalePreOrders }  = require('./controllers/preOrderController');
@@ -48,10 +49,27 @@ app.use(cors({
   methods:        ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Capture raw body for webhook HMAC verification BEFORE express.json parses it.
+// Only applies to the /api/webhooks prefix to avoid memory cost on large uploads.
+app.use('/api/webhooks', (req, _res, next) => {
+  let data = '';
+  req.setEncoding('utf8');
+  req.on('data', (chunk) => { data += chunk; });
+  req.on('end',  () => {
+    req.rawBody = data;
+    try { req.body = JSON.parse(data || '{}'); } catch { req.body = {}; }
+    next();
+  });
+});
+
 app.use(express.json({ limit: '20mb' })); // allow base64 document uploads (registration flow)
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+// ── Webhook routes (public, before activation guard) ─────────
+app.use('/api/webhooks', webhookRoutes);
 
 // ── Activation guard (blocks inactive shop accounts from non-billing routes) ──
 app.use(activationGuard);
@@ -80,6 +98,7 @@ app.use('/api/clothing',       clothingRoutes);
 app.use('/api/qr',             qrPaymentRoutes);
 // Shop payment proofs (shop owner uploads, admin verifies)
 app.use('/api/shop-payments',  shopPaymentRoutes);
+// Webhook logs viewer (admin) — route already mounted above for public POST
 
 // ── Serve React frontend in production ────────────────────────
 if (process.env.NODE_ENV === 'production') {
