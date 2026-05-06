@@ -795,7 +795,12 @@ async function generateDepositQR(req, res) {
     res.json({ reference, qr_data, expires_at: expiresAt, amount: DEPOSIT_AMOUNT });
   } catch (err) {
     console.error('generateDepositQR error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate QR' });
+    const isMissingConfig = err.message?.includes('not configured');
+    res.status(isMissingConfig ? 503 : 500).json({
+      error: isMissingConfig
+        ? 'HelaPay QR payments are not yet configured on this server. Please contact your administrator.'
+        : (err.message || 'Failed to generate QR'),
+    });
   }
 }
 
