@@ -389,26 +389,38 @@ async function verifyPayment(req, res) {
 
     // Unlock onboarding commission if this is the first payment (still pending)
     if (shop.agent_id) {
-      await client.query(
-        `UPDATE agent_commissions
-            SET status = 'approved'
+      const { rows: obRows } = await client.query(
+        `SELECT id FROM agent_commissions
           WHERE agent_id = $1 AND shop_id = $2
             AND commission_type = 'onboarding'
-            AND status IN ('pending', 'locked')`,
+            AND status IN ('pending','locked')
+          LIMIT 1`,
         [shop.agent_id, payment.shop_id]
       );
+      const hasUnlockableOnboarding = obRows.length > 0;
 
-      // Create monthly commission for this subscription payment
-      const paymentMonth = new Date().toISOString().slice(0, 7) + '-01';
-      await client.query(
-        `INSERT INTO agent_commissions
-           (agent_id, shop_id, commission_type, amount, month, status, earned_date,
-            payment_method, transaction_reference)
-         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE,
-                 'bank_transfer', $4::TEXT)
-         ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
-        [shop.agent_id, payment.shop_id, paymentMonth, String(payment.id)]
-      );
+      if (hasUnlockableOnboarding) {
+        await client.query(
+          `UPDATE agent_commissions
+              SET status = 'approved'
+            WHERE agent_id = $1 AND shop_id = $2
+              AND commission_type = 'onboarding'
+              AND status IN ('pending', 'locked')`,
+          [shop.agent_id, payment.shop_id]
+        );
+      } else {
+        // Renewal payment — create monthly commission
+        const paymentMonth = new Date().toISOString().slice(0, 7) + '-01';
+        await client.query(
+          `INSERT INTO agent_commissions
+             (agent_id, shop_id, commission_type, amount, month, status, earned_date,
+              payment_method, transaction_reference)
+           VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE,
+                   'bank_transfer', $4::TEXT)
+           ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+          [shop.agent_id, payment.shop_id, paymentMonth, String(payment.id)]
+        );
+      }
     }
 
     await client.query('COMMIT');

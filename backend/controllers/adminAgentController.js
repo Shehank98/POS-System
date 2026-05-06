@@ -230,24 +230,36 @@ async function verifyPayment(req, res) {
       [sub.shop_id]
     );
 
-    // Unlock the onboarding commission if still pending
-    await client.query(
-      `UPDATE agent_commissions
-          SET status = 'approved'
+    // First payment → unlock onboarding commission only.
+    // Renewal → create monthly commission.
+    const { rows: obRows } = await client.query(
+      `SELECT id FROM agent_commissions
         WHERE agent_id = $1 AND shop_id = $2
           AND commission_type = 'onboarding'
-          AND status IN ('pending', 'locked')`,
+          AND status IN ('pending','locked')
+        LIMIT 1`,
       [sub.agent_id, sub.shop_id]
     );
+    const hasUnlockableOnboarding = obRows.length > 0;
 
-    // Create approved monthly commission for this payment
-    await client.query(
-      `INSERT INTO agent_commissions
-         (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_submission_id)
-       VALUES ($1, $2, 'monthly', 500, DATE_TRUNC('month', NOW()), 'approved', CURRENT_DATE, $3)
-       ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
-      [sub.agent_id, sub.shop_id, submissionId]
-    );
+    if (hasUnlockableOnboarding) {
+      await client.query(
+        `UPDATE agent_commissions
+            SET status = 'approved'
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'onboarding'
+            AND status IN ('pending', 'locked')`,
+        [sub.agent_id, sub.shop_id]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO agent_commissions
+           (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_submission_id)
+         VALUES ($1, $2, 'monthly', 500, DATE_TRUNC('month', NOW()), 'approved', CURRENT_DATE, $3)
+         ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+        [sub.agent_id, sub.shop_id, submissionId]
+      );
+    }
 
     // Update agent wallet: increment total_verified
     await client.query(
