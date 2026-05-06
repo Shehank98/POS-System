@@ -135,6 +135,13 @@ async function adminVerifyShopPayment(req, res) {
     }
     const proof = proofRows[0];
 
+    // Check first vs renewal payment before updating
+    const { rows: shopStatusRows } = await client.query(
+      `SELECT activation_status, onboarded_by_agent_id, name FROM shops WHERE id = $1 FOR UPDATE`,
+      [proof.shop_id]
+    );
+    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
+
     // Activate the shop account
     await client.query(
       `UPDATE shops
@@ -156,24 +163,30 @@ async function adminVerifyShopPayment(req, res) {
       [proofId]
     );
 
-    // Get shop name + agent for notifications
-    const { rows: shopInfoRows } = await client.query(
-      `SELECT s.name, s.onboarded_by_agent_id FROM shops WHERE id = $1`,
-      [proof.shop_id]
-    );
-    const shopName = shopInfoRows[0]?.name || `Shop #${proof.shop_id}`;
-    const agentId  = proof.agent_id || shopInfoRows[0]?.onboarded_by_agent_id;
+    const shopName = shopStatusRows[0]?.name    || `Shop #${proof.shop_id}`;
+    const agentId  = proof.agent_id            || shopStatusRows[0]?.onboarded_by_agent_id;
 
-    // Unlock onboarding commission for the agent who registered this shop
+    // Commissions: first payment unlocks onboarding only; renewals create monthly
     if (agentId) {
-      await client.query(
-        `UPDATE agent_commissions
-            SET status = 'approved', approved_at = NOW()
-          WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'onboarding'
-            AND status IN ('pending', 'locked')`,
-        [agentId, proof.shop_id]
-      );
+      if (isFirstPayment) {
+        await client.query(
+          `UPDATE agent_commissions
+              SET status = 'approved', approved_at = NOW()
+            WHERE agent_id = $1 AND shop_id = $2
+              AND commission_type = 'onboarding'
+              AND status IN ('pending', 'locked')`,
+          [agentId, proof.shop_id]
+        );
+      } else {
+        const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+        await client.query(
+          `INSERT INTO agent_commissions
+             (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_method)
+           VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE, 'bank_transfer')
+           ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+          [agentId, proof.shop_id, currentMonth]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -238,6 +251,14 @@ async function adminVerifyHelaPay(req, res) {
     }
     const proof = rows[0];
 
+    // Check first vs renewal payment before updating
+    const { rows: shopStatusRows } = await client.query(
+      `SELECT activation_status, onboarded_by_agent_id FROM shops WHERE id = $1 FOR UPDATE`,
+      [proof.shop_id]
+    );
+    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
+    const agentId = proof.agent_id || shopStatusRows[0]?.onboarded_by_agent_id;
+
     await client.query(
       `UPDATE shops
           SET activation_status   = 'active',
@@ -255,15 +276,27 @@ async function adminVerifyHelaPay(req, res) {
       [proofId]
     );
 
-    if (proof.agent_id) {
-      await client.query(
-        `UPDATE agent_commissions
-            SET status = 'approved'
-          WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'onboarding'
-            AND status IN ('pending', 'locked')`,
-        [proof.agent_id, proof.shop_id]
-      );
+    // Commissions: first payment unlocks onboarding only; renewals create monthly
+    if (agentId) {
+      if (isFirstPayment) {
+        await client.query(
+          `UPDATE agent_commissions
+              SET status = 'approved'
+            WHERE agent_id = $1 AND shop_id = $2
+              AND commission_type = 'onboarding'
+              AND status IN ('pending', 'locked')`,
+          [agentId, proof.shop_id]
+        );
+      } else {
+        const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+        await client.query(
+          `INSERT INTO agent_commissions
+             (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_method)
+           VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE, 'helapay')
+           ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+          [agentId, proof.shop_id, currentMonth]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -412,6 +445,13 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
     }
     const proof = proofRows[0];
 
+    // Check if this is the first activation before updating
+    const { rows: shopStatusRows } = await client.query(
+      `SELECT activation_status FROM shops WHERE id = $1 FOR UPDATE`,
+      [shopId]
+    );
+    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
+
     // Mark proof verified
     await client.query(
       `UPDATE shop_payment_proofs
@@ -434,25 +474,27 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
       [shopId]
     );
 
-    // Unlock agent onboarding commission + create monthly commission
+    // Commissions: first payment unlocks onboarding only; renewals create monthly
     if (proof.agent_id) {
-      await client.query(
-        `UPDATE agent_commissions
-            SET status = 'approved'
-          WHERE agent_id = $1 AND shop_id = $2
-            AND commission_type = 'onboarding'
-            AND status IN ('pending', 'locked')`,
-        [proof.agent_id, shopId]
-      );
-
-      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
-      await client.query(
-        `INSERT INTO agent_commissions
-           (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_method)
-         VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE, 'helaPay')
-         ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
-        [proof.agent_id, shopId, currentMonth]
-      );
+      if (isFirstPayment) {
+        await client.query(
+          `UPDATE agent_commissions
+              SET status = 'approved'
+            WHERE agent_id = $1 AND shop_id = $2
+              AND commission_type = 'onboarding'
+              AND status IN ('pending', 'locked')`,
+          [proof.agent_id, shopId]
+        );
+      } else {
+        const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+        await client.query(
+          `INSERT INTO agent_commissions
+             (agent_id, shop_id, commission_type, amount, month, status, earned_date, payment_method)
+           VALUES ($1, $2, 'monthly', 500, $3::DATE, 'approved', CURRENT_DATE, 'helaPay')
+           ON CONFLICT (agent_id, shop_id, commission_type, month) WHERE month IS NOT NULL DO NOTHING`,
+          [proof.agent_id, shopId, currentMonth]
+        );
+      }
     }
 
     // Fetch shop name for notifications (before releasing client)
