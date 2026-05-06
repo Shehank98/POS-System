@@ -334,7 +334,8 @@ async function getMe(req, res) {
               COALESCE(s.car_service_products_enabled, TRUE)  AS car_service_products_enabled,
               COALESCE(s.grace_period_days,            5)     AS grace_period_days,
               COALESCE(s.activation_status, 'active')        AS activation_status,
-              s.shop_reference_id
+              s.shop_reference_id,
+              COALESCE(s.subscription_months, 1)            AS subscription_months
          FROM users u
          JOIN shops s ON s.id = u.shop_id
         WHERE u.id = $1`,

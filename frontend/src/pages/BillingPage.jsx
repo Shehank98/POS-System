@@ -93,7 +93,9 @@ function CurrentPlanCard({ user, onRenew, onUpgrade }) {
   const isExpired   = days !== null && days < 0;
   const isSuspended = status === 'suspended';
 
-  const progressPct  = days === null ? 0 : isExpired ? 0 : Math.min(Math.round((days / 90) * 100), 100);
+  const planMonths  = Math.max(user?.subscription_months || 1, 1);
+  const totalDays   = planMonths * 30;
+  const progressPct = days === null ? 0 : isExpired ? 0 : Math.min(Math.round((days / totalDays) * 100), 100);
   const progressColor = (isExpired || isSuspended) ? 'bg-red-500' : isExpiring ? 'bg-amber-400' : 'bg-green-500';
 
   let borderCls = 'border-gray-200', bgCls = 'bg-white';
@@ -119,6 +121,7 @@ function CurrentPlanCard({ user, onRenew, onUpgrade }) {
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Current Plan</p>
           <p className="text-2xl font-black text-gray-900 leading-tight">{plan}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{planMonths === 1 ? '1 Month' : `${planMonths} Months`} plan</p>
         </div>
         <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full shrink-0 ${statusInfo.cls}`}>
           {statusInfo.icon} {statusInfo.label}
