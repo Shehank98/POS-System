@@ -87,26 +87,65 @@ function DashboardTab() {
     ? Math.min((data.active_customers / data.monthly_target) * 100, 100)
     : 0;
 
+  const commTypeLabel = (t) =>
+    t === 'onboarding' ? 'Onboarding' : t === 'monthly' ? 'Monthly' : t;
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <StatCard label="Total Shops"   value={data.total_customers}  icon={Store}       color="green" />
-        <StatCard label="Active Shops"  value={data.active_customers} icon={CheckCircle} color="blue" />
-        <StatCard label="Approved Earn" value={fmtMoney(data.approved_earnings)} icon={Wallet} color="green" />
-        <StatCard label="Pending Earn"  value={fmtMoney(data.pending_earnings)}  icon={Lock}   color="yellow" />
-      </div>
 
-      {/* Account balance */}
-      {data.account_balance > 0 && (
-        <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-xl p-4 text-white flex items-center justify-between gap-3">
+      {/* Account balance hero */}
+      {Number(data.account_balance) > 0 && (
+        <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-xl p-4 sm:p-5 text-white flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-green-200">Account Balance</p>
-            <p className="text-2xl font-bold">{fmtMoney(data.account_balance)}</p>
+            <p className="text-xs text-green-200 mb-0.5">Account Balance</p>
+            <p className="text-2xl sm:text-3xl font-bold">{fmtMoney(data.account_balance)}</p>
           </div>
-          <Wallet className="w-8 h-8 text-green-300 shrink-0" />
+          <Wallet className="w-9 h-9 text-green-300 shrink-0" />
         </div>
       )}
+
+      {/* Primary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <StatCard label="Total Shops"    value={data.total_customers}  icon={Store}       color="green" />
+        <StatCard label="Active (sub)"   value={data.active_customers} icon={CheckCircle} color="blue" />
+        <StatCard label="Activated"      value={data.activated_shops}  icon={BadgeCheck}  color="green" />
+        <StatCard label="Pending Pay"    value={data.pending_payment_shops} icon={Clock}  color="yellow" />
+      </div>
+
+      {/* Earnings breakdown */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-green-600 shrink-0" /> Earnings Overview
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="bg-green-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-1">This Month</p>
+            <p className="text-sm font-bold text-green-800">{fmtMoney(data.this_month_earnings)}</p>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-1">Approved</p>
+            <p className="text-sm font-bold text-blue-800">{fmtMoney(data.approved_earnings)}</p>
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-1">Pending</p>
+            <p className="text-sm font-bold text-yellow-800">{fmtMoney(data.pending_earnings)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-1">Total Paid Out</p>
+            <p className="text-sm font-bold text-gray-800">{fmtMoney(data.total_paid)}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+            <span className="text-xs text-gray-500">Onboarding commissions</span>
+            <span className="text-xs font-semibold text-gray-800">{fmtMoney(data.onboarding_earned)}</span>
+          </div>
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+            <span className="text-xs text-gray-500">Monthly commissions</span>
+            <span className="text-xs font-semibold text-gray-800">{fmtMoney(data.monthly_earned)}</span>
+          </div>
+        </div>
+      </div>
 
       {/* Monthly target */}
       {data.monthly_target > 0 && (
@@ -114,7 +153,7 @@ function DashboardTab() {
           <div className="flex items-center justify-between mb-2 gap-2">
             <span className="text-sm font-semibold text-gray-700">Monthly Target</span>
             <span className="text-xs text-gray-500 whitespace-nowrap">
-              {data.active_customers} / {data.monthly_target}
+              {data.active_customers} / {data.monthly_target} active shops
             </span>
           </div>
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -141,13 +180,36 @@ function DashboardTab() {
       {data.expiring_soon?.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" /> Expiring Soon (within 3 days)
+            <AlertCircle className="w-4 h-4 shrink-0" /> Expiring Soon (within 7 days)
           </h3>
           <div className="space-y-2">
             {data.expiring_soon.map((s, i) => (
               <div key={i} className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium text-gray-800 truncate">{s.name}</span>
                 <span className="text-red-600 whitespace-nowrap shrink-0">{fmtDate(s.subscription_end_date)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent commission activity */}
+      {data.recent_commissions?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-gray-500 shrink-0" /> Recent Commissions
+          </h3>
+          <div className="space-y-2">
+            {data.recent_commissions.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{c.shop_name}</p>
+                  <p className="text-xs text-gray-400">{commTypeLabel(c.commission_type)} · {fmtDate(c.earned_date || c.created_at)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-gray-900">{fmtMoney(c.amount)}</p>
+                  <StatusBadge status={c.status} />
+                </div>
               </div>
             ))}
           </div>

@@ -275,11 +275,19 @@ function AgentCommissionCard({ agent, commissions, onRefresh }) {
                 )}
                 {!selectable && <div className="w-4 h-4 shrink-0" />}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{c.shop_name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-white truncate">{c.shop_name}</p>
+                    {c.shop_activation_status && (
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${c.shop_activation_status === 'active' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+                        {c.shop_activation_status}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 capitalize">
                     {TYPE_LABEL[c.commission_type] || c.commission_type}
                     {c.month ? ` · ${new Date(c.month).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}` : ''}
                     {c.earned_date ? ` · Earned ${fmtDate(c.earned_date)}` : ''}
+                    {c.shop_subscription_status ? ` · Sub: ${c.shop_subscription_status.replace(/_/g,' ')}` : ''}
                   </p>
                   {c.status === 'paid' && c.paid_at && (
                     <p className="text-xs text-green-500">Paid {fmtDate(c.paid_at)}

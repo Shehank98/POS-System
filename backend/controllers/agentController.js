@@ -36,30 +36,54 @@ async function getDashboard(req, res) {
   try {
     const { rows } = await db.query(`
       SELECT
-        (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1)                              AS total_customers,
-        (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'active')  AS active_customers,
-        (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status != 'active') AS inactive_customers,
-        (SELECT COUNT(*)                FROM shops             WHERE onboarded_by_agent_id = $1 AND subscription_status = 'pending_payment') AS pending_payment_shops,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'approved')                           AS approved_earnings,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status IN ('pending','locked'))               AS pending_earnings,
-        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'paid')                              AS total_paid,
-        (SELECT COUNT(*)                FROM agent_payment_submissions WHERE agent_id = $1 AND status = 'pending_verification') AS pending_submissions,
-        (SELECT monthly_target          FROM sales_agents      WHERE id = $1)                                                  AS monthly_target,
-        (SELECT total_collected         FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_collected,
-        (SELECT total_verified          FROM agent_wallet      WHERE agent_id = $1)                                            AS wallet_verified,
-        (SELECT COALESCE(balance,0)     FROM agent_wallet      WHERE agent_id = $1)                                            AS account_balance
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE)                                              AS total_customers,
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE AND subscription_status = 'active')           AS active_customers,
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE AND subscription_status != 'active')          AS inactive_customers,
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE AND activation_status = 'active')             AS activated_shops,
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE AND activation_status != 'active')            AS unactivated_shops,
+        (SELECT COUNT(*) FROM shops WHERE onboarded_by_agent_id = $1 AND COALESCE(is_deleted,FALSE) = FALSE AND subscription_status = 'pending_payment')  AS pending_payment_shops,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'approved')                                               AS approved_earnings,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status IN ('pending','locked'))                                    AS pending_earnings,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status = 'paid')                                                   AS total_paid,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND commission_type = 'onboarding' AND status IN ('approved','paid'))  AS onboarding_earned,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND commission_type = 'monthly'    AND status IN ('approved','paid'))  AS monthly_earned,
+        (SELECT COALESCE(SUM(amount),0) FROM agent_commissions WHERE agent_id = $1 AND status IN ('approved','paid')
+           AND DATE_TRUNC('month', COALESCE(earned_date::TIMESTAMPTZ, created_at)) = DATE_TRUNC('month', NOW()))                                          AS this_month_earnings,
+        (SELECT COUNT(*) FROM agent_payment_submissions WHERE agent_id = $1 AND status = 'pending_verification')                                           AS pending_submissions,
+        (SELECT monthly_target      FROM sales_agents WHERE id = $1)                                                                                       AS monthly_target,
+        (SELECT total_collected     FROM agent_wallet  WHERE agent_id = $1)                                                                                AS wallet_collected,
+        (SELECT total_verified      FROM agent_wallet  WHERE agent_id = $1)                                                                                AS wallet_verified,
+        (SELECT COALESCE(balance,0) FROM agent_wallet  WHERE agent_id = $1)                                                                                AS account_balance
     `, [agentId]);
 
-    const { rows: expiring } = await db.query(`
-      SELECT id, name, subscription_end_date
-        FROM shops
-       WHERE onboarded_by_agent_id = $1
-         AND subscription_status = 'active'
-         AND subscription_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'
-       ORDER BY subscription_end_date
-    `, [agentId]);
+    const [expiringRes, recentCommRes] = await Promise.all([
+      db.query(`
+        SELECT id, name, subscription_end_date
+          FROM shops
+         WHERE onboarded_by_agent_id = $1
+           AND COALESCE(is_deleted, FALSE) = FALSE
+           AND subscription_status = 'active'
+           AND subscription_end_date BETWEEN NOW() AND NOW() + INTERVAL '7 days'
+         ORDER BY subscription_end_date
+      `, [agentId]),
+      db.query(`
+        SELECT ac.id, ac.commission_type, ac.amount, ac.status,
+               ac.earned_date, ac.created_at,
+               s.name AS shop_name
+          FROM agent_commissions ac
+          JOIN shops s ON s.id = ac.shop_id
+         WHERE ac.agent_id = $1
+           AND COALESCE(s.is_deleted, FALSE) = FALSE
+         ORDER BY COALESCE(ac.earned_date, ac.created_at::DATE) DESC, ac.id DESC
+         LIMIT 5
+      `, [agentId]),
+    ]);
 
-    res.json({ ...rows[0], expiring_soon: expiring });
+    res.json({
+      ...rows[0],
+      expiring_soon: expiringRes.rows,
+      recent_commissions: recentCommRes.rows,
+    });
   } catch (err) {
     console.error('agent getDashboard error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -79,6 +103,7 @@ async function listCustomers(req, res) {
         FROM shops s
         LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
        WHERE s.onboarded_by_agent_id = $1
+         AND COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY s.created_at DESC
     `, [agentId]);
     res.json(rows);
@@ -371,6 +396,7 @@ async function listPayments(req, res) {
         FROM agent_payment_submissions aps
         JOIN shops s ON s.id = aps.shop_id
        WHERE aps.agent_id = $1
+         AND COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY aps.created_at DESC
     `, [agentId]);
     res.json(rows);
@@ -401,6 +427,7 @@ async function listCommissions(req, res) {
         FROM agent_commissions ac
         JOIN shops s ON s.id = ac.shop_id
        WHERE ac.agent_id = $1
+         AND COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY COALESCE(ac.earned_date, ac.created_at::DATE) DESC, ac.id DESC
     `, [agentId]);
     res.json(rows);
@@ -437,6 +464,7 @@ async function getRenewals(req, res) {
       SELECT id, name, owner_name, phone, subscription_status, subscription_end_date
         FROM shops
        WHERE onboarded_by_agent_id = $1
+         AND COALESCE(is_deleted, FALSE) = FALSE
          AND (
            subscription_status = 'expired'
            OR (subscription_status = 'active' AND subscription_end_date <= NOW() + INTERVAL '7 days')
@@ -742,7 +770,7 @@ async function listShopPayments(req, res) {
   const shopId  = parseInt(req.params.shopId, 10);
   try {
     const check = await db.query(
-      `SELECT id FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2`,
+      `SELECT id FROM shops WHERE id = $1 AND onboarded_by_agent_id = $2 AND COALESCE(is_deleted, FALSE) = FALSE`,
       [shopId, agentId]
     );
     if (check.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
@@ -778,6 +806,7 @@ async function getSubscriptions(req, res) {
       LEFT JOIN subscription_plans sp  ON sp.id  = s.plan_id
       LEFT JOIN agent_shop_notes   asn ON asn.shop_id = s.id AND asn.agent_id = $1
       WHERE s.onboarded_by_agent_id = $1
+        AND COALESCE(s.is_deleted, FALSE) = FALSE
       ORDER BY s.name ASC
     `, [agentId]);
     res.json(rows);

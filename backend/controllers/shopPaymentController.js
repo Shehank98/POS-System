@@ -104,7 +104,7 @@ async function adminListShopPayments(req, res) {
                 ORDER BY ac.created_at DESC LIMIT 1
              ) AS onboarding_commission_amount
         FROM shop_payment_proofs spp
-        JOIN shops s ON s.id = spp.shop_id
+        JOIN shops s ON s.id = spp.shop_id AND COALESCE(s.is_deleted, FALSE) = FALSE
         LEFT JOIN sales_agents sa ON sa.id = COALESCE(spp.agent_id, s.onboarded_by_agent_id)
        ${where}
        ORDER BY spp.created_at DESC

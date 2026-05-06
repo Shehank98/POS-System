@@ -336,17 +336,20 @@ async function listCommissions(req, res) {
     const conditions = [];
     if (agent_id) { params.push(agent_id); conditions.push(`ac.agent_id = $${params.length}`); }
     if (status)   { params.push(status);   conditions.push(`ac.status   = $${params.length}`); }
-    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    conditions.push(`COALESCE(s.is_deleted, FALSE) = FALSE`);
+    const where2 = 'WHERE ' + conditions.join(' AND ');
 
     const { rows } = await db.query(`
       SELECT ac.*,
              sa.name AS agent_name, sa.bank_name, sa.bank_account,
              sa.bank_branch, sa.account_holder,
-             s.name AS shop_name
+             s.name AS shop_name,
+             s.activation_status AS shop_activation_status,
+             s.subscription_status AS shop_subscription_status
         FROM agent_commissions ac
         JOIN sales_agents sa ON sa.id = ac.agent_id
         JOIN shops s ON s.id = ac.shop_id
-       ${where}
+       ${where2}
        ORDER BY ac.created_at DESC
        LIMIT 500
     `, params);
@@ -673,7 +676,7 @@ async function getShopsByAgent(req, res) {
         COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'approved'),           0)    AS pending_commission,
         COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'paid'),               0)    AS paid_commission
       FROM sales_agents sa
-      LEFT JOIN shops           s  ON s.onboarded_by_agent_id = sa.id
+      LEFT JOIN shops           s  ON s.onboarded_by_agent_id = sa.id AND COALESCE(s.is_deleted, FALSE) = FALSE
       LEFT JOIN agent_commissions ac ON ac.agent_id = sa.id
       GROUP BY sa.id
       ORDER BY COUNT(DISTINCT s.id) DESC, sa.name ASC
@@ -691,6 +694,7 @@ async function getShopsByAgent(req, res) {
         COALESCE(SUM(ac.amount) FILTER (WHERE ac.status = 'approved'),           0) AS pending
       FROM shops s
       LEFT JOIN agent_commissions ac ON ac.shop_id = s.id
+     WHERE COALESCE(s.is_deleted, FALSE) = FALSE
       GROUP BY s.id
       ORDER BY s.created_at DESC
     `);
