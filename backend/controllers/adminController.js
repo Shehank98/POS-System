@@ -43,13 +43,13 @@ async function getDashboard(req, res) {
   try {
     const { rows } = await db.query(`
       SELECT
-        (SELECT COUNT(*) FROM shops)                                                          AS total_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'active')                    AS active_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'trial')                     AS trial_shops,
-        (SELECT COUNT(*) FROM shops WHERE subscription_status = 'expired')                   AS expired_shops,
-        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'verified')            AS total_revenue,
-        (SELECT COUNT(*) FROM payments WHERE status = 'pending')                             AS pending_payments,
-        (SELECT COUNT(*) FROM shops WHERE created_at >= NOW() - INTERVAL '7 days')          AS new_shops_7d
+        (SELECT COUNT(*) FROM shops WHERE COALESCE(is_deleted,FALSE)=FALSE)                                                             AS total_shops,
+        (SELECT COUNT(*) FROM shops WHERE COALESCE(is_deleted,FALSE)=FALSE AND subscription_status = 'active')                         AS active_shops,
+        (SELECT COUNT(*) FROM shops WHERE COALESCE(is_deleted,FALSE)=FALSE AND subscription_status = 'trial')                          AS trial_shops,
+        (SELECT COUNT(*) FROM shops WHERE COALESCE(is_deleted,FALSE)=FALSE AND subscription_status = 'expired')                        AS expired_shops,
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'verified')                                                       AS total_revenue,
+        (SELECT COUNT(*) FROM payments WHERE status = 'pending')                                                                        AS pending_payments,
+        (SELECT COUNT(*) FROM shops WHERE COALESCE(is_deleted,FALSE)=FALSE AND created_at >= NOW() - INTERVAL '7 days')                AS new_shops_7d
     `);
 
     const { rows: monthly } = await db.query(`

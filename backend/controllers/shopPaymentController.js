@@ -460,7 +460,7 @@ function qr_reference_from_session(session) {
 // ── Shared billing fulfilment logic (called from webhook + poll) ──
 // Idempotent: checks proof status before updating, wrapped in transaction
 async function fulfillBillingPayment(proofId, shopId, qrReference) {
-  const { createNotification } = require('./notificationController');
+  const { createNotification, createAgentNotification } = require('./notificationController');
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -571,7 +571,22 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
         { method: 'helaPay', amount: 2500 }
       );
     } catch (e) {
-      console.warn('[BillingQR] notification error:', e.message);
+      console.warn('[BillingQR] shop notification error:', e.message);
+    }
+
+    // Notify agent with a durable in-app notification (non-blocking)
+    if (agentId) {
+      try {
+        await createAgentNotification(
+          agentId,
+          'shop_activated',
+          'Shop Activated!',
+          `${shopName} has been activated after HelaPlay payment of LKR 2,500.`,
+          { shop_id: shopId, method: 'helaPay', amount: 2500 }
+        );
+      } catch (e) {
+        console.warn('[BillingQR] agent notification error:', e.message);
+      }
     }
 
     console.log(`[BillingQR] Fulfilled billing payment for shop ${shopId}, proof ${proofId}`);

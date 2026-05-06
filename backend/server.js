@@ -8,6 +8,22 @@ if (_missing.length > 0) {
   process.exit(1);
 }
 
+// Warn about optional-but-important env vars missing at startup
+if (process.env.NODE_ENV === 'production' && !process.env.FRONTEND_URL) {
+  console.warn('[WARN] FRONTEND_URL not set — CORS is open to all origins (*). Set it in production!');
+}
+const _helaposVars = ['HELAPOS_SYSTEM_APP_ID', 'HELAPOS_SYSTEM_APP_SECRET', 'HELAPOS_SYSTEM_BUSINESS_ID', 'HELAPOS_SYSTEM_BUSINESS_USER_ID'];
+const _missingHela = _helaposVars.filter((k) => !process.env[k]);
+if (_missingHela.length > 0) {
+  console.warn(`[WARN] HelaPOS billing QR disabled — missing env vars: ${_missingHela.join(', ')}`);
+}
+if (!process.env.HELAPAY_WEBHOOK_SECRET) {
+  const mode = process.env.NODE_ENV === 'production' ? 'ERROR' : 'WARN';
+  console[mode === 'ERROR' ? 'error' : 'warn'](
+    `[${mode}] HELAPAY_WEBHOOK_SECRET not set — webhook signature verification ${mode === 'ERROR' ? 'will REJECT all webhooks in production' : 'is disabled (dev mode)'}`
+  );
+}
+
 const http           = require('http');
 const express        = require('express');
 const cors           = require('cors');
@@ -40,6 +56,7 @@ const webhookRoutes       = require('./routes/webhooks');
 const { runDailyChecks }        = require('./controllers/notificationController');
 const { cancelStalePreOrders }  = require('./controllers/preOrderController');
 const activationGuard           = require('./middleware/activationGuard');
+const loginRateLimiter          = require('./middleware/loginRateLimiter');
 
 const app = express();
 
@@ -50,9 +67,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Capture raw body for webhook HMAC verification BEFORE express.json parses it.
-// Only applies to the /api/webhooks prefix to avoid memory cost on large uploads.
-app.use('/api/webhooks', (req, _res, next) => {
+// Capture raw body for HMAC verification on webhook endpoints BEFORE express.json parses it.
+function rawBodyCapture(req, _res, next) {
   let data = '';
   req.setEncoding('utf8');
   req.on('data', (chunk) => { data += chunk; });
@@ -62,9 +78,19 @@ app.use('/api/webhooks', (req, _res, next) => {
     req._body = true; // tell body-parser/express.json to skip — stream already consumed
     next();
   });
-});
+}
+app.use('/api/webhooks', rawBodyCapture);
+app.post('/api/qr/webhook', rawBodyCapture); // HelaPOS per-shop QR payment webhook
 
-app.use(express.json({ limit: '20mb' })); // allow base64 document uploads (registration flow)
+// Restrict the large body limit to only the routes that need it (agent registration file uploads).
+// All other routes get a safe 1mb limit to reduce DoS surface area.
+app.use((req, _res, next) => {
+  const isUploadRoute =
+    req.path === '/api/agent-auth/upload-file' ||
+    req.path === '/api/agents/shops/upload-selfie' ||
+    req.path === '/api/shop-payments/upload-proof';
+  express.json({ limit: isUploadRoute ? '20mb' : '1mb' })(req, _res, next);
+});
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
@@ -76,6 +102,11 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(activationGuard);
 
 // ── Routes ────────────────────────────────────────────────────
+// Rate-limit login endpoints (20 attempts per 15 min per IP)
+app.post('/api/auth/login',         loginRateLimiter);
+app.post('/api/admin/login',        loginRateLimiter);
+app.post('/api/agent-auth/login',   loginRateLimiter);
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/agent-auth',    agentAuthRoutes);
 app.use('/api/agents',        agentRoutes);
@@ -120,12 +151,12 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// ── Cron: daily checks at 09:00 server time ───────────────────
-cron.schedule('0 9 * * *', runDailyChecks);
-console.log('[Cron] Daily check scheduled at 09:00');
+// ── Cron: daily checks at 09:00 Sri Lanka time ────────────────
+cron.schedule('0 9 * * *', runDailyChecks, { timezone: 'Asia/Colombo' });
+console.log('[Cron] Daily check scheduled at 09:00 Asia/Colombo');
 
 // ── Cron: cancel stale pre-orders every 30 minutes ────────────
-cron.schedule('*/30 * * * *', cancelStalePreOrders);
+cron.schedule('*/30 * * * *', cancelStalePreOrders, { timezone: 'Asia/Colombo' });
 console.log('[Cron] Stale pre-order cleanup scheduled every 30 minutes');
 
 // ── Start: apply pending DB migrations, then listen ──────────

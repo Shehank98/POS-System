@@ -1,6 +1,37 @@
-const { randomUUID } = require('crypto');
+const { randomUUID, createHmac } = require('crypto');
 const db             = require('../config/database');
 const helapos        = require('../services/helaposService');
+
+const QR_WEBHOOK_SECRET = process.env.HELAPAY_WEBHOOK_SECRET || '';
+
+// Verify HMAC-SHA256 signature sent by HelaPOS on the /api/qr/webhook callback.
+// Uses the same secret and format as helapayWebhookController.js.
+function verifyQRWebhookSignature(rawBody, headers) {
+  if (!QR_WEBHOOK_SECRET) {
+    // Not configured: allow in dev, reject in production
+    if (process.env.NODE_ENV === 'production') return false;
+    console.warn('[QR] HELAPAY_WEBHOOK_SECRET not set — skipping signature check (dev mode)');
+    return true;
+  }
+  const sigHeader =
+    headers['x-helapay-signature'] ||
+    headers['x-signature']         ||
+    headers['x-helaPay-signature'] ||
+    '';
+  if (!sigHeader) return false;
+  const expected = 'sha256=' + createHmac('sha256', QR_WEBHOOK_SECRET)
+    .update(rawBody)
+    .digest('hex');
+  try {
+    // Use timingSafeEqual to prevent timing attacks
+    const a = Buffer.from(sigHeader);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return require('crypto').timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 const { notifyShopQRPayment } = require('../websocket');
 const { sendToTopic } = require('../utils/fcm');
 const { fulfillBillingPayment } = require('./shopPaymentController');
@@ -95,6 +126,13 @@ async function generateQR(req, res) {
 //   "sale": { "payment_status": 2, "amount": 1500, ... }
 // }
 async function handleWebhook(req, res) {
+  // Verify HMAC signature before processing
+  const rawBody = req.rawBody || JSON.stringify(req.body || {});
+  if (!verifyQRWebhookSignature(rawBody, req.headers)) {
+    console.warn('[QR] webhook rejected: invalid signature');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
   // Always acknowledge immediately — HelaPOS expects 200 fast
   res.json({ received: true });
 

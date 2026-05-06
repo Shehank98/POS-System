@@ -392,11 +392,11 @@ async function listPayments(req, res) {
   const agentId = req.agent.id;
   try {
     const { rows } = await db.query(`
-      SELECT aps.*, s.name AS shop_name
+      SELECT aps.*,
+             COALESCE(s.name, '[Deleted Shop]') AS shop_name
         FROM agent_payment_submissions aps
-        JOIN shops s ON s.id = aps.shop_id
+        LEFT JOIN shops s ON s.id = aps.shop_id
        WHERE aps.agent_id = $1
-         AND COALESCE(s.is_deleted, FALSE) = FALSE
        ORDER BY aps.created_at DESC
     `, [agentId]);
     res.json(rows);
@@ -510,6 +510,15 @@ async function registerShop(req, res) {
 
   if (!shop_name || !owner_name || !contact_number) {
     return res.status(400).json({ error: 'shop_name, owner_name, and contact_number are required' });
+  }
+  if (typeof shop_name !== 'string' || shop_name.trim().length < 2) {
+    return res.status(400).json({ error: 'shop_name must be at least 2 characters' });
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'A valid email address is required' });
+  }
+  if (!username || username.trim().length < 3) {
+    return res.status(400).json({ error: 'username must be at least 3 characters' });
   }
   if (!location_map_url) {
     return res.status(400).json({ error: 'Google Maps link is required' });
