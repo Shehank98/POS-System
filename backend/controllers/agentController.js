@@ -846,6 +846,12 @@ async function getDepositQRStatus(req, res) {
 async function getDepositHistory(req, res) {
   const agentId = req.agent.id;
   try {
+    // Ensure wallet row exists so the balance query never returns empty
+    await db.query(
+      `INSERT INTO agent_wallet (agent_id) VALUES ($1) ON CONFLICT (agent_id) DO NOTHING`,
+      [agentId]
+    );
+
     const [{ rows: history }, { rows: wallet }] = await Promise.all([
       db.query(
         `SELECT id, amount_paid, credited, reference, status, paid_at, created_at

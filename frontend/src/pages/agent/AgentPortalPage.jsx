@@ -884,9 +884,10 @@ function ShopsTab() {
 // ── Payments Tab ──────────────────────────────────────────────
 // ── HelaPlay Deposit QR Panel ─────────────────────────────────
 function DepositQRPanel({ onPaid }) {
-  const [qrSession,   setQrSession]   = useState(null);   // { reference, qr_data, expires_at }
-  const [generating,  setGenerating]  = useState(false);
-  const [status,      setStatus]      = useState(0);       // 0=pending 2=paid -1=cancelled -2=expired
+  const [qrSession,   setQrSession]   = useState(null);
+  const [generating,  setGenerating]  = useState(true);  // start generating immediately
+  const [genError,    setGenError]    = useState('');
+  const [status,      setStatus]      = useState(0);
   const [timeLeft,    setTimeLeft]    = useState(0);
 
   const pollRef      = useRef(null);
@@ -920,24 +921,30 @@ function DepositQRPanel({ onPaid }) {
         } else if (data.payment_status !== 0) {
           clearPolling();
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore poll errors */ }
     }, 3000);
   }
 
-  async function generateQR() {
+  const generateQR = useCallback(async () => {
     setGenerating(true);
+    setGenError('');
     setStatus(0);
+    setQrSession(null);
     try {
       const { data } = await agentApi.generateDepositQR();
       setQrSession(data);
       setTimeLeft(Math.ceil((new Date(data.expires_at) - Date.now()) / 1000));
       startPolling(data.reference, data.expires_at);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to generate QR');
+      const msg = err.response?.data?.error || 'Failed to generate QR code. Please try again.';
+      setGenError(msg);
     } finally {
       setGenerating(false);
     }
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-generate on mount
+  useEffect(() => { generateQR(); }, [generateQR]);
 
   const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const seconds = String(timeLeft % 60).padStart(2, '0');
@@ -949,6 +956,31 @@ function DepositQRPanel({ onPaid }) {
         <PartyPopper className="w-12 h-12 text-green-500" />
         <p className="text-lg font-bold text-green-700">Payment Received!</p>
         <p className="text-sm text-gray-500">LKR 500 has been credited to your account balance.</p>
+      </div>
+    );
+  }
+
+  // Generating / loading state
+  if (generating) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-3">
+        <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+        <p className="text-sm text-gray-500">Generating QR code…</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (genError) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <p className="text-sm text-red-600 font-medium">{genError}</p>
+        <button
+          onClick={generateQR}
+          className="min-h-[44px] px-6 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -968,12 +1000,17 @@ function DepositQRPanel({ onPaid }) {
     );
   }
 
-  // Live QR state
+  // Live QR state — detect if qr_data is already a base64 image or a raw QR string
   if (qrSession && qrSession.qr_data) {
+    const isImageUrl = qrSession.qr_data.startsWith('data:image') ||
+                       qrSession.qr_data.startsWith('http');
     return (
       <div className="flex flex-col items-center gap-4">
         <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm">
-          <QRCodeSVG value={qrSession.qr_data} size={220} level="M" />
+          {isImageUrl
+            ? <img src={qrSession.qr_data} alt="HelaPlay QR" className="w-[220px] h-[220px] object-contain" />
+            : <QRCodeSVG value={qrSession.qr_data} size={220} level="M" />
+          }
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="w-4 h-4 text-green-600 animate-spin shrink-0" />
@@ -985,32 +1022,12 @@ function DepositQRPanel({ onPaid }) {
     );
   }
 
-  // Initial state
+  // Fallback — shouldn't reach here
   return (
-    <div className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2 text-sm text-blue-800">
-        <div className="flex items-start gap-2">
-          <Smartphone className="w-4 h-4 mt-0.5 shrink-0" />
-          <p>Open your HelaPlay app and scan the QR code</p>
-        </div>
-        <div className="flex items-start gap-2">
-          <BadgeCheck className="w-4 h-4 mt-0.5 shrink-0" />
-          <p>Pay <strong>LKR 2,500</strong> — LKR 500 will be credited to your balance instantly</p>
-        </div>
-        <div className="flex items-start gap-2">
-          <ArrowDownCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <p>Your account balance is updated automatically after payment</p>
-        </div>
-      </div>
-      <button
-        onClick={generateQR}
-        disabled={generating}
-        className="w-full min-h-[48px] bg-green-700 hover:bg-green-800 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
-      >
-        {generating
-          ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
-          : <><QrCode className="w-4 h-4" /> Generate QR Code — LKR 2,500</>
-        }
+    <div className="flex flex-col items-center gap-3 py-6 text-center">
+      <p className="text-sm text-gray-400">Something went wrong.</p>
+      <button onClick={generateQR} className="min-h-[44px] px-6 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800">
+        Retry
       </button>
     </div>
   );
