@@ -425,7 +425,8 @@ function fillDays(rows, count, fromMonthStart = false) {
       const d = new Date(todayUtcMs - i * 86_400_000);
       key = d.toISOString().split('T')[0];
     }
-    result.push(map[key] || { day: key, sales: '0', transactions: '0' });
+    // Always use string key for day so frontend template literals produce valid dates
+    result.push({ ...(map[key] || { sales: '0', transactions: '0' }), day: key });
   }
   return result;
 }

@@ -15,7 +15,7 @@ function SubscriptionBanner({ user }) {
 
   const statusMap = {
     active:  { cls: 'badge-active',   label: 'Active'  },
-    trial:   { cls: 'badge-trial',    label: 'Trial'   },
+    trial:   { cls: 'badge-active',   label: 'Active'  },
     expired: { cls: 'badge-expired',  label: 'Expired' },
   };
   const s = statusMap[subscription_status] || statusMap.expired;
