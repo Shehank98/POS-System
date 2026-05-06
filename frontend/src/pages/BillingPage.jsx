@@ -104,16 +104,14 @@ function CurrentPlanCard({ user, onRenew, onUpgrade }) {
   else if (isActive)            { borderCls = 'border-green-200';  bgCls = 'bg-green-50/40';  }
 
   const statusInfo = isSuspended
-    ? { label: 'Suspended',     cls: 'bg-red-100 text-red-700',     icon: <XCircle     className="w-4 h-4" /> }
+    ? { label: 'Suspended',     cls: 'bg-red-100 text-red-700',     icon: <XCircle       className="w-4 h-4" /> }
     : isExpired
-    ? { label: 'Expired',       cls: 'bg-red-100 text-red-700',     icon: <XCircle     className="w-4 h-4" /> }
+    ? { label: 'Expired',       cls: 'bg-red-100 text-red-700',     icon: <XCircle       className="w-4 h-4" /> }
     : isExpiring
     ? { label: 'Expiring Soon', cls: 'bg-amber-100 text-amber-700', icon: <AlertTriangle className="w-4 h-4" /> }
-    : status === 'trial'
-    ? { label: 'Trial',         cls: 'bg-blue-100 text-blue-700',   icon: <CheckCircle2 className="w-4 h-4" /> }
     : isActive
-    ? { label: 'Active',        cls: 'bg-green-100 text-green-700', icon: <CheckCircle2 className="w-4 h-4" /> }
-    : { label: 'Inactive',      cls: 'bg-gray-100 text-gray-600',   icon: <Clock className="w-4 h-4" /> };
+    ? { label: 'Active',        cls: 'bg-green-100 text-green-700', icon: <CheckCircle2  className="w-4 h-4" /> }
+    : { label: 'Inactive',      cls: 'bg-gray-100 text-gray-600',   icon: <Clock         className="w-4 h-4" /> };
 
   return (
     <div className={`rounded-2xl border-2 p-5 ${borderCls} ${bgCls}`}>
