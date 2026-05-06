@@ -135,14 +135,31 @@ async function adminVerifyShopPayment(req, res) {
     }
     const proof = proofRows[0];
 
-    // Check first vs renewal payment before updating
+    // Read shop info + check for a pending onboarding commission
     const { rows: shopStatusRows } = await client.query(
       `SELECT activation_status, onboarded_by_agent_id, name FROM shops WHERE id = $1 FOR UPDATE`,
       [proof.shop_id]
     );
-    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
+    const shopName = shopStatusRows[0]?.name || `Shop #${proof.shop_id}`;
+    const agentId  = proof.agent_id || shopStatusRows[0]?.onboarded_by_agent_id;
 
-    // Activate the shop account
+    // Determine first vs renewal: prefer checking for a pending/locked onboarding
+    // commission rather than activation_status (which defaults to 'active' for
+    // older onboardCustomer-created shops even before first payment).
+    let hasUnlockableOnboarding = false;
+    if (agentId) {
+      const { rows: obRows } = await client.query(
+        `SELECT id FROM agent_commissions
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'onboarding'
+            AND status IN ('pending','locked')
+          LIMIT 1`,
+        [agentId, proof.shop_id]
+      );
+      hasUnlockableOnboarding = obRows.length > 0;
+    }
+
+    // Activate shop
     await client.query(
       `UPDATE shops
           SET activation_status   = 'active',
@@ -163,12 +180,9 @@ async function adminVerifyShopPayment(req, res) {
       [proofId]
     );
 
-    const shopName = shopStatusRows[0]?.name    || `Shop #${proof.shop_id}`;
-    const agentId  = proof.agent_id            || shopStatusRows[0]?.onboarded_by_agent_id;
-
-    // Commissions: first payment unlocks onboarding only; renewals create monthly
+    // Commissions
     if (agentId) {
-      if (isFirstPayment) {
+      if (hasUnlockableOnboarding) {
         await client.query(
           `UPDATE agent_commissions
               SET status = 'approved', approved_at = NOW()
@@ -242,7 +256,7 @@ async function adminVerifyHelaPay(req, res) {
 
     const { rows } = await client.query(
       `SELECT * FROM shop_payment_proofs
-        WHERE id = $1 AND payment_method = 'agent_helaPay' AND status = 'pending' FOR UPDATE`,
+        WHERE id = $1 AND payment_method IN ('agent_helaPay','helaPay') AND status = 'pending' FOR UPDATE`,
       [proofId]
     );
     if (rows.length === 0) {
@@ -251,13 +265,24 @@ async function adminVerifyHelaPay(req, res) {
     }
     const proof = rows[0];
 
-    // Check first vs renewal payment before updating
     const { rows: shopStatusRows } = await client.query(
-      `SELECT activation_status, onboarded_by_agent_id FROM shops WHERE id = $1 FOR UPDATE`,
+      `SELECT onboarded_by_agent_id FROM shops WHERE id = $1 FOR UPDATE`,
       [proof.shop_id]
     );
-    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
     const agentId = proof.agent_id || shopStatusRows[0]?.onboarded_by_agent_id;
+
+    let hasUnlockableOnboarding = false;
+    if (agentId) {
+      const { rows: obRows } = await client.query(
+        `SELECT id FROM agent_commissions
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'onboarding'
+            AND status IN ('pending','locked')
+          LIMIT 1`,
+        [agentId, proof.shop_id]
+      );
+      hasUnlockableOnboarding = obRows.length > 0;
+    }
 
     await client.query(
       `UPDATE shops
@@ -276,9 +301,8 @@ async function adminVerifyHelaPay(req, res) {
       [proofId]
     );
 
-    // Commissions: first payment unlocks onboarding only; renewals create monthly
     if (agentId) {
-      if (isFirstPayment) {
+      if (hasUnlockableOnboarding) {
         await client.query(
           `UPDATE agent_commissions
               SET status = 'approved'
@@ -445,12 +469,21 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
     }
     const proof = proofRows[0];
 
-    // Check if this is the first activation before updating
-    const { rows: shopStatusRows } = await client.query(
-      `SELECT activation_status FROM shops WHERE id = $1 FOR UPDATE`,
-      [shopId]
-    );
-    const isFirstPayment = shopStatusRows[0]?.activation_status !== 'active';
+    // Lock shop row + check for pending onboarding commission
+    await client.query(`SELECT id FROM shops WHERE id = $1 FOR UPDATE`, [shopId]);
+
+    let hasUnlockableOnboarding = false;
+    if (proof.agent_id) {
+      const { rows: obRows } = await client.query(
+        `SELECT id FROM agent_commissions
+          WHERE agent_id = $1 AND shop_id = $2
+            AND commission_type = 'onboarding'
+            AND status IN ('pending','locked')
+          LIMIT 1`,
+        [proof.agent_id, shopId]
+      );
+      hasUnlockableOnboarding = obRows.length > 0;
+    }
 
     // Mark proof verified
     await client.query(
@@ -474,9 +507,9 @@ async function fulfillBillingPayment(proofId, shopId, qrReference) {
       [shopId]
     );
 
-    // Commissions: first payment unlocks onboarding only; renewals create monthly
+    // Commissions
     if (proof.agent_id) {
-      if (isFirstPayment) {
+      if (hasUnlockableOnboarding) {
         await client.query(
           `UPDATE agent_commissions
               SET status = 'approved'

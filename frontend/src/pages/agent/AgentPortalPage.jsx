@@ -489,11 +489,30 @@ function ShopRegisterForm({ onDone, onClose }) {
   const [saving, setSaving]           = useState(false);
   const [result, setResult]           = useState(null);
 
+  function parseGoogleMapsCoords(url) {
+    if (!url) return null;
+    let m = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (m) return { lat: m[1], lng: m[2] };
+    m = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (m) return { lat: m[1], lng: m[2] };
+    m = url.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (m) return { lat: m[1], lng: m[2] };
+    return null;
+  }
+
   const set = (k) => (e) => {
     const v = e.target.value;
-    setForm((p) => ({ ...p, [k]: v }));
     if (k === 'location_map_url') {
       setMapUrlError(v && !MAPS_RE.test(v) ? 'Please enter a valid Google Maps link' : '');
+      const coords = parseGoogleMapsCoords(v);
+      setForm((p) => ({
+        ...p,
+        location_map_url: v,
+        location_lat: coords ? coords.lat : p.location_lat,
+        location_lng: coords ? coords.lng : p.location_lng,
+      }));
+    } else {
+      setForm((p) => ({ ...p, [k]: v }));
     }
   };
   const fc = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
@@ -648,6 +667,11 @@ function ShopRegisterForm({ onDone, onClose }) {
             placeholder="https://maps.google.com/maps?q=..."
           />
           {mapUrlError && <p className="text-xs text-red-500 mt-1">{mapUrlError}</p>}
+          {!mapUrlError && form.location_lat && form.location_lng && (
+            <p className="text-xs text-green-600 mt-1">
+              ✓ Location detected ({parseFloat(form.location_lat).toFixed(5)}, {parseFloat(form.location_lng).toFixed(5)})
+            </p>
+          )}
           <p className="text-xs text-gray-400 mt-1">
             Open Google Maps → find the location → tap Share → Copy link
           </p>

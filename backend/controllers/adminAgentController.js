@@ -702,6 +702,24 @@ async function getShopsByAgent(req, res) {
 
 // ── GET /api/admin/shops/map-data ────────────────────────────
 // Returns all shops with location + agent info for the map view
+// Parse lat/lng from a Google Maps URL (server-side fallback)
+function parseGoogleMapsUrl(url) {
+  if (!url) return null;
+  // @lat,lng,zoom  (share links)
+  let m = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  // ?q=lat,lng
+  m = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  // ll=lat,lng
+  m = url.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  // saddr / daddr
+  m = url.match(/(?:saddr|daddr)=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return null;
+}
+
 async function getShopsMapData(req, res) {
   try {
     const { rows } = await db.query(`
@@ -714,7 +732,33 @@ async function getShopsMapData(req, res) {
         LEFT JOIN sales_agents sa ON sa.id = s.onboarded_by_agent_id
        ORDER BY s.name ASC
     `);
-    res.json(rows);
+
+    // For shops without stored lat/lng, parse from location_map_url and
+    // persist the result so future calls are instant.
+    const toUpdate = [];
+    const enriched = rows.map((shop) => {
+      const lat = parseFloat(shop.location_lat);
+      const lng = parseFloat(shop.location_lng);
+      if (!isNaN(lat) && !isNaN(lng)) return shop; // already has coords
+
+      const parsed = parseGoogleMapsUrl(shop.location_map_url);
+      if (!parsed) return shop;
+
+      toUpdate.push({ id: shop.id, lat: parsed.lat, lng: parsed.lng });
+      return { ...shop, location_lat: parsed.lat, location_lng: parsed.lng };
+    });
+
+    // Persist parsed coords asynchronously (best-effort, non-blocking)
+    if (toUpdate.length) {
+      Promise.all(toUpdate.map(({ id, lat, lng }) =>
+        db.query(
+          `UPDATE shops SET location_lat = $1, location_lng = $2 WHERE id = $3`,
+          [lat, lng, id]
+        )
+      )).catch((e) => console.error('getShopsMapData coord backfill error:', e.message));
+    }
+
+    res.json(enriched);
   } catch (err) {
     console.error('getShopsMapData error:', err);
     res.status(500).json({ error: 'Server error' });
