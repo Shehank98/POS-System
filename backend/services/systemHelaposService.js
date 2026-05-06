@@ -12,13 +12,20 @@ const BUSINESS_ID  = process.env.HELAPOS_SYSTEM_BUSINESS_ID;
 
 let refreshLock = null; // in-flight refresh promise
 
+class HelaPOSError extends Error {
+  constructor(status, body) {
+    super(`HelaPOS ${status}: ${body}`);
+    this.status = status;
+  }
+}
+
 async function helaPost(url, body, authHeader) {
   const headers = { 'Content-Type': 'application/json' };
   if (authHeader) headers.Authorization = authHeader;
   const res  = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
   const text = await res.text();
   console.log(`[SysHelaPOS] ${res.status} ← ${url.split('/').slice(-2).join('/')}: ${text.slice(0, 300)}`);
-  if (!res.ok) throw new Error(`HelaPOS ${res.status}: ${text}`);
+  if (!res.ok) throw new HelaPOSError(res.status, text);
   try { return JSON.parse(text); } catch { return text; }
 }
 
@@ -36,6 +43,13 @@ async function fetchFreshToken() {
     access_token:  raw.accessToken  || raw.access_token,
     refresh_token: raw.refreshToken || raw.refresh_token,
   };
+}
+
+// Force-clear DB token cache so next getOrRefreshToken call fetches fresh credentials
+async function invalidateCachedToken() {
+  try {
+    await db.query(`UPDATE system_helapos_token SET expires_at = NOW() WHERE id = 1`);
+  } catch { /* table may not exist yet — ignore */ }
 }
 
 async function getOrRefreshToken() {
@@ -102,13 +116,26 @@ async function getOrRefreshToken() {
   }
 }
 
+// Call a HelaPOS endpoint with automatic token refresh on 401
+async function helaPostWithRetry(url, body) {
+  let token = await getOrRefreshToken();
+  try {
+    return await helaPost(url, body, `Bearer ${token}`);
+  } catch (err) {
+    if (err.status !== 401) throw err;
+    // Token was rejected — force a fresh login and retry once
+    console.log('[SysHelaPOS] 401 received — forcing token refresh and retrying');
+    await invalidateCachedToken();
+    token = await getOrRefreshToken();
+    return await helaPost(url, body, `Bearer ${token}`);
+  }
+}
+
 async function generateBillingQR(reference, amount) {
   if (!BUSINESS_ID) throw new Error('HELAPOS_SYSTEM_BUSINESS_ID not configured');
-  const token = await getOrRefreshToken();
-  const raw   = await helaPost(
+  const raw = await helaPostWithRetry(
     `${BASE_URL}/merchant/api/helapos/qr/generate`,
     { b: BUSINESS_ID, r: reference, am: Number(amount) },
-    `Bearer ${token}`
   );
   const qr_data      = raw.qr_data      || raw.qrData;
   const qr_reference = raw.qr_reference || raw.qrReference || raw.reference;
@@ -117,15 +144,14 @@ async function generateBillingQR(reference, amount) {
 }
 
 async function checkBillingQRStatus(reference, qrReference) {
-  const token = await getOrRefreshToken();
-  const body  = qrReference ? { qr_reference: qrReference } : { reference };
-  const raw   = await helaPost(
+  const body = qrReference ? { qr_reference: qrReference } : { reference };
+  const raw  = await helaPostWithRetry(
     `${BASE_URL}/merchant/api/helapos/sales/getSaleStatus`,
     body,
-    `Bearer ${token}`
   );
   const status = raw.sale?.payment_status ?? raw.payment_status ?? 0;
   return { payment_status: Number(status), sale: raw.sale || null };
 }
 
 module.exports = { generateBillingQR, checkBillingQRStatus, getOrRefreshToken };
+
