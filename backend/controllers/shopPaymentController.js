@@ -592,5 +592,5 @@ module.exports = {
   adminVerifyHelaPay,
   generateBillingQR,
   getBillingQRStatus,
-  fulfillBillingPayment,
+  fulfillBillingPayment, // exported so agentController can call it for shop-payment QR
 };

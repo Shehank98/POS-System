@@ -419,51 +419,158 @@ function OnboardWizard({ onDone, onClose }) {
 }
 
 // ── Shop QR Modal ─────────────────────────────────────────────
-function ShopQRModal({ shop, onClose }) {
-  const [qr,       setQr]       = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [proofId,  setProofId]  = useState(null);
-  const [reference, setRef]     = useState('');
+function ShopQRModal({ shop, onClose, onSuccess }) {
+  const [session,   setSession]  = useState(null); // { reference, qr_data, expires_at }
+  const [loading,   setLoading]  = useState(true);
+  const [status,    setStatus]   = useState(0);    // 0=pending, 2=paid, -1=failed, -2=expired
+  const [timeLeft,  setTimeLeft] = useState(null);
+  const [error,     setError]    = useState('');
+  const pollRef  = useRef(null);
+  const timerRef = useRef(null);
 
-  useEffect(() => {
-    agentApi.generateShopQR(shop.id)
-      .then(({ data }) => {
-        setQr(data.qr_data_url);
-        setRef(data.reference);
-        setProofId(data.proof_id);
-      })
-      .catch(() => toast.error('Failed to generate QR code'))
-      .finally(() => setLoading(false));
-  }, [shop.id]);
+  const stopPolling = useCallback(() => {
+    clearInterval(pollRef.current);
+    clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  const generate = useCallback(async () => {
+    setLoading(true);
+    setStatus(0);
+    setError('');
+    stopPolling();
+    try {
+      const { data } = await agentApi.generateShopQR(shop.id);
+      setSession(data);
+
+      // Countdown timer
+      timerRef.current = setInterval(() => {
+        const secs = Math.max(0, Math.round((new Date(data.expires_at) - Date.now()) / 1000));
+        setTimeLeft(secs);
+        if (secs === 0) stopPolling();
+      }, 1000);
+
+      // Poll payment status every 3 seconds
+      pollRef.current = setInterval(async () => {
+        try {
+          const { data: st } = await agentApi.shopPaymentQRStatus(shop.id, data.reference);
+          if (st.payment_status !== 0) {
+            setStatus(st.payment_status);
+            stopPolling();
+            if (st.payment_status === 2) {
+              setTimeout(() => { onSuccess?.(); onClose(); }, 2500);
+            }
+          }
+        } catch { /* silent — keep polling */ }
+      }, 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate QR. Check system configuration.');
+    } finally {
+      setLoading(false);
+    }
+  }, [shop.id, stopPolling, onSuccess, onClose]);
+
+  useEffect(() => { generate(); }, [generate]);
+
+  const fmtTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const expired = timeLeft === 0 || status === -2;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6">
         <h3 className="font-bold text-gray-900 mb-1 truncate">HelaPay QR – {shop.name}</h3>
         <p className="text-xs text-gray-500 mb-4">
-          Ref: <span className="font-mono font-semibold">{shop.shop_reference_id}</span> · LKR 2,500.00
+          {shop.shop_reference_id && <span className="font-mono font-semibold">{shop.shop_reference_id} · </span>}
+          LKR 2,500.00
         </p>
-        {loading ? (
+
+        {/* Loading */}
+        {loading && (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
           </div>
-        ) : qr ? (
-          <div className="text-center">
-            <img src={qr} alt="Payment QR" className="mx-auto w-52 h-52 sm:w-56 sm:h-56 border rounded-xl p-2" />
-            <p className="text-xs text-gray-400 mt-2 font-mono break-all">{reference}</p>
-            <p className="text-xs text-green-700 mt-2 font-medium">
-              QR recorded — admin can verify payment once scanned
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-red-500 text-center py-6">Failed to generate QR</p>
         )}
-        <button
-          onClick={onClose}
-          className="mt-4 w-full min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-        >
-          Close
-        </button>
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="text-center py-4 space-y-3">
+            <XCircle className="w-10 h-10 text-red-400 mx-auto" />
+            <p className="text-sm text-red-600">{error}</p>
+            <button onClick={generate}
+              className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Payment confirmed */}
+        {status === 2 && (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <PartyPopper className="w-12 h-12 text-green-500" />
+            <p className="text-lg font-bold text-green-700">Payment Confirmed!</p>
+            <p className="text-sm text-gray-500">{shop.name} is now being activated…</p>
+            <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
+          </div>
+        )}
+
+        {/* Payment failed */}
+        {status === -1 && (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <XCircle className="w-10 h-10 text-red-400" />
+            <p className="font-semibold text-red-600">Payment Failed</p>
+            <button onClick={generate}
+              className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* QR code */}
+        {!loading && !error && session && status === 0 && (
+          <div className="space-y-3">
+            <div className={`flex justify-center p-3 bg-white border-2 rounded-2xl transition-opacity
+                            ${expired ? 'opacity-30 border-red-300' : 'border-green-300'}`}>
+              <QRCodeSVG value={session.qr_data} size={200} level="M" includeMargin />
+            </div>
+
+            {/* Timer */}
+            {!expired && timeLeft !== null && (
+              <p className="text-center text-sm text-gray-500 flex items-center justify-center gap-1.5">
+                <Clock className="w-4 h-4 text-amber-500" />
+                Expires in <span className="font-bold text-amber-600">{fmtTime(timeLeft)}</span>
+              </p>
+            )}
+
+            {expired && (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-red-500 font-medium">QR code expired</p>
+                <button onClick={generate}
+                  className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 flex items-center gap-2 mx-auto">
+                  <RefreshCw className="w-4 h-4" /> Generate New QR
+                </button>
+              </div>
+            )}
+
+            {!expired && (
+              <div className="bg-gray-50 rounded-xl p-3 text-center space-y-1">
+                <p className="text-xl font-black text-gray-900">LKR 2,500</p>
+                <p className="text-xs text-gray-500">Scan with HelaPay or any LankaQR-compatible app</p>
+                <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-1">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  Waiting for payment confirmation…
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status !== 2 && (
+          <button onClick={onClose}
+            className="mt-4 w-full min-h-[44px] border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+            Close
+          </button>
+        )}
       </div>
     </div>
   );
@@ -828,7 +935,7 @@ function ShopsTab() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {qrShop && <ShopQRModal shop={qrShop} onClose={() => setQrShop(null)} />}
+      {qrShop && <ShopQRModal shop={qrShop} onClose={() => setQrShop(null)} onSuccess={load} />}
 
       {/* Search + Register — stack on very small screens */}
       <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">

@@ -19,8 +19,9 @@ router.put ('/me/customers/:shopId',             ctrl.editCustomer);
 // Shop registration (new full flow with location + reference ID)
 router.get ('/me/shops',                         ctrl.listShops);
 router.post('/me/shops/register',                ctrl.registerShop);
-router.post('/me/shops/:shopId/payment-qr',      ctrl.generateShopPaymentQR);
-router.get ('/me/shops/:shopId/payments',        ctrl.listShopPayments);
+router.post('/me/shops/:shopId/payment-qr',                    ctrl.generateShopPaymentQR);
+router.get ('/me/shops/:shopId/payment-qr/status/:reference', ctrl.getShopPaymentQRStatus);
+router.get ('/me/shops/:shopId/payments',                     ctrl.listShopPayments);
 
 // Payments (agent collects cash)
 router.post('/me/payments',                      ctrl.submitPayment);

@@ -272,6 +272,7 @@ export const agentApi = {
   uploadShopSelfie:     (data)    => agentClient.post('/agents/shops/upload-selfie', data),
   registerShop:         (data)    => agentClient.post('/agents/me/shops/register', data),
   generateShopQR:       (shopId)  => agentClient.post(`/agents/me/shops/${shopId}/payment-qr`),
+  shopPaymentQRStatus:  (shopId, ref) => agentClient.get(`/agents/me/shops/${shopId}/payment-qr/status/${ref}`),
   shopPayments:         (shopId)  => agentClient.get(`/agents/me/shops/${shopId}/payments`),
   // Payments (agent cash collection)
   payments:             ()        => agentClient.get('/agents/me/payments'),

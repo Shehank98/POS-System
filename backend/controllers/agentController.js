@@ -611,56 +611,126 @@ async function listShops(req, res) {
 }
 
 // ── POST /api/agents/me/shops/:shopId/payment-qr ─────────────
-// Agent generates a HelaPay QR for a specific shop payment
+// Agent generates a real HelaPOS QR so they can pay on behalf of the shop.
+// On payment: fulfillBillingPayment activates the shop automatically.
 async function generateShopPaymentQR(req, res) {
   const agentId = req.agent.id;
   const shopId  = parseInt(req.params.shopId, 10);
-  const qrcode  = require('qrcode');
 
   try {
     // Verify shop belongs to this agent
-    const { rows } = await db.query(
-      `SELECT id, name, shop_reference_id FROM shops
+    const { rows: shopRows } = await db.query(
+      `SELECT id, name, shop_reference_id, activation_status FROM shops
         WHERE id = $1 AND onboarded_by_agent_id = $2`,
       [shopId, agentId]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
-    const shop = rows[0];
+    if (shopRows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    const shop = shopRows[0];
 
-    const amount    = 2500;
-    const reference = `${shop.shop_reference_id}-${Date.now()}`;
+    if (shop.activation_status === 'active') {
+      return res.status(400).json({ error: 'Shop is already active' });
+    }
 
-    // QR payload for HelaPay / LankaQR (standard format)
-    const qrPayload = JSON.stringify({
-      merchant:  'BillFlow',
-      reference,
-      shop_ref:  shop.shop_reference_id,
-      shop_name: shop.name,
-      amount,
-      currency:  'LKR',
-    });
-
-    const qrDataUrl = await qrcode.toDataURL(qrPayload, { width: 300, margin: 2 });
-
-    // Record as pending proof
-    const { rows: proofRows } = await db.query(
-      `INSERT INTO shop_payment_proofs
-         (shop_id, agent_id, amount, payment_method, qr_reference, month_paid_for, status)
-       VALUES ($1, $2, $3, 'agent_helaPay', $4, DATE_TRUNC('month', NOW()), 'pending')
-       RETURNING id`,
-      [shopId, agentId, amount, reference]
+    // Cancel any existing pending shop-payment QR for this shop
+    await db.query(
+      `UPDATE qr_payment_sessions
+          SET payment_status = -3
+        WHERE shop_id = $1 AND session_type = 'billing' AND payment_status = 0`,
+      [shopId]
     );
 
-    res.json({
-      qr_data_url: qrDataUrl,
-      reference,
-      amount,
-      shop_name:      shop.name,
-      shop_reference: shop.shop_reference_id,
-      proof_id:       proofRows[0].id,
-    });
+    const amount    = 2500;
+    const reference = randomUUID();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    try {
+      const { qr_data, qr_reference } = await sysHelaPOS.generateBillingQR(reference, amount);
+
+      // Create payment proof record
+      const { rows: proofRows } = await db.query(
+        `INSERT INTO shop_payment_proofs
+           (shop_id, agent_id, amount, payment_method, qr_reference, month_paid_for, status)
+         VALUES ($1, $2, $3, 'agent_helaPay', $4, DATE_TRUNC('month', NOW()), 'pending')
+         RETURNING id`,
+        [shopId, agentId, amount, qr_reference]
+      );
+      const proofId = proofRows[0].id;
+
+      // Create QR session — session_type='billing' wires into fulfillBillingPayment
+      await db.query(
+        `INSERT INTO qr_payment_sessions
+           (shop_id, agent_id, reference, qr_reference, qr_data, amount,
+            session_type, billing_proof_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'billing', $7, $8)`,
+        [shopId, agentId, reference, qr_reference, qr_data, amount, proofId, expiresAt]
+      );
+
+      res.json({ reference, qr_data, amount, shop_name: shop.name, expires_at: expiresAt });
+    } catch (err) {
+      const isMissingConfig = err.message?.includes('not configured');
+      res.status(isMissingConfig ? 503 : 500).json({
+        error: isMissingConfig
+          ? 'HelaPay QR payments are not yet configured on this server. Please contact your administrator.'
+          : (err.message || 'Failed to generate QR'),
+      });
+    }
   } catch (err) {
     console.error('generateShopPaymentQR error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// ── GET /api/agents/me/shops/:shopId/payment-qr/status/:reference ─
+async function getShopPaymentQRStatus(req, res) {
+  const agentId       = req.agent.id;
+  const shopId        = parseInt(req.params.shopId, 10);
+  const { reference } = req.params;
+
+  try {
+    const { rows } = await db.query(
+      `SELECT id, qr_reference, payment_status, amount, expires_at, billing_proof_id
+         FROM qr_payment_sessions
+        WHERE reference = $1 AND shop_id = $2 AND session_type = 'billing'`,
+      [reference, shopId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const session = rows[0];
+
+    if (session.payment_status !== 0) {
+      return res.json({ payment_status: session.payment_status, amount: session.amount, expires_at: session.expires_at });
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      return res.json({ payment_status: -2, amount: session.amount, expires_at: session.expires_at });
+    }
+
+    // 12s cooldown between HelaPOS API calls
+    const lastCall = SHOP_PAY_COOLDOWN.get(reference) || 0;
+    if (Date.now() - lastCall < 12_000) {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+    SHOP_PAY_COOLDOWN.set(reference, Date.now());
+
+    try {
+      const { payment_status } = await sysHelaPOS.checkBillingQRStatus(reference, session.qr_reference);
+      if (payment_status === 2 || payment_status === -1) {
+        await db.query(
+          `UPDATE qr_payment_sessions SET payment_status = $1, updated_at = NOW()
+            WHERE id = $2 AND payment_status = 0`,
+          [payment_status, session.id]
+        );
+        if (payment_status === 2 && session.billing_proof_id) {
+          const { fulfillBillingPayment } = require('./shopPaymentController');
+          fulfillBillingPayment(session.billing_proof_id, shopId, session.qr_reference)
+            .catch((e) => console.error('[ShopPayQR] fulfil error:', e.message));
+          SHOP_PAY_COOLDOWN.delete(reference);
+        }
+      }
+      return res.json({ payment_status, amount: session.amount, expires_at: session.expires_at });
+    } catch {
+      return res.json({ payment_status: 0, amount: session.amount, expires_at: session.expires_at });
+    }
+  } catch (err) {
+    console.error('getShopPaymentQRStatus error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 }
@@ -748,10 +818,12 @@ async function saveShopNote(req, res) {
 // ── Agent deposit / self-payment ──────────────────────────────
 const { randomUUID } = require('crypto');
 const sysHelaPOS     = require('../services/systemHelaposService');
+const { randomUUID } = require('crypto');
 
 const DEPOSIT_AMOUNT  = 2500;
 const DEPOSIT_CREDIT  = 500;
-const DEPOSIT_COOLDOWN = new Map(); // reference → last-poll timestamp
+const DEPOSIT_COOLDOWN     = new Map(); // reference → last-poll timestamp
+const SHOP_PAY_COOLDOWN    = new Map(); // reference → last-poll timestamp
 
 // POST /api/agents/me/deposit/generate-qr
 async function generateDepositQR(req, res) {
@@ -931,7 +1003,7 @@ module.exports = {
   getDashboard, listCustomers, onboardCustomer, editCustomer,
   submitPayment, listPayments, listCommissions, updateBankDetails, getRenewals,
   listPlans,
-  uploadShopSelfie, registerShop, listShops, generateShopPaymentQR, listShopPayments,
+  uploadShopSelfie, registerShop, listShops, generateShopPaymentQR, getShopPaymentQRStatus, listShopPayments,
   getSubscriptions, saveShopNote,
   generateDepositQR, getDepositQRStatus, getDepositHistory, fulfillAgentDeposit,
 };
