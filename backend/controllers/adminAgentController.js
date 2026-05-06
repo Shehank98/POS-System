@@ -347,9 +347,38 @@ async function listCommissions(req, res) {
   }
 }
 
+// ── PUT /api/admin/agent-commissions/approve ─────────────────
+// Bulk-approve pending commissions (pending → approved)
+async function approveCommissions(req, res) {
+  const { commission_ids, agent_id } = req.body;
+  if (!commission_ids?.length || !agent_id) {
+    return res.status(400).json({ error: 'commission_ids and agent_id are required' });
+  }
+  try {
+    const { rows: updated } = await db.query(
+      `UPDATE agent_commissions
+          SET status = 'approved', approved_at = NOW()
+        WHERE id = ANY($1) AND agent_id = $2 AND status IN ('pending','locked')
+        RETURNING id, amount`,
+      [commission_ids, agent_id]
+    );
+    if (updated.length === 0) {
+      return res.status(400).json({ error: 'No eligible pending commissions to approve' });
+    }
+    const total = updated.reduce((s, c) => s + parseFloat(c.amount), 0);
+    res.json({ approved_count: updated.length, total_amount: total });
+  } catch (err) {
+    console.error('approveCommissions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ── PUT /api/admin/agent-commissions/payout ──────────────────
 async function markPayout(req, res) {
-  const { commission_ids, agent_id, notes } = req.body;
+  const {
+    commission_ids, agent_id, notes,
+    payment_method = 'bank_transfer', transaction_reference, payment_date,
+  } = req.body;
   if (!commission_ids?.length || !agent_id) {
     return res.status(400).json({ error: 'commission_ids and agent_id are required' });
   }
@@ -358,10 +387,12 @@ async function markPayout(req, res) {
     await client.query('BEGIN');
 
     const { rows: updated } = await client.query(
-      `UPDATE agent_commissions SET status = 'paid', paid_at = NOW()
+      `UPDATE agent_commissions
+          SET status = 'paid', paid_at = NOW(),
+              payment_method = $3, transaction_reference = $4
         WHERE id = ANY($1) AND agent_id = $2 AND status = 'approved'
         RETURNING id, amount`,
-      [commission_ids, agent_id]
+      [commission_ids, agent_id, payment_method, transaction_reference || null]
     );
     if (updated.length === 0) {
       await client.query('ROLLBACK');
@@ -370,9 +401,11 @@ async function markPayout(req, res) {
 
     const totalAmount = updated.reduce((s, c) => s + parseFloat(c.amount), 0);
     await client.query(
-      `INSERT INTO agent_payout_logs (agent_id, amount, commission_ids, notes)
-       VALUES ($1, $2, $3, $4)`,
-      [agent_id, totalAmount, updated.map((c) => c.id), notes || null]
+      `INSERT INTO agent_payout_logs
+         (agent_id, amount, commission_ids, notes, payment_method, transaction_reference, payment_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [agent_id, totalAmount, updated.map((c) => c.id), notes || null,
+       payment_method, transaction_reference || null, payment_date || null]
     );
 
     await client.query('COMMIT');
@@ -393,6 +426,27 @@ async function markPayout(req, res) {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+}
+
+// ── GET /api/admin/agent-payout-logs ─────────────────────────
+async function listPayoutLogs(req, res) {
+  const { agent_id } = req.query;
+  try {
+    const params = [];
+    const where  = agent_id ? (params.push(agent_id), 'WHERE apl.agent_id = $1') : '';
+    const { rows } = await db.query(`
+      SELECT apl.*, sa.name AS agent_name, sa.bank_name, sa.bank_account, sa.account_holder
+        FROM agent_payout_logs apl
+        JOIN sales_agents sa ON sa.id = apl.agent_id
+       ${where}
+       ORDER BY apl.paid_at DESC
+       LIMIT 500
+    `, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('listPayoutLogs error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -694,7 +748,7 @@ module.exports = {
   listAgents, createAgent, updateAgent, getAgentCustomers,
   listPendingPayments, listAllPayments, getFraudSummary,
   verifyPayment, rejectPayment,
-  listCommissions, markPayout,
+  listCommissions, approveCommissions, markPayout, listPayoutLogs,
   listRiskScores, recalculateAgentRisk, setAgentRestriction,
   generateInviteToken, listPendingRegistrations, getAgentDocuments,
   approveAgentRegistration, rejectAgentRegistration, listInviteTokens,

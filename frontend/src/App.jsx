@@ -25,6 +25,7 @@ import CustomersPage from './pages/CustomersPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AgentsPage from './pages/admin/AgentsPage';
+import CommissionManagementPage from './pages/admin/CommissionManagementPage';
 import AgentLoginPage from './pages/agent/AgentLoginPage';
 import AgentRegistrationPage from './pages/agent/AgentRegistrationPage';
 import AgentPortalPage from './pages/agent/AgentPortalPage';
@@ -132,6 +133,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AgentsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/commissions"
+          element={
+            <AdminRoute>
+              <CommissionManagementPage />
             </AdminRoute>
           }
         />

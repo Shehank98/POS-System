@@ -68,7 +68,9 @@ router.put ('/agent-payments/:id/reject',    agentCtrl.rejectPayment);
 
 // Agent commissions
 router.get ('/agent-commissions',           agentCtrl.listCommissions);
+router.put ('/agent-commissions/approve',   agentCtrl.approveCommissions);
 router.put ('/agent-commissions/payout',    agentCtrl.markPayout);
+router.get ('/agent-payout-logs',           agentCtrl.listPayoutLogs);
 
 // Agent risk scores
 router.get ('/agent-risk-scores',           agentCtrl.listRiskScores);

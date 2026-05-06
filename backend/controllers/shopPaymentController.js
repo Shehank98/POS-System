@@ -85,12 +85,27 @@ async function adminListShopPayments(req, res) {
 
     const { rows } = await db.query(`
       SELECT spp.*,
-             s.name AS shop_name, s.owner_name, s.shop_reference_id, s.activation_status,
+             s.name AS shop_name, s.owner_name, s.shop_reference_id,
+             s.activation_status, s.subscription_status,
              s.selfie_url AS shop_selfie_url,
-             sa.name AS agent_name
+             sa.id     AS agent_id_info,
+             sa.name   AS agent_name,
+             sa.phone  AS agent_phone,
+             sa.email  AS agent_email,
+             sa.district AS agent_district,
+             (
+               SELECT ac.status FROM agent_commissions ac
+                WHERE ac.shop_id = spp.shop_id AND ac.commission_type = 'onboarding'
+                ORDER BY ac.created_at DESC LIMIT 1
+             ) AS onboarding_commission_status,
+             (
+               SELECT ac.amount FROM agent_commissions ac
+                WHERE ac.shop_id = spp.shop_id AND ac.commission_type = 'onboarding'
+                ORDER BY ac.created_at DESC LIMIT 1
+             ) AS onboarding_commission_amount
         FROM shop_payment_proofs spp
         JOIN shops s ON s.id = spp.shop_id
-        LEFT JOIN sales_agents sa ON sa.id = spp.agent_id
+        LEFT JOIN sales_agents sa ON sa.id = COALESCE(spp.agent_id, s.onboarded_by_agent_id)
        ${where}
        ORDER BY spp.created_at DESC
        LIMIT 500
@@ -141,19 +156,40 @@ async function adminVerifyShopPayment(req, res) {
       [proofId]
     );
 
+    // Get shop name + agent for notifications
+    const { rows: shopInfoRows } = await client.query(
+      `SELECT s.name, s.onboarded_by_agent_id FROM shops WHERE id = $1`,
+      [proof.shop_id]
+    );
+    const shopName = shopInfoRows[0]?.name || `Shop #${proof.shop_id}`;
+    const agentId  = proof.agent_id || shopInfoRows[0]?.onboarded_by_agent_id;
+
     // Unlock onboarding commission for the agent who registered this shop
-    if (proof.agent_id) {
+    if (agentId) {
       await client.query(
         `UPDATE agent_commissions
-            SET status = 'approved'
+            SET status = 'approved', approved_at = NOW()
           WHERE agent_id = $1 AND shop_id = $2
             AND commission_type = 'onboarding'
             AND status IN ('pending', 'locked')`,
-        [proof.agent_id, proof.shop_id]
+        [agentId, proof.shop_id]
       );
     }
 
     await client.query('COMMIT');
+
+    // Notify agent via WebSocket (non-blocking)
+    if (agentId) {
+      try {
+        notifyAgent(agentId, {
+          event:     'shop_activated',
+          shop_id:   proof.shop_id,
+          shop_name: shopName,
+          method:    'bank_proof',
+        });
+      } catch {}
+    }
+
     res.json({ message: 'Payment verified. Shop account has been activated.' });
   } catch (err) {
     await client.query('ROLLBACK');

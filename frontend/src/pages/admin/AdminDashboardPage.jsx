@@ -2409,6 +2409,7 @@ export default function AdminDashboardPage() {
             { id: 'plans',         label: 'Plans',         icon: Layers },
             { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'agents',        label: 'Sales Agents',  icon: Users, isLink: '/admin/agents' },
+            { id: 'commissions',   label: 'Commissions',   icon: DollarSign, isLink: '/admin/commissions' },
           ].map((t) => (
             t.isLink ? (
               <a key={t.id} href={t.isLink}

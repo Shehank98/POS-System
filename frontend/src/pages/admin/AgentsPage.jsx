@@ -877,10 +877,13 @@ function InviteTokenSection() {
 
 // ── Shop Payment Proofs Tab ───────────────────────────────────
 function ShopPaymentsTab() {
-  const [proofs,   setProofs]   = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState('pending');
-  const [acting,   setActing]   = useState(null);
+  const [proofs,      setProofs]      = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [filter,      setFilter]      = useState('pending');
+  const [acting,      setActing]      = useState(null);
+  const [rejectOpen,  setRejectOpen]  = useState(null);
+  const [rejectNote,  setRejectNote]  = useState('');
+  const [expandedId,  setExpandedId]  = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -900,19 +903,19 @@ function ShopPaymentsTab() {
       } else {
         await adminApi.verifyShopPayment(id);
       }
-      toast.success('Payment verified — shop activated!');
+      toast.success('Payment verified — shop activated & onboarding commission approved!');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to verify');
     } finally { setActing(null); }
   }
 
-  async function reject(id) {
-    const reason = window.prompt('Rejection reason (optional):') ?? '';
+  async function confirmReject(id) {
     setActing(id);
     try {
-      await adminApi.rejectShopPayment(id, { admin_note: reason });
+      await adminApi.rejectShopPayment(id, { admin_note: rejectNote });
       toast.success('Payment rejected');
+      setRejectOpen(null); setRejectNote('');
       load();
     } catch {
       toast.error('Failed to reject');
@@ -924,17 +927,30 @@ function ShopPaymentsTab() {
     verified: { label: 'Verified', cls: 'bg-green-100  text-green-700' },
     rejected: { label: 'Rejected', cls: 'bg-red-100    text-red-700'   },
   };
+  const commStatusMap = {
+    pending:  'text-yellow-400', approved: 'text-blue-400',
+    locked:   'text-gray-400',   paid:     'text-green-400',
+  };
+
+  const pending = proofs.filter((p) => p.status === 'pending');
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        {['pending','verified','rejected'].map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-              filter === s ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-            {s}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-2">
+          {['pending','verified','rejected'].map((s) => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                filter === s ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+              {s}{s === 'pending' && pending.length > 0 ? ` (${pending.length})` : ''}
+            </button>
+          ))}
+        </div>
+        {filter === 'pending' && proofs.length > 0 && (
+          <p className="text-xs text-yellow-400 ml-auto">
+            Verifying activates shop account and approves LKR 500 onboarding commission
+          </p>
+        )}
       </div>
 
       {loading ? (
@@ -943,70 +959,172 @@ function ShopPaymentsTab() {
         <div className="text-center py-12 text-gray-500">No {filter} shop payments</div>
       ) : (
         <div className="space-y-3">
-          {proofs.map((p) => (
-            <div key={p.id} className="bg-gray-800 rounded-2xl p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-semibold text-white">{p.shop_name}</p>
-                    {p.shop_reference_id && <span className="text-xs font-mono text-gray-400">{p.shop_reference_id}</span>}
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusMap[p.status]?.cls || ''}`}>
-                      {statusMap[p.status]?.label || p.status}
-                    </span>
-                    {p.activation_status === 'inactive' && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900 text-orange-300">Inactive</span>
+          {proofs.map((p) => {
+            const isExpanded = expandedId === p.id;
+            const hasAgent   = !!(p.agent_name);
+            const commAmount = p.onboarding_commission_amount ? `LKR ${Number(p.onboarding_commission_amount).toLocaleString()}` : 'LKR 500';
+            const commStatus = p.onboarding_commission_status;
+
+            return (
+            <div key={p.id} className="bg-gray-800 rounded-2xl overflow-hidden border border-gray-700">
+              {/* Main row */}
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-semibold text-white truncate">{p.shop_name}</p>
+                      {p.shop_reference_id && <span className="text-xs font-mono text-gray-400">{p.shop_reference_id}</span>}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusMap[p.status]?.cls || ''}`}>
+                        {statusMap[p.status]?.label || p.status}
+                      </span>
+                      {p.activation_status === 'inactive' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900 text-orange-300">Not Activated</span>
+                      )}
+                      {p.activation_status === 'active' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900 text-green-300">Active</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400">{p.owner_name}</p>
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-1">
+                      <span className="capitalize">{p.payment_method?.replace(/_/g, ' ')}</span>
+                      <span>{fmtDate(p.created_at)}</span>
+                      {p.amount && <span className="text-white font-semibold">LKR {Number(p.amount).toLocaleString()}</span>}
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {p.shop_selfie_url && (
+                      <a href={p.shop_selfie_url} target="_blank" rel="noreferrer">
+                        <img src={p.shop_selfie_url} alt="Shop" className="w-14 h-14 object-cover rounded-lg border border-gray-600 hover:border-purple-400 transition-colors" />
+                      </a>
+                    )}
+                    <button onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                      className="p-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-400">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                {p.status === 'pending' && (
+                  <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-700">
+                    {p.proof_url && (
+                      <a href={p.proof_url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-lg">
+                        <Eye className="w-3 h-3" /> View Proof
+                      </a>
+                    )}
+                    <button onClick={() => { setRejectOpen(p.id); setRejectNote(''); }}
+                      disabled={acting === p.id}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs rounded-lg disabled:opacity-50">
+                      <XCircle className="w-3 h-3" /> Reject
+                    </button>
+                    <button onClick={() => verify(p.id, p.payment_method === 'agent_helaPay' || p.payment_method === 'helaPay')}
+                      disabled={acting === p.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                      {acting === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
+                      Activate Account
+                    </button>
+                    {rejectOpen === p.id && (
+                      <div className="w-full flex gap-2 mt-1">
+                        <input type="text" value={rejectNote} onChange={(e) => setRejectNote(e.target.value)}
+                          placeholder="Rejection reason (optional)"
+                          className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
+                        <button onClick={() => { setRejectOpen(null); setRejectNote(''); }}
+                          className="px-2 py-1.5 text-xs rounded-lg bg-gray-700 text-gray-400 hover:bg-gray-600">Cancel</button>
+                        <button onClick={() => confirmReject(p.id)} disabled={acting === p.id}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-red-700 hover:bg-red-600 text-white font-semibold disabled:opacity-50">Confirm</button>
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400">{p.owner_name}</p>
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-1">
-                    {p.agent_name && <span>Agent: {p.agent_name}</span>}
-                    <span className="capitalize">{p.payment_method?.replace('_', ' ')}</span>
-                    <span>{new Date(p.created_at).toLocaleDateString()}</span>
-                    {p.month_paid_for && <span>Month: {new Date(p.month_paid_for).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}</span>}
+                )}
+                {p.status !== 'pending' && (p.proof_url || p.qr_reference) && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-700">
+                    {p.proof_url && (
+                      <a href={p.proof_url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-lg">
+                        <Eye className="w-3 h-3" /> View Proof
+                      </a>
+                    )}
                   </div>
-                  {p.admin_note && <p className="text-xs text-red-400 mt-1">Note: {p.admin_note}</p>}
-                </div>
-                <div className="shrink-0 flex flex-col items-end gap-2">
-                  {p.shop_selfie_url && (
-                    <a href={p.shop_selfie_url} target="_blank" rel="noreferrer" title="Shop selfie — click to enlarge">
-                      <img
-                        src={p.shop_selfie_url}
-                        alt="Shop selfie"
-                        className="w-16 h-16 object-cover rounded-lg border border-gray-600 hover:border-purple-400 transition-colors"
-                      />
-                    </a>
+                )}
+              </div>
+
+              {/* Expanded: agent info + commission */}
+              {isExpanded && (
+                <div className="border-t border-gray-700 p-4 space-y-4 bg-gray-750/30">
+                  {/* Agent information */}
+                  {hasAgent ? (
+                    <div className="bg-gray-800 rounded-xl p-4">
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-3">
+                        Agent Information
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-500">Name</p>
+                          <p className="text-white font-medium">{p.agent_name}</p>
+                        </div>
+                        {p.agent_id_info && (
+                          <div>
+                            <p className="text-xs text-gray-500">Agent ID</p>
+                            <p className="text-white font-mono">#{p.agent_id_info}</p>
+                          </div>
+                        )}
+                        {p.agent_phone && (
+                          <div>
+                            <p className="text-xs text-gray-500">Phone</p>
+                            <a href={`tel:${p.agent_phone}`} className="text-blue-400 hover:underline">{p.agent_phone}</a>
+                          </div>
+                        )}
+                        {p.agent_email && (
+                          <div>
+                            <p className="text-xs text-gray-500">Email</p>
+                            <p className="text-gray-300 truncate">{p.agent_email}</p>
+                          </div>
+                        )}
+                        {p.agent_district && (
+                          <div>
+                            <p className="text-xs text-gray-500">District</p>
+                            <p className="text-gray-300">{p.agent_district}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Onboarding commission */}
+                      <div className="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-gray-400">Onboarding Commission</p>
+                          <p className="text-white font-semibold">{commAmount}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">Status</p>
+                          <p className={`text-sm font-semibold capitalize ${commStatusMap[commStatus] || 'text-gray-400'}`}>
+                            {commStatus ? (commStatus === 'locked' ? 'pending' : commStatus) : 'Will be approved on activation'}
+                          </p>
+                        </div>
+                      </div>
+                      {p.status === 'pending' && (
+                        <p className="text-xs text-yellow-400 mt-2">
+                          Clicking "Activate Account" will activate the shop and approve the {commAmount} onboarding commission.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-800 rounded-xl p-4 text-center text-gray-500 text-sm">
+                      No agent associated with this shop
+                    </div>
                   )}
-                <div className="text-right space-y-1">
-                  <p className="text-lg font-bold text-white">LKR {Number(p.amount || 0).toLocaleString()}</p>
-                  {p.shop_selfie_url && (
-                    <a href={p.shop_selfie_url} target="_blank" rel="noreferrer"
-                      className="text-xs text-purple-400 underline block">Shop selfie</a>
-                  )}
-                  {p.proof_url && (
-                    <a href={p.proof_url} target="_blank" rel="noreferrer"
-                      className="text-xs text-indigo-400 underline block">View proof</a>
-                  )}
-                  {p.qr_reference && (
-                    <p className="text-xs text-gray-500 font-mono">{p.qr_reference.slice(0, 20)}…</p>
-                  )}
-                  {p.status === 'pending' && (
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => reject(p.id)} disabled={acting === p.id}
-                        className="px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 text-xs rounded-lg disabled:opacity-50">
-                        Reject
-                      </button>
-                      <button onClick={() => verify(p.id, p.payment_method === 'agent_helaPay')} disabled={acting === p.id}
-                        className="px-2 py-1 bg-green-700 hover:bg-green-600 text-white text-xs rounded-lg flex items-center gap-1 disabled:opacity-50">
-                        {acting === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
-                        Verify & Activate
-                      </button>
+
+                  {/* Payment details */}
+                  {p.admin_note && (
+                    <div className="bg-red-900/20 border border-red-800 rounded-xl px-4 py-3">
+                      <p className="text-xs text-red-400">Admin note: {p.admin_note}</p>
                     </div>
                   )}
                 </div>
-                </div>
-              </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

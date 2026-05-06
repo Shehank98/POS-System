@@ -353,8 +353,10 @@ export const adminApi = {
   rejectAgentPayment:   (id, data) => adminClient.put(`/admin/agent-payments/${id}/reject`, data),
 
   // Agent commissions
-  agentCommissions: (params) => adminClient.get('/admin/agent-commissions', { params }),
-  payoutCommissions: (data)  => adminClient.put('/admin/agent-commissions/payout', data),
+  agentCommissions:    (params) => adminClient.get('/admin/agent-commissions', { params }),
+  approveCommissions:  (data)   => adminClient.put('/admin/agent-commissions/approve', data),
+  payoutCommissions:   (data)   => adminClient.put('/admin/agent-commissions/payout', data),
+  payoutLogs:          (params) => adminClient.get('/admin/agent-payout-logs', { params }),
 
   // Agent risk scores
   listRiskScores:         ()           => adminClient.get('/admin/agent-risk-scores'),
