@@ -72,9 +72,10 @@ async function recordLoginSession(userId, role, req) {
 // Backward-compat: also accepts { username, password, shop_id } from legacy clients.
 async function login(req, res) {
   // Support both new (identifier) and legacy (username + shop_id) payloads
-  const identifier = (req.body.identifier || req.body.username || '').trim();
-  const password   = (req.body.password || '').trim();
-  const shopIdHint = req.body.shop_id; // optional, used to disambiguate usernames
+  const identifier    = (req.body.identifier || req.body.username || '').trim();
+  const password      = (req.body.password || '').trim();
+  const shopIdHint    = req.body.shop_id;          // numeric shop_id (legacy)
+  const shopRefHint   = (req.body.shop_reference_id || '').trim().toUpperCase(); // e.g. SHP-000042
 
   if (!identifier || !password) {
     return res.status(400).json({ error: 'identifier and password are required' });
@@ -123,19 +124,32 @@ async function login(req, res) {
       }
     } else {
       // ── Username lookup ────────────────────────────────────
-      // If shop_id is provided (legacy clients), narrow by it.
-      // Otherwise look globally; if ambiguous, ask user to log in with email.
-      if (shopIdHint) {
+      // Resolve shop_reference_id hint (e.g. "SHP-000042") to a numeric shop_id.
+      // Cashier accounts have no email, so shop disambiguation is their only path
+      // when the same username exists across multiple shops.
+      let resolvedShopId = shopIdHint || null;
+
+      if (!resolvedShopId && shopRefHint) {
+        const refRes = await db.query(
+          `SELECT id FROM shops WHERE UPPER(shop_reference_id) = $1 LIMIT 1`,
+          [shopRefHint]
+        );
+        if (refRes.rows.length) resolvedShopId = refRes.rows[0].id;
+      }
+
+      if (resolvedShopId) {
+        // Targeted lookup — shop is known, username just needs to match
         const result = await db.query(
           `SELECT ${USER_SHOP_COLS}
              FROM users u
              JOIN shops s ON s.id = u.shop_id
             WHERE u.username = $1 AND u.shop_id = $2
             LIMIT 1`,
-          [identifier, shopIdHint]
+          [identifier, resolvedShopId]
         );
         rows = result.rows;
       } else {
+        // Global username lookup — works as long as the username is unique
         const result = await db.query(
           `SELECT ${USER_SHOP_COLS}
              FROM users u
@@ -146,8 +160,11 @@ async function login(req, res) {
         );
         rows = result.rows;
         if (rows.length > 1) {
+          // Username exists in multiple shops — return a signal so the frontend
+          // can ask for the Shop ID instead of showing an unhelpful error.
           return res.status(409).json({
-            error: 'This username exists in multiple shops. Please log in with your email address instead.',
+            error: 'This username exists in multiple shops. Please enter your Shop ID to continue.',
+            requires_shop_id: true,
           });
         }
       }

@@ -9,9 +9,10 @@ export default function LoginPage() {
   const login    = useAuthStore((s) => s.login);
   const loading  = useAuthStore((s) => s.loading);
 
-  const [form, setForm]     = useState({ identifier: '', password: '' });
-  const [showPw, setShowPw] = useState(false);
-  const [error, setError]   = useState('');
+  const [form, setForm]         = useState({ identifier: '', password: '', shop_reference_id: '' });
+  const [showPw, setShowPw]     = useState(false);
+  const [showShopId, setShowShopId] = useState(false);
+  const [error, setError]       = useState('');
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -25,10 +26,15 @@ export default function LoginPage() {
     }
 
     try {
-      const data = await login({
+      const payload = {
         identifier: form.identifier.trim(),
         password:   form.password,
-      });
+      };
+      if (form.shop_reference_id.trim()) {
+        payload.shop_reference_id = form.shop_reference_id.trim();
+      }
+
+      const data = await login(payload);
 
       if (data.user.read_only) {
         toast('Logged in as read-only - subscription expired', { icon: '⚠️' });
@@ -37,7 +43,13 @@ export default function LoginPage() {
       }
       navigate('/');
     } catch (err) {
-      setError(err.message);
+      // 409 means username exists in multiple shops — ask for Shop ID
+      if (err.message?.includes('multiple shops') || err.message?.includes('Shop ID')) {
+        setShowShopId(true);
+        setError('Your username exists in multiple shops. Please enter your Shop ID (e.g. SHP-000042) to continue.');
+      } else {
+        setError(err.message);
+      }
     }
   }
 
@@ -135,6 +147,35 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {/* Shop ID — always shown for non-email logins; auto-shown on username clash */}
+            {(showShopId || (!form.identifier.includes('@') && form.shop_reference_id)) ? (
+              <div>
+                <label className="label">Shop ID</label>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="e.g. SHP-000042"
+                  value={form.shop_reference_id}
+                  onChange={set('shop_reference_id')}
+                  autoComplete="off"
+                  autoFocus={showShopId}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Ask your shop owner for the Shop ID (found in their Settings page).
+                </p>
+              </div>
+            ) : (
+              !form.identifier.includes('@') && form.identifier && (
+                <button
+                  type="button"
+                  className="text-xs text-primary-600 hover:underline -mt-2 text-left"
+                  onClick={() => setShowShopId(true)}
+                >
+                  Have a Shop ID? Enter it here
+                </button>
+              )
+            )}
 
             <button
               type="submit"

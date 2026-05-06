@@ -139,7 +139,20 @@ export default function SettingsPage() {
           <span className="text-gray-500">Shop</span>
           <span className="font-medium">{user?.shop_name}</span>
           <span className="text-gray-500">Shop ID</span>
-          <span className="font-mono">{user?.shop_id}</span>
+          <span className="font-mono flex items-center gap-2">
+            {user?.shop_reference_id || `SHP-${String(user?.shop_id).padStart(6,'0')}`}
+            <button
+              type="button"
+              className="text-xs text-primary-600 hover:underline"
+              onClick={() => {
+                const ref = user?.shop_reference_id || `SHP-${String(user?.shop_id).padStart(6,'0')}`;
+                navigator.clipboard.writeText(ref).then(() => toast.success('Shop ID copied'));
+              }}
+            >Copy</button>
+          </span>
+          <span className="col-span-2 text-xs text-gray-400 -mt-1">
+            Share this ID with cashier/manager staff so they can log in when prompted.
+          </span>
           <span className="text-gray-500">Username</span>
           <span className="font-medium">{user?.username}</span>
           <span className="text-gray-500">Role</span>
