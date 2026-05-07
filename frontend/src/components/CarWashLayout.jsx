@@ -106,7 +106,7 @@ export default function CarWashLayout() {
 
         {/* Nav */}
         <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? 'px-1' : 'px-2'}`}>
-          {/* New Job shortcut — hidden when inactive */}
+          {/* New Job shortcut - hidden when inactive */}
           {!isInactive && !collapsed && (
             <NavLink
               to="/carwash/jobs/new"

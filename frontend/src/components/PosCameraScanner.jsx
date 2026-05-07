@@ -6,7 +6,7 @@ import { productsApi } from '../api/client';
 const COOLDOWN_MS = 1500;
 const fmt = (n) => Number(n || 0).toFixed(2);
 
-// Lightweight beep — reuses a single AudioContext
+// Lightweight beep - reuses a single AudioContext
 function playBeep(audioCtx) {
   if (!audioCtx) return;
   try {
@@ -45,7 +45,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
   }, []);
 
   const handleBarcode = useCallback(async (decoded) => {
-    // Flash feedback (no separate lookingUp state — fewer renders)
+    // Flash feedback (no separate lookingUp state - fewer renders)
     setScanFlash(decoded);
     clearTimeout(flashTimerRef.current);
     flashTimerRef.current = setTimeout(() => setScanFlash(''), 500);
@@ -69,7 +69,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
     }
   }, []);
 
-  // Start camera — fps:8 keeps CPU load low on mobile
+  // Start camera - fps:8 keeps CPU load low on mobile
   useEffect(() => {
     let scanner;
     setCamError('');
@@ -82,7 +82,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
           {
             fps: 8,           // 8fps is enough for barcode scanning, half the CPU of 15fps
             aspectRatio: 1.778, // 16:9 keeps video ~220px tall on a 390px wide phone
-            // No qrbox — scan entire frame regardless of where barcode appears
+            // No qrbox - scan entire frame regardless of where barcode appears
           },
           (decoded) => {
             const now = Date.now();
@@ -148,7 +148,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
         </button>
       </div>
 
-      {/* Camera viewfinder — compact, no transition (avoids repaint on flash) */}
+      {/* Camera viewfinder - compact, no transition (avoids repaint on flash) */}
       <div
         className={`relative bg-black shrink-0 overflow-hidden
                     ${flash ? 'ring-4 ring-green-400 ring-inset' : ''}`}
@@ -156,7 +156,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
       >
         <div id="pos-multi-cam-view" className="w-full" />
 
-        {/* Static corner-bracket guide — no animation = no GPU cost */}
+        {/* Static corner-bracket guide - no animation = no GPU cost */}
         {!flash && !camError && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="relative w-56 h-24">
@@ -194,7 +194,7 @@ export default function PosCameraScanner({ onDone, onClose }) {
       <div className="px-4 py-1.5 bg-gray-800 border-t border-gray-700 shrink-0">
         <p className="text-gray-400 text-[11px] text-center">
           {scannedItems.length === 0
-            ? 'Point camera at any barcode — scans automatically'
+            ? 'Point camera at any barcode - scans automatically'
             : 'Keep scanning or tap Add to Cart'}
         </p>
       </div>

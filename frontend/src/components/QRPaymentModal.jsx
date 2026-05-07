@@ -58,7 +58,7 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
     return () => { cancelled = true; };
   }, [amount, sessionType, preOrderId]);
 
-  // Poll for payment status — slow fallback only; WebSocket handles the fast path
+  // Poll for payment status - slow fallback only; WebSocket handles the fast path
   useEffect(() => {
     if (phase !== 'waiting' || !session?.reference) return;
     stopPolling();
@@ -74,11 +74,11 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
           setPhase('failed');
         }
       } catch {}
-    }, 15000); // 15s — WebSocket is primary; this is only a missed-webhook safety net
+    }, 15000); // 15s - WebSocket is primary; this is only a missed-webhook safety net
     return stopPolling;
   }, [phase, session, stopPolling, onSuccess]);
 
-  // WebSocket — instant payment confirmation without waiting for next poll cycle
+  // WebSocket - instant payment confirmation without waiting for next poll cycle
   useEffect(() => {
     if (phase !== 'waiting' || !session?.reference || !user?.shop_id) return;
     closeWs();
@@ -160,7 +160,7 @@ export default function QRPaymentModal({ amount, sessionType = 'pos', preOrderId
             </div>
           )}
 
-          {/* Waiting — show QR */}
+          {/* Waiting - show QR */}
           {phase === 'waiting' && session && (
             <>
               <div className="flex flex-col items-center gap-3">

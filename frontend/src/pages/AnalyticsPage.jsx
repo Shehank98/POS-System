@@ -422,7 +422,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center gap-2 mt-3 bg-red-50 border border-red-100
                             rounded-lg px-3 py-2 text-xs text-red-700">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              {data.inventory.out_of_stock} product{data.inventory.out_of_stock > 1 ? 's' : ''} out of stock — update stock in the Products page.
+              {data.inventory.out_of_stock} product{data.inventory.out_of_stock > 1 ? 's' : ''} out of stock - update stock in the Products page.
             </div>
           )}
         </div>

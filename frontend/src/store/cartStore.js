@@ -28,7 +28,7 @@ const useCartStore = create((set, get) => ({
   // ── Add product (or increment qty if already in cart) ──────
   // Clothing variants use `cv-{variant_id}` as the dedup key so two
   // variants of the same parent product are treated as separate rows.
-  // Retail items continue to use `p-{product_id}` — fully backward-compatible.
+  // Retail items continue to use `p-{product_id}` - fully backward-compatible.
   addItem(product, qty = 1) {
     set((state) => {
       const key = product.clothing_variant_id

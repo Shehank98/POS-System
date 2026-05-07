@@ -16,7 +16,7 @@ import useAgentStore from '../../store/agentStore';
 // ── Helpers ────────────────────────────────────────────────────
 const fmt = new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 });
 function fmtMoney(v) { return `LKR ${fmt.format(Number(v) || 0)}`; }
-function fmtDate(d)  { return d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'; }
+function fmtDate(d)  { return d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '-'; }
 
 function statusChip(status) {
   const map = {
@@ -312,7 +312,7 @@ function OnboardWizard({ onDone, onClose }) {
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Step 1 — Shop Info */}
+        {/* Step 1 - Shop Info */}
         {step === 1 && (
           <>
             <h3 className="font-semibold text-green-800 text-sm">Shop Information</h3>
@@ -345,7 +345,7 @@ function OnboardWizard({ onDone, onClose }) {
           </>
         )}
 
-        {/* Step 2 — Login account */}
+        {/* Step 2 - Login account */}
         {step === 2 && (
           <>
             <h3 className="font-semibold text-green-800 text-sm">Owner Login Account</h3>
@@ -364,12 +364,12 @@ function OnboardWizard({ onDone, onClose }) {
           </>
         )}
 
-        {/* Step 3 — Subscription plan */}
+        {/* Step 3 - Subscription plan */}
         {step === 3 && (
           <>
             <h3 className="font-semibold text-green-800 text-sm">Subscription Plan</h3>
             {plans.length === 0
-              ? <p className="text-xs text-gray-400">No plans available — shop will be created without a plan.</p>
+              ? <p className="text-xs text-gray-400">No plans available - shop will be created without a plan.</p>
               : (
                 <div className="space-y-2">
                   {plans.map((p) => (
@@ -419,7 +419,7 @@ function OnboardWizard({ onDone, onClose }) {
           </>
         )}
 
-        {/* Step 4 — Review */}
+        {/* Step 4 - Review */}
         {step === 4 && (
           <>
             <h3 className="font-semibold text-green-800 text-sm">Review & Confirm</h3>
@@ -428,12 +428,12 @@ function OnboardWizard({ onDone, onClose }) {
                 ['Shop Name',    form.name],
                 ['Owner',        form.owner_name],
                 ['Email',        form.email],
-                ['Phone',        form.phone || '—'],
+                ['Phone',        form.phone || '-'],
                 ['Shop Type',    SHOP_TYPES.find((t) => t.value === form.shop_type)?.label || form.shop_type],
                 ['Username',     form.username],
-                ['Plan',         selectedPlan?.name || '— (no plan)'],
+                ['Plan',         selectedPlan?.name || '- (no plan)'],
                 ['Duration',     `${form.subscription_months} month(s)`],
-                ['Expected Amt', totalPrice ? `LKR ${Number(totalPrice).toLocaleString()}` : '—'],
+                ['Expected Amt', totalPrice ? `LKR ${Number(totalPrice).toLocaleString()}` : '-'],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-2">
                   <span className="text-gray-500 shrink-0">{k}</span>
@@ -524,7 +524,7 @@ function ShopQRModal({ shop, onClose, onSuccess }) {
               setTimeout(() => { onSuccess?.(); onClose(); }, 2500);
             }
           }
-        } catch { /* silent — keep polling */ }
+        } catch { /* silent - keep polling */ }
       }, 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate QR. Check system configuration.');
@@ -710,7 +710,7 @@ function ShopRegisterForm({ onDone, onClose }) {
         setSelfie({ preview: fileData, url: data.url });
         toast.success('Selfie uploaded');
       } catch (err) {
-        setSelfieErr(err.response?.data?.error || 'Upload failed — try again');
+        setSelfieErr(err.response?.data?.error || 'Upload failed - try again');
       } finally {
         setSelfieU(false);
       }
@@ -865,7 +865,7 @@ function ShopRegisterForm({ onDone, onClose }) {
           <User className="w-3 h-3" /> Selfie
         </legend>
         <p className="text-xs text-gray-400">
-          Take a photo of yourself standing in front of the shop — the shop signage must be clearly visible.
+          Take a photo of yourself standing in front of the shop - the shop signage must be clearly visible.
         </p>
 
         <input
@@ -999,7 +999,7 @@ function ShopsTab() {
     <div className="space-y-3 sm:space-y-4">
       {qrShop && <ShopQRModal shop={qrShop} onClose={() => setQrShop(null)} onSuccess={load} />}
 
-      {/* Search + Register — stack on very small screens */}
+      {/* Search + Register - stack on very small screens */}
       <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
         <input
           className="flex-1 min-h-[44px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -1205,7 +1205,7 @@ function DepositQRPanel({ onPaid }) {
     );
   }
 
-  // Live QR state — detect if qr_data is already a base64 image or a raw QR string
+  // Live QR state - detect if qr_data is already a base64 image or a raw QR string
   if (qrSession && qrSession.qr_data) {
     const isImageUrl = qrSession.qr_data.startsWith('data:image') ||
                        qrSession.qr_data.startsWith('http');
@@ -1227,7 +1227,7 @@ function DepositQRPanel({ onPaid }) {
     );
   }
 
-  // Fallback — shouldn't reach here
+  // Fallback - shouldn't reach here
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
       <p className="text-sm text-gray-400">Something went wrong.</p>
@@ -1364,7 +1364,7 @@ function PaymentsTab() {
         payment_date:   form.payment_date,
         notes:          form.notes || undefined,
       });
-      toast.success('Payment submitted — awaiting admin verification');
+      toast.success('Payment submitted - awaiting admin verification');
       setShowForm(false);
       setForm({ shop_id:'', amount:'', payment_date:todayStr(), notes:'' });
       load();
@@ -1430,7 +1430,7 @@ function PaymentsTab() {
                   onChange={(e) => setForm((p) => ({ ...p, shop_id: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
-                  <option value="">— Choose shop —</option>
+                  <option value="">- Choose shop -</option>
                   {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -1772,7 +1772,7 @@ function CommissionsTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                        {c.paid_at ? fmtDate(c.paid_at) : '—'}
+                        {c.paid_at ? fmtDate(c.paid_at) : '-'}
                       </td>
                     </tr>
                   ))}
@@ -1931,13 +1931,13 @@ function ProfileTab() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-xs">
-          <div><p className="text-gray-400">Phone</p><p className="font-medium text-gray-700">{profile?.phone || '—'}</p></div>
-          <div><p className="text-gray-400">District</p><p className="font-medium text-gray-700">{profile?.district || '—'}</p></div>
-          <div><p className="text-gray-400">NIC Number</p><p className="font-medium text-gray-700 break-all">{profile?.nic_number || '—'}</p></div>
-          <div><p className="text-gray-400">Driving License</p><p className="font-medium text-gray-700">{profile?.driving_license_number || '—'}</p></div>
+          <div><p className="text-gray-400">Phone</p><p className="font-medium text-gray-700">{profile?.phone || '-'}</p></div>
+          <div><p className="text-gray-400">District</p><p className="font-medium text-gray-700">{profile?.district || '-'}</p></div>
+          <div><p className="text-gray-400">NIC Number</p><p className="font-medium text-gray-700 break-all">{profile?.nic_number || '-'}</p></div>
+          <div><p className="text-gray-400">Driving License</p><p className="font-medium text-gray-700">{profile?.driving_license_number || '-'}</p></div>
           <div className="col-span-2">
             <p className="text-gray-400">Member Since</p>
-            <p className="font-medium text-gray-700">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) : '—'}</p>
+            <p className="font-medium text-gray-700">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) : '-'}</p>
           </div>
         </div>
       </div>
@@ -2132,7 +2132,7 @@ function RenewalsTab() {
 
   function renewalLabel(s) {
     const days = daysUntil(s.subscription_end_date);
-    if (days === null) return <span className="text-gray-400">—</span>;
+    if (days === null) return <span className="text-gray-400">-</span>;
     if (days < 0)  return <span className="text-red-600 font-semibold">Expired {Math.abs(days)}d ago</span>;
     if (days === 0) return <span className="text-red-600 font-semibold">Expires today</span>;
     if (days === 1) return <span className="text-orange-600 font-semibold">Tomorrow</span>;
@@ -2215,10 +2215,10 @@ function RenewalsTab() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{s.plan_name || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{s.plan_name || '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusChip(s.subscription_status)}`}>
-                      {s.subscription_status?.replace(/_/g, ' ') || '—'}
+                      {s.subscription_status?.replace(/_/g, ' ') || '-'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{fmtDate(s.subscription_end_date)}</td>
@@ -2297,12 +2297,12 @@ function RenewalsTab() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
                 <div>
                   <span className="text-gray-400">Plan: </span>
-                  {s.plan_name || '—'}
+                  {s.plan_name || '-'}
                 </div>
                 <div>
                   <span className="text-gray-400">Status: </span>
                   <span className={`inline-block font-semibold px-1.5 py-0.5 rounded-full text-[10px] ${statusChip(s.subscription_status)}`}>
-                    {s.subscription_status?.replace(/_/g, ' ') || '—'}
+                    {s.subscription_status?.replace(/_/g, ' ') || '-'}
                   </span>
                 </div>
                 <div>
@@ -2482,7 +2482,7 @@ export default function AgentPortalPage() {
           </button>
         </div>
 
-        {/* Tab bar — icons only on xs, icons + label on sm+ */}
+        {/* Tab bar - icons only on xs, icons + label on sm+ */}
         <div className="max-w-5xl mx-auto px-2 sm:px-4 flex overflow-x-auto scrollbar-none pb-0">
           {TABS.map((t) => (
             <button

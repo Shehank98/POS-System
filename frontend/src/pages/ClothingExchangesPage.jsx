@@ -82,7 +82,7 @@ export default function ClothingExchangesPage() {
   // ── Step 2: choose replacements (optional per returned item) ──
   async function openPickerFor(item) {
     if (!item.clothing_variant_id) {
-      toast('This item has no clothing variant — skip replacement.');
+      toast('This item has no clothing variant - skip replacement.');
       return;
     }
     try {
@@ -349,7 +349,7 @@ export default function ClothingExchangesPage() {
             </p>
           )}
           {result.net_refund_amount === 0 && (
-            <p className="text-sm text-gray-600">Even exchange — no payment required.</p>
+            <p className="text-sm text-gray-600">Even exchange - no payment required.</p>
           )}
           <div className="flex gap-3 justify-center flex-wrap">
             <button

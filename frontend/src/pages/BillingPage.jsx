@@ -71,7 +71,7 @@ const STATUS_BADGE = {
   rejected: { label: 'Rejected',       cls: 'bg-red-100    text-red-700'    },
 };
 
-const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 const fmtMoney = (n) => Number(n || 0).toLocaleString();
 
 function daysUntil(dateStr) {
@@ -136,7 +136,7 @@ function CurrentPlanCard({ user, onRenew, onUpgrade }) {
             <div className="bg-white/70 rounded-xl p-3">
               <p className="text-xs text-gray-400 mb-0.5">Remaining</p>
               <p className={`font-bold text-sm ${(isExpiring || isExpired) ? 'text-red-600' : 'text-gray-800'}`}>
-                {days === null ? '—' : isExpired ? 'Expired' : `${days} day${days !== 1 ? 's' : ''}`}
+                {days === null ? '-' : isExpired ? 'Expired' : `${days} day${days !== 1 ? 's' : ''}`}
                 {isExpiring && !isExpired && <span className="ml-1">⚠️</span>}
               </p>
             </div>
@@ -157,7 +157,7 @@ function CurrentPlanCard({ user, onRenew, onUpgrade }) {
         <div className={`mt-3 text-xs font-medium px-3 py-2 rounded-xl ${isExpired ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
           {isExpired
             ? 'Subscription expired. Select a plan below to renew access.'
-            : `Renew now — only ${days} day${days !== 1 ? 's' : ''} remaining.`}
+            : `Renew now - only ${days} day${days !== 1 ? 's' : ''} remaining.`}
         </div>
       )}
 
@@ -239,7 +239,7 @@ function DurationSelector({ tierPlan, selected, onSelect }) {
       <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
         <Clock className="w-4 h-4 text-primary-600" />
         Choose Duration
-        <span className="text-xs font-normal text-gray-400">— {tierPlan.name} plan</span>
+        <span className="text-xs font-normal text-gray-400">- {tierPlan.name} plan</span>
       </h2>
       <div className="space-y-2.5">
         {DURATIONS.map((d) => {
@@ -296,7 +296,7 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Only image files are accepted'); return; }
-    if (file.size > 2 * 1024 * 1024) { toast.error('Image too large — max 2 MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Image too large - max 2 MB'); return; }
     setProofFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setProofB64(ev.target.result);
@@ -372,7 +372,7 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
               <div className="py-4 space-y-2">
                 <Upload className="w-8 h-8 text-gray-300 mx-auto" />
                 <p className="text-sm font-medium text-gray-500">Tap to upload screenshot</p>
-                <p className="text-xs text-gray-300">PNG, JPG — max 2 MB</p>
+                <p className="text-xs text-gray-300">PNG, JPG - max 2 MB</p>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -401,7 +401,7 @@ function PaymentSection({ tierPlan, duration, bankInfo, onSubmit, submitting }) 
           {submitting
             ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Submitting…</>
             : total > 0
-              ? `Submit Payment — Rs. ${fmtMoney(total)}`
+              ? `Submit Payment - Rs. ${fmtMoney(total)}`
               : 'Select a plan & duration above'}
         </button>
       </form>
@@ -463,7 +463,7 @@ function HelaPlayQRPanel({ onPaid }) {
             setTimeout(() => { onPaid(); }, 2500);
           }
         }
-      } catch { /* silent — keep polling */ }
+      } catch { /* silent - keep polling */ }
     }, 3000);
   }
 
@@ -475,7 +475,7 @@ function HelaPlayQRPanel({ onPaid }) {
       <div className="flex flex-col items-center gap-4 py-8 text-center">
         <PartyPopper className="w-14 h-14 text-green-500" />
         <p className="text-xl font-bold text-green-700">Payment Confirmed!</p>
-        <p className="text-sm text-gray-500">Your account is being activated — refreshing…</p>
+        <p className="text-sm text-gray-500">Your account is being activated - refreshing…</p>
         <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
       </div>
     );
@@ -515,7 +515,7 @@ function HelaPlayQRPanel({ onPaid }) {
         >
           {generating
             ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating QR…</>
-            : <><QrCode className="w-5 h-5" /> Generate QR Code — LKR 2,500</>}
+            : <><QrCode className="w-5 h-5" /> Generate QR Code - LKR 2,500</>}
         </button>
       </div>
     );
@@ -724,7 +724,7 @@ function InactiveShopBilling({ user }) {
               <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
                 <div>
                   <p className="font-medium text-gray-700 capitalize">
-                    {p.payment_method === 'helaPay' ? '⚡ HelaPlay QR' : '🏦 Bank Transfer'} — LKR {Number(p.amount || 0).toLocaleString()}
+                    {p.payment_method === 'helaPay' ? '⚡ HelaPlay QR' : '🏦 Bank Transfer'} - LKR {Number(p.amount || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString()}</p>
                   {p.admin_note && <p className="text-xs text-red-500 mt-0.5">Note: {p.admin_note}</p>}
@@ -818,7 +818,7 @@ export default function BillingPage() {
     );
   }
 
-  // Unactivated shop — show activation payment form only
+  // Unactivated shop - show activation payment form only
   if (user?.activation_status != null && user.activation_status !== 'active') {
     return <InactiveShopBilling user={user} />;
   }
@@ -832,10 +832,10 @@ export default function BillingPage() {
         <p className="text-sm text-gray-500 mt-0.5">Manage your subscription and renew your plan</p>
       </div>
 
-      {/* 1 — Current Plan */}
+      {/* 1 - Current Plan */}
       <CurrentPlanCard user={user} onRenew={scrollToPlans} onUpgrade={scrollToPlans} />
 
-      {/* 2 — Plan Tier Cards */}
+      {/* 2 - Plan Tier Cards */}
       <div ref={plansSectionRef}>
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -860,7 +860,7 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* 3 — Duration Selector (shown after tier picked) */}
+      {/* 3 - Duration Selector (shown after tier picked) */}
       {selectedTier && (
         <DurationSelector
           tierPlan={selectedTier}
@@ -869,7 +869,7 @@ export default function BillingPage() {
         />
       )}
 
-      {/* 4 — Payment Section */}
+      {/* 4 - Payment Section */}
       <PaymentSection
         tierPlan={selectedTier}
         duration={selectedDur}
@@ -878,7 +878,7 @@ export default function BillingPage() {
         submitting={submitting}
       />
 
-      {/* 5 — Payment History */}
+      {/* 5 - Payment History */}
       {payments.length > 0 && (
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2">

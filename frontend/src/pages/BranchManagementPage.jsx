@@ -210,7 +210,7 @@ function TransferModal({ branches, onClose, onDone }) {
                   <option value="">Select…</option>
                   {fromInventory.map((i) => (
                     <option key={i.variant_id} value={i.variant_id}>
-                      {i.product_name} — {i.size}/{i.color} (stock: {i.stock_quantity})
+                      {i.product_name} - {i.size}/{i.color} (stock: {i.stock_quantity})
                     </option>
                   ))}
                 </select>

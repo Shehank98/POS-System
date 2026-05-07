@@ -7,14 +7,14 @@ import {
 
 const GRACE_DAYS         = 5;
 const EXPIRY_WARN_DAYS   = 7;
-const TAMPER_TOLERANCE   = 2 * 60 * 1000; // 2 minutes — allows minor clock drift
+const TAMPER_TOLERANCE   = 2 * 60 * 1000; // 2 minutes - allows minor clock drift
 
 // Called on every successful online auth (login or /me)
 export async function recordOnlineVerification() {
   await setLastVerifiedOnline(Date.now());
 }
 
-// Called on app startup and every 5 minutes — seeds the anti-tamper check
+// Called on app startup and every 5 minutes - seeds the anti-tamper check
 export async function recordRunTimestamp() {
   const now  = Date.now();
   const last = await getLastRunTimestamp();
@@ -24,7 +24,7 @@ export async function recordRunTimestamp() {
   await setLastRunTimestamp(now);
 }
 
-// Clears tamper flag — called on fresh successful login (user explicitly re-authenticated)
+// Clears tamper flag - called on fresh successful login (user explicitly re-authenticated)
 export async function clearTampered() {
   await setTampered(false);
 }
@@ -33,7 +33,7 @@ export async function clearTampered() {
  * Returns a subscription state object used by SubscriptionGuard and SubscriptionStatusBar.
  * Priority: time_tampered → needs_online → suspended → locked → in_grace → expiring_soon → active
  *
- * @param {object|null} user  — live user from authStore (most recent data)
+ * @param {object|null} user  - live user from authStore (most recent data)
  */
 export async function getSubscriptionState(user) {
   const [sub, lastVerified, tampered] = await Promise.all([

@@ -258,7 +258,7 @@ export default function CarWashJobCreate() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
                          focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— Unassigned —</option>
+              <option value="">- Unassigned -</option>
               {staff.map((u) => (
                 <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
               ))}

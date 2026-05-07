@@ -181,7 +181,7 @@ export default function OrderPage() {
   const [error, setError]                       = useState('');
   const [cancellationStatus, setCancellationStatus] = useState(null); // { total_cancellations, cooldown_active, cooldown_until }
 
-  // Saved order (localStorage — persists across page closes)
+  // Saved order (localStorage - persists across page closes)
   const [savedOrder,   setSavedOrder]   = useState(null); // { token, shopId, createdAt }
   const [showSavedQR,  setShowSavedQR]  = useState(false);
 
@@ -189,7 +189,7 @@ export default function OrderPage() {
 
   // Load shop + products
   useEffect(() => {
-    if (!shopId) { setError('Invalid link — no shop ID found.'); setLoading(false); return; }
+    if (!shopId) { setError('Invalid link - no shop ID found.'); setLoading(false); return; }
     Promise.all([
       preOrdersApi.getShop(shopId),
       preOrdersApi.getProducts(shopId),
@@ -217,10 +217,10 @@ export default function OrderPage() {
           if (ACTIVE_STATUSES.includes(data.order.status)) {
             setSavedOrder({ ...parsed, status: data.order.status });
           } else {
-            localStorage.removeItem(LS_KEY); // completed or cancelled — don't show
+            localStorage.removeItem(LS_KEY); // completed or cancelled - don't show
           }
         })
-        .catch(() => setSavedOrder(parsed)); // network error — show it anyway
+        .catch(() => setSavedOrder(parsed)); // network error - show it anyway
     } catch {
       localStorage.removeItem(LS_KEY);
     }
@@ -415,7 +415,7 @@ export default function OrderPage() {
             </button>
           </div>
 
-          {/* QR code — collapsible */}
+          {/* QR code - collapsible */}
           {showSavedQR && (
             <div className="flex justify-center pb-3">
               <div className="bg-white p-2.5 rounded-xl border border-primary-100 inline-block">
@@ -586,7 +586,7 @@ export default function OrderPage() {
                 )}
               </div>
 
-              {/* Previous Orders — Reorder */}
+              {/* Previous Orders - Reorder */}
               {history.length > 0 && (
                 <div className="mt-5">
                   <h3 className="font-semibold text-gray-700 text-sm mb-2 flex items-center gap-1">

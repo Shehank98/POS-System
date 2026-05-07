@@ -70,10 +70,10 @@ function AddItemModal({ onClose, onAdd, services, products }) {
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">— Select {tab} —</option>
+          <option value="">- Select {tab} -</option>
           {list.map((i) => (
             <option key={i.id} value={i.id}>
-              {i.name} — Rs. {parseFloat(i.price).toFixed(2)}
+              {i.name} - Rs. {parseFloat(i.price).toFixed(2)}
               {tab === 'product' ? ` (${i.stock_quantity} in stock)` : ''}
             </option>
           ))}
@@ -327,7 +327,7 @@ export default function CarWashJobDetail() {
         )}
         <div className="flex justify-between text-gray-600">
           <span>Created</span>
-          <span>{job.created_at ? new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+          <span>{job.created_at ? new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
         </div>
         {job.notes && (
           <div className="pt-1 border-t border-gray-100 text-gray-500 italic">
@@ -382,7 +382,7 @@ export default function CarWashJobDetail() {
           </div>
         )}
 
-        {/* Totals — hidden from staff */}
+        {/* Totals - hidden from staff */}
         {!isStaff && (
           <div className="pt-2 border-t border-gray-100 space-y-1">
             <div className="flex justify-between text-sm font-bold text-gray-900">
@@ -405,7 +405,7 @@ export default function CarWashJobDetail() {
         )}
       </div>
 
-      {/* Payment history — hidden from staff */}
+      {/* Payment history - hidden from staff */}
       {!isStaff && job.payments && job.payments.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
           <h2 className="font-semibold text-gray-700 text-sm">Payments</h2>
@@ -415,7 +415,7 @@ export default function CarWashJobDetail() {
               <div className="text-right">
                 <span className="font-semibold text-gray-900">Rs. {parseFloat(p.amount).toFixed(2)}</span>
                 <span className="block text-xs text-gray-400">
-                  {p.paid_at ? new Date(p.paid_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  {p.paid_at ? new Date(p.paid_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                 </span>
               </div>
             </div>

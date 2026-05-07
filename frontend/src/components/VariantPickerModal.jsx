@@ -29,9 +29,9 @@ function stockStatus(stock, threshold) {
 
 /**
  * Props:
- *   product  — { id, name, base_price }
- *   variants — array from /api/clothing/products/:id/variants
- *   onSelect(variant) — called when a cell is clicked
+ *   product  - { id, name, base_price }
+ *   variants - array from /api/clothing/products/:id/variants
+ *   onSelect(variant) - called when a cell is clicked
  *   onClose()
  */
 export default function VariantPickerModal({ product, variants, onSelect, onClose }) {

@@ -43,7 +43,7 @@ export default function LoginPage() {
       }
       navigate('/');
     } catch (err) {
-      // 409 means username exists in multiple shops — ask for Shop ID
+      // 409 means username exists in multiple shops - ask for Shop ID
       if (err.message?.includes('multiple shops') || err.message?.includes('Shop ID')) {
         setShowShopId(true);
         setError('Your username exists in multiple shops. Please enter your Shop ID (e.g. SHP-000042) to continue.');
@@ -148,7 +148,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Shop ID — always shown for non-email logins; auto-shown on username clash */}
+            {/* Shop ID - always shown for non-email logins; auto-shown on username clash */}
             {(showShopId || (!form.identifier.includes('@') && form.shop_reference_id)) ? (
               <div>
                 <label className="label">Shop ID</label>

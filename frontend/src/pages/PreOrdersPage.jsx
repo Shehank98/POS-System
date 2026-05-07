@@ -116,7 +116,7 @@ function OrderCard({ order, onStatusChange, onMarkPaid, onQRSuccess, updating, m
             </button>
           ))}
 
-          {/* Mark as Paid + Charge via QR — shown when not yet paid and order is active */}
+          {/* Mark as Paid + Charge via QR - shown when not yet paid and order is active */}
           {!isPaid && order.status !== 'CANCELLED' && (
             <>
               <button
@@ -180,7 +180,7 @@ function OrderCard({ order, onStatusChange, onMarkPaid, onQRSuccess, updating, m
             )
           )}
 
-          {/* WhatsApp notify — visible on READY status */}
+          {/* WhatsApp notify - visible on READY status */}
           {order.status === 'READY' && (
             <a
               href={waLink}
@@ -357,7 +357,7 @@ export default function PreOrdersPage() {
               order={order}
               onStatusChange={handleStatusChange}
               onMarkPaid={handleMarkPaid}
-              onQRSuccess={(id) => { preOrdersApi.markAsPaid(id).then(() => { toast.success('QR payment confirmed — order marked paid'); fetchOrders(true); fetchCounts(); }).catch(() => toast.error('Payment received but failed to mark paid')); }}
+              onQRSuccess={(id) => { preOrdersApi.markAsPaid(id).then(() => { toast.success('QR payment confirmed - order marked paid'); fetchOrders(true); fetchCounts(); }).catch(() => toast.error('Payment received but failed to mark paid')); }}
               updating={updating}
               markingPaid={markingPaid}
             />

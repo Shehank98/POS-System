@@ -14,7 +14,7 @@ import SubscriptionStatusBar from './SubscriptionStatusBar';
 import { syncPending, cacheUserSubscription } from '../utils/syncService';
 import { preOrdersApi } from '../api/client';
 
-// Full sidebar nav (base — clothing extras injected at render time)
+// Full sidebar nav (base - clothing extras injected at render time)
 const NAV_BASE = [
   { to: '/pos',          label: 'POS / Sale',   icon: ShoppingCart                                                       },
   { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard                                                    },
@@ -352,7 +352,7 @@ export default function Layout() {
               <div className="w-8 h-1 bg-gray-200 rounded-full" />
             </div>
 
-            {/* Scrollable nav list — max 65vh so it never overflows small screens */}
+            {/* Scrollable nav list - max 65vh so it never overflows small screens */}
             <nav className="px-2 space-y-0.5 overflow-y-auto max-h-[65vh]">
               {MORE_NAV
                 .filter(featureFilter)

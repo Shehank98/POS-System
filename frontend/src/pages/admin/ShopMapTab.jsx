@@ -52,8 +52,8 @@ function makeIcon(color) {
 // Handles formats:
 //   maps.google.com/maps?q=6.9271,79.8612
 //   google.com/maps/place/.../@6.9271,79.8612,15z
-//   goo.gl/maps/... (no coords — skipped)
-//   maps.app.goo.gl/... (no coords — skipped)
+//   goo.gl/maps/... (no coords - skipped)
+//   maps.app.goo.gl/... (no coords - skipped)
 function parseGoogleMapsUrl(url) {
   if (!url) return null;
 
@@ -313,7 +313,7 @@ export default function ShopMapTab() {
             {shopsNoCoords.map((s) => (
               <div key={s.id} className="flex items-center justify-between text-xs text-gray-500">
                 <span>{s.name}</span>
-                <span className="text-gray-600">{s.agent_name || '—'}</span>
+                <span className="text-gray-600">{s.agent_name || '-'}</span>
               </div>
             ))}
           </div>

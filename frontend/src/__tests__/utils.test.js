@@ -11,7 +11,7 @@ const fmt = new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 });
 const fmtMoney = (v) => `LKR ${fmt.format(Number(v) || 0)}`;
 const fmtDate  = (d) => d
   ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  : '—';
+  : '-';
 
 describe('fmtMoney', () => {
   it('formats zero', () => {
@@ -40,8 +40,8 @@ describe('fmtDate', () => {
   });
 
   it('returns em-dash for null', () => {
-    expect(fmtDate(null)).toBe('—');
-    expect(fmtDate(undefined)).toBe('—');
+    expect(fmtDate(null)).toBe('-');
+    expect(fmtDate(undefined)).toBe('-');
   });
 });
 

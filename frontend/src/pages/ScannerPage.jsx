@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Wifi, WifiOff, Camera, AlertCircle, Loader2 } from 'lucide-react';
 
 /**
- * Standalone phone camera scanner page — no auth required.
+ * Standalone phone camera scanner page - no auth required.
  * Opens at /scanner (public route).
  * Pairs with a POS terminal via 6-digit code, then streams
  * scanned barcodes over WebSocket.
@@ -218,11 +218,11 @@ export default function ScannerPage() {
       {/* Scanner screen */}
       {wsState === 'paired' && (
         <div className="flex-1 flex flex-col">
-          {/* Camera viewfinder — no overflow:hidden, no h-full; library controls sizing */}
+          {/* Camera viewfinder - no overflow:hidden, no h-full; library controls sizing */}
           <div className="flex-1 relative bg-black">
             <div id="qr-reader-phone" className="w-full" />
 
-            {/* Green flash overlay — strong visual feedback (especially for iOS) */}
+            {/* Green flash overlay - strong visual feedback (especially for iOS) */}
             {flash && (
               <div className="absolute inset-0 bg-green-500/60 flex flex-col items-center
                               justify-center pointer-events-none gap-3">

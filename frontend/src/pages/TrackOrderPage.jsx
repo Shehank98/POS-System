@@ -125,7 +125,7 @@ export default function TrackOrderPage() {
 
   useEffect(() => {
     if (!shopId || !token) {
-      setError('Invalid link — missing shop ID or token.');
+      setError('Invalid link - missing shop ID or token.');
       setLoading(false);
       return;
     }
@@ -268,7 +268,7 @@ export default function TrackOrderPage() {
               </div>
             )}
 
-            {/* Cancel button — only while PENDING */}
+            {/* Cancel button - only while PENDING */}
             {order.status === 'PENDING' && (
               <button
                 onClick={() => { setShowCancel(true); setCancelPhone(''); }}

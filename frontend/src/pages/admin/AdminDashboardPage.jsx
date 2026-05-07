@@ -784,7 +784,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-500 mb-0.5">Agent Name</p>
-                          <p className="text-sm font-medium text-white">{agentInfo.agent_name || '—'}</p>
+                          <p className="text-sm font-medium text-white">{agentInfo.agent_name || '-'}</p>
                         </div>
                         <div className="bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-500 mb-0.5">Agent ID</p>
@@ -794,21 +794,21 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                           <Mail className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs text-gray-500 mb-0.5">Email</p>
-                            <p className="text-sm text-white truncate">{agentInfo.agent_email || '—'}</p>
+                            <p className="text-sm text-white truncate">{agentInfo.agent_email || '-'}</p>
                           </div>
                         </div>
                         <div className="bg-gray-800 rounded-lg p-3 flex items-start gap-2">
                           <Phone className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-500 mb-0.5">Phone</p>
-                            <p className="text-sm text-white">{agentInfo.agent_phone || '—'}</p>
+                            <p className="text-sm text-white">{agentInfo.agent_phone || '-'}</p>
                           </div>
                         </div>
                         <div className="bg-gray-800 rounded-lg p-3 flex items-start gap-2">
                           <MapPin className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-500 mb-0.5">District</p>
-                            <p className="text-sm text-white capitalize">{agentInfo.agent_district || '—'}</p>
+                            <p className="text-sm text-white capitalize">{agentInfo.agent_district || '-'}</p>
                           </div>
                         </div>
                         <div className="bg-gray-800 rounded-lg p-3">
@@ -861,9 +861,9 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                           <tbody>
                             {agentInfo.commissions.map((c) => (
                               <tr key={c.id} className="border-t border-gray-700/50 hover:bg-gray-700/20">
-                                <td className="px-3 py-2 text-gray-300 capitalize">{c.commission_type?.replace(/_/g, ' ') || '—'}</td>
+                                <td className="px-3 py-2 text-gray-300 capitalize">{c.commission_type?.replace(/_/g, ' ') || '-'}</td>
                                 <td className="px-3 py-2 text-white font-medium">LKR {fmtMoney(c.amount)}</td>
-                                <td className="px-3 py-2 text-gray-400">{c.month || '—'}</td>
+                                <td className="px-3 py-2 text-gray-400">{c.month || '-'}</td>
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full font-medium ${
                                     c.status === 'paid'     ? 'bg-green-900/40 text-green-300' :
@@ -874,7 +874,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
                                     {c.status}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-gray-400">{c.paid_at ? fmtDate(c.paid_at) : '—'}</td>
+                                <td className="px-3 py-2 text-gray-400">{c.paid_at ? fmtDate(c.paid_at) : '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -900,7 +900,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
             <div className="space-y-4">
               <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-4">
                 <p className="text-sm font-semibold text-yellow-300 mb-1">Suspend Shop</p>
-                <p className="text-xs text-gray-400 mb-3">Sets status to "suspended" — staff cannot log in.</p>
+                <p className="text-xs text-gray-400 mb-3">Sets status to "suspended" - staff cannot log in.</p>
                 <button
                   onClick={async () => {
                     if (!window.confirm('Suspend this shop?')) return;
@@ -953,7 +953,7 @@ function ShopControlCenter({ shop, onClose, onDone }) {
           )}
         </div>
 
-        {/* Footer save — hidden on Users and Danger tabs */}
+        {/* Footer save - hidden on Users and Danger tabs */}
         {!['users', 'agent', 'danger'].includes(activeTab) && (
           <div className="flex gap-2 px-5 py-3 border-t border-gray-700 shrink-0">
             <button onClick={onClose}
@@ -1914,7 +1914,7 @@ function NotificationsTab({ shops }) {
           <div>
             <label className="block text-xs text-gray-400 mb-1">Shop *</label>
             <select className={inputCls} value={shopId} onChange={(e) => setShopId(e.target.value)} required>
-              <option value="">— Select shop —</option>
+              <option value="">- Select shop -</option>
               {shops.map((s) => (
                 <option key={s.id} value={s.id}>{s.name} (ID {s.id})</option>
               ))}
@@ -2028,7 +2028,7 @@ function AgentPaymentsTab({ payments, loading, onVerify, onReject }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-400">
-        {payments.length} pending submission{payments.length !== 1 ? 's' : ''} — verifying activates the shop subscription
+        {payments.length} pending submission{payments.length !== 1 ? 's' : ''} - verifying activates the shop subscription
       </p>
       {payments.map((p) => {
         const submitted    = Number(p.submitted_amount || p.amount || 0);
@@ -2333,7 +2333,7 @@ export default function AdminDashboardPage() {
   async function handleVerifyAgentPayment(id) {
     try {
       await adminApi.verifyAgentPayment(id);
-      toast.success('Agent payment verified — shop subscription activated!');
+      toast.success('Agent payment verified - shop subscription activated!');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to verify');

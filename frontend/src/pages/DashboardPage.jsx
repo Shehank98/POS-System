@@ -229,7 +229,7 @@ export default function DashboardPage() {
     fetchSummary(activePeriod);
   }
 
-  // Chart data — parse date as local noon to avoid UTC-offset day shift
+  // Chart data - parse date as local noon to avoid UTC-offset day shift
   const chartData = weekData?.daily?.map((d) => ({
     day:   new Date(`${d.day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
     Sales: parseFloat(d.sales) || 0,

@@ -54,7 +54,7 @@ export default function SubscriptionGuard({ children }) {
     await check();
   }
 
-  // While determining state — render children to avoid flash on every route change
+  // While determining state - render children to avoid flash on every route change
   if (!state) return children;
 
   if (state.status === 'time_tampered') {
@@ -89,7 +89,7 @@ export default function SubscriptionGuard({ children }) {
     );
   }
 
-  // 'locked', 'in_grace', 'expiring_soon', 'active' — render children
+  // 'locked', 'in_grace', 'expiring_soon', 'active' - render children
   // SubscriptionStatusBar handles the visual warning for these states
   return children;
 }

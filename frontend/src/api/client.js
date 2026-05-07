@@ -121,7 +121,7 @@ export const paymentsApi = {
 const publicClient = axios.create({ baseURL: BASE_URL });
 
 export const preOrdersApi = {
-  // Public — customer ordering (no auth)
+  // Public - customer ordering (no auth)
   getProducts:          (shopId)        => publicClient.get(`/pre-orders/public/products?shop_id=${shopId}`),
   getShop:              (shopId)        => publicClient.get(`/pre-orders/public/shop?shop_id=${shopId}`),
   create:               (data)          => publicClient.post('/pre-orders/public', data),
@@ -129,7 +129,7 @@ export const preOrdersApi = {
   trackOrder:           (shopId, token) => publicClient.get(`/pre-orders/public/track?shop_id=${shopId}&token=${encodeURIComponent(token)}`),
   getCancellationStatus:(shopId, phone) => publicClient.get(`/pre-orders/public/cancellation-status?shop_id=${shopId}&phone=${encodeURIComponent(phone)}`),
   cancelOrder:         (data)          => publicClient.post('/pre-orders/public/cancel', data),
-  // Authenticated — shop owner / POS staff
+  // Authenticated - shop owner / POS staff
   list:         (status)        => client.get('/pre-orders', { params: status ? { status } : {} }),
   getCounts:    ()              => client.get('/pre-orders/counts'),
   updateStatus: (id, status)    => client.put(`/pre-orders/${id}/status`, { status }),
@@ -232,7 +232,7 @@ export const qrPaymentsApi = {
   getDisplay:     (reference) => publicClient.get(`/qr/display/${reference}`),
 };
 
-// ── Car Wash Public (no auth — customer portal) ───────────────
+// ── Car Wash Public (no auth - customer portal) ───────────────
 export const carwashPublicApi = {
   lookup:        (shopId, phone, vehicle) =>
     publicClient.get('/carwash/public/lookup', { params: { shop_id: shopId, phone, vehicle } }),

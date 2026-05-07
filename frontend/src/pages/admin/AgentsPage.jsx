@@ -13,7 +13,7 @@ import ShopMapTab from './ShopMapTab';
 import ShopsByAgentTab from './ShopsByAgentTab';
 
 const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 
 const PAYMENT_STATUS = {
   pending_verification: { label: 'Pending',  cls: 'bg-yellow-100 text-yellow-700' },
@@ -213,7 +213,7 @@ function AgentDetailPanel({ agent: initialAgent, onClose, onEdit }) {
   async function handlePayout() {
     if (!selected.size) return toast.error('Select at least one commission');
     if (!hasBankDetails) {
-      return toast.error('Agent bank details are missing — add them in the Bank Account tab before paying');
+      return toast.error('Agent bank details are missing - add them in the Bank Account tab before paying');
     }
     setPaying(true);
     try {
@@ -331,14 +331,14 @@ function AgentDetailPanel({ agent: initialAgent, onClose, onEdit }) {
                 <Building2 className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-gray-300 space-y-0.5">
                   <p><span className="text-gray-500">Account:</span> {agent.account_holder} · {agent.bank_account}</p>
-                  <p><span className="text-gray-500">Bank:</span> {agent.bank_name}{agent.bank_branch ? ` — ${agent.bank_branch}` : ''}</p>
+                  <p><span className="text-gray-500">Bank:</span> {agent.bank_name}{agent.bank_branch ? ` - ${agent.bank_branch}` : ''}</p>
                 </div>
               </div>
             )}
             {approvedCommissions.length > 0 && (
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm text-gray-300">
-                  {selected.size > 0 ? `${selected.size} selected — LKR ${fmtMoney([...selected].reduce((s, id) => {
+                  {selected.size > 0 ? `${selected.size} selected - LKR ${fmtMoney([...selected].reduce((s, id) => {
                     const c = commissions.find((c) => c.id === id);
                     return s + (c ? parseFloat(c.amount) : 0);
                   }, 0))}` : `${approvedCommissions.length} approved · LKR ${fmtMoney(approvedTotal)}`}
@@ -399,7 +399,7 @@ function AgentDetailPanel({ agent: initialAgent, onClose, onEdit }) {
                     { label: 'Account Holder', value: agent.account_holder },
                     { label: 'Bank Name',      value: agent.bank_name      },
                     { label: 'Account Number', value: agent.bank_account   },
-                    { label: 'Branch',         value: agent.bank_branch || '—' },
+                    { label: 'Branch',         value: agent.bank_branch || '-' },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-xs text-gray-500">{label}</p>
@@ -541,7 +541,7 @@ function RiskScoresTab({ onAgentUpdated }) {
       {allLow && (
         <div className="text-center py-12 text-gray-400">
           <ShieldAlert className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>No agents with elevated risk — all scores are low.</p>
+          <p>No agents with elevated risk - all scores are low.</p>
         </div>
       )}
 
@@ -724,13 +724,13 @@ function AgentDocModal({ agentId, onClose }) {
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div><p className="text-gray-500">Email</p><p className="text-white">{docs.email}</p></div>
-              <div><p className="text-gray-500">Phone</p><p className="text-white">{docs.phone || '—'}</p></div>
-              <div><p className="text-gray-500">NIC</p><p className="text-white">{docs.nic_number || '—'}</p></div>
-              <div><p className="text-gray-500">Driving License</p><p className="text-white">{docs.driving_license_number || '—'}</p></div>
-              <div><p className="text-gray-500">Bank</p><p className="text-white">{docs.bank_name || '—'}</p></div>
-              <div><p className="text-gray-500">Account</p><p className="text-white">{docs.bank_account || '—'}</p></div>
-              <div><p className="text-gray-500">Account Holder</p><p className="text-white">{docs.account_holder || '—'}</p></div>
-              <div><p className="text-gray-500">District</p><p className="text-white">{docs.district || '—'}</p></div>
+              <div><p className="text-gray-500">Phone</p><p className="text-white">{docs.phone || '-'}</p></div>
+              <div><p className="text-gray-500">NIC</p><p className="text-white">{docs.nic_number || '-'}</p></div>
+              <div><p className="text-gray-500">Driving License</p><p className="text-white">{docs.driving_license_number || '-'}</p></div>
+              <div><p className="text-gray-500">Bank</p><p className="text-white">{docs.bank_name || '-'}</p></div>
+              <div><p className="text-gray-500">Account</p><p className="text-white">{docs.bank_account || '-'}</p></div>
+              <div><p className="text-gray-500">Account Holder</p><p className="text-white">{docs.account_holder || '-'}</p></div>
+              <div><p className="text-gray-500">District</p><p className="text-white">{docs.district || '-'}</p></div>
             </div>
 
             <div className="bg-gray-800 rounded-xl p-3 space-y-1">
@@ -903,7 +903,7 @@ function ShopPaymentsTab() {
       } else {
         await adminApi.verifyShopPayment(id);
       }
-      toast.success('Payment verified — shop activated & onboarding commission approved!');
+      toast.success('Payment verified - shop activated & onboarding commission approved!');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to verify');
@@ -1167,7 +1167,7 @@ export default function AgentsPage() {
     setVerifying(id);
     try {
       await adminApi.verifyAgentPayment(id);
-      toast.success('Payment verified — shop activated & commission unlocked');
+      toast.success('Payment verified - shop activated & commission unlocked');
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to verify');
@@ -1320,7 +1320,7 @@ export default function AgentsPage() {
                 <div className="flex gap-3 text-xs text-gray-500 mt-1">
                   <span>{ag.phone}</span>
                   {ag.district && <span>{ag.district}</span>}
-                  <span>NIC: {ag.nic_number || '—'}</span>
+                  <span>NIC: {ag.nic_number || '-'}</span>
                   <span>Applied: {new Date(ag.created_at).toLocaleDateString()}</span>
                 </div>
               </div>

@@ -137,7 +137,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Barcode — always shown; autoFocus when adding a new product so USB scanner works */}
+          {/* Barcode - always shown; autoFocus when adding a new product so USB scanner works */}
           <div>
             <label className="label flex items-center gap-1.5">
               <Barcode className="w-4 h-4 text-gray-400" />
@@ -166,7 +166,7 @@ export default function ProductForm({ product, onSaved, onClose }) {
               >
                 <Camera className="w-4 h-4" />
               </button>
-              {/* Phone scanner button — only when barcode feature + phone mode enabled */}
+              {/* Phone scanner button - only when barcode feature + phone mode enabled */}
               {showPhone && (
                 <button
                   type="button"

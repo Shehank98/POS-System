@@ -37,7 +37,7 @@ export default function AgentLoginPage() {
             <Briefcase className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">Sales Agent Portal</h1>
-          <p className="text-green-200 text-sm mt-1">BillFlow — Agent Dashboard</p>
+          <p className="text-green-200 text-sm mt-1">BillFlow - Agent Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 space-y-4 shadow-xl">
@@ -91,7 +91,7 @@ export default function AgentLoginPage() {
         </form>
 
         <p className="text-center text-xs text-green-200 mt-4">
-          For sales agents only — contact admin if you need access.
+          For sales agents only - contact admin if you need access.
         </p>
       </div>
     </div>

@@ -120,7 +120,7 @@ function VariantRow({ variant, productName, basePrice, onDelete, onStockChange, 
           {variant.barcode || <span className="text-gray-200">no barcode</span>}
         </td>
 
-        {/* Price cell — shows override (or base fallback) + edit button */}
+        {/* Price cell - shows override (or base fallback) + edit button */}
         <td className="py-2 px-3 text-right">
           <div className="flex items-center justify-end gap-1 group">
             {priceOverride != null
@@ -138,7 +138,7 @@ function VariantRow({ variant, productName, basePrice, onDelete, onStockChange, 
           </div>
         </td>
 
-        {/* Stock cell — click badge to open inline adjust */}
+        {/* Stock cell - click badge to open inline adjust */}
         <td className="py-2 px-3 text-right">
           <button
             onClick={() => { setAdjusting((v) => !v); setEditingPrice(false); }}
@@ -283,17 +283,17 @@ function AddVariantForm({ productId, basePrice, onAdded, onClose }) {
   const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState(1);
 
-  // Step 1 — sizes
+  // Step 1 - sizes
   const [selSizes, setSelSizes]         = useState([]);
   const [extraSizeInput, setExtraSizeInput] = useState('');
   const [extraSizes, setExtraSizes]     = useState([]);
 
-  // Step 2 — colors
+  // Step 2 - colors
   const [selColors, setSelColors]       = useState([]);
   const [extraColorInput, setExtraColorInput] = useState('');
   const [extraColors, setExtraColors]   = useState([]);
 
-  // Step 3 — matrix rows
+  // Step 3 - matrix rows
   const [rows, setRows]   = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -848,7 +848,7 @@ function AddProductForm({ onAdded, onClose }) {
         tax_rate:     parseFloat(form.tax_rate)    || 0,
         is_clearance: form.is_clearance,
       });
-      toast.success('Product created — now add variants');
+      toast.success('Product created - now add variants');
       onAdded(data);
       onClose();
     } catch (err) {

@@ -604,9 +604,9 @@ function HelaPOSSettings() {
                       setTesting(true);
                       try {
                         await qrPaymentsApi.testConnection();
-                        toast.success('HelaPOS connection OK — credentials are valid');
+                        toast.success('HelaPOS connection OK - credentials are valid');
                       } catch (err) {
-                        toast.error(err.response?.data?.error || 'Connection failed — check credentials');
+                        toast.error(err.response?.data?.error || 'Connection failed - check credentials');
                       } finally {
                         setTesting(false);
                       }

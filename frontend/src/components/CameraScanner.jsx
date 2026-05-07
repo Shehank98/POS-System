@@ -8,9 +8,9 @@ const COOLDOWN_MS = 1500;
  * Modal overlay that opens the device camera and decodes barcodes.
  *
  * Props:
- *   onScan(code)  — called every time a new barcode is decoded
- *   onClose()     — called when the user dismisses the modal
- *   scannerId     — unique DOM id for the html5-qrcode container
+ *   onScan(code)  - called every time a new barcode is decoded
+ *   onClose()     - called when the user dismisses the modal
+ *   scannerId     - unique DOM id for the html5-qrcode container
  *                   (default "cam-scanner-view"; change when two
  *                    instances might mount at once)
  */
@@ -35,7 +35,7 @@ export default function CameraScanner({ onScan, onClose, scannerId = 'cam-scanne
           { facingMode: 'environment' },
           { fps: 12, qrbox: { width: 260, height: 130 } },
           (decoded) => {
-            // Debounce — html5-qrcode fires the callback on every frame
+            // Debounce - html5-qrcode fires the callback on every frame
             const now = Date.now();
             if (
               decoded === lastScanRef.current.code &&
@@ -140,7 +140,7 @@ export default function CameraScanner({ onScan, onClose, scannerId = 'cam-scanne
         {/* Hint */}
         <div className="px-4 py-3 bg-gray-900 border-t border-gray-800">
           <p className="text-gray-500 text-xs text-center">
-            Point camera at a barcode — it scans automatically
+            Point camera at a barcode - it scans automatically
           </p>
         </div>
       </div>

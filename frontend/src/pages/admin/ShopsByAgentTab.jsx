@@ -9,7 +9,7 @@ import { adminApi } from '../../api/client';
 // ── Helpers ───────────────────────────────────────────────────
 const fmt = new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 });
 const fmtMoney  = (v) => `LKR ${fmt.format(Number(v) || 0)}`;
-const fmtDate   = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+const fmtDate   = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '-';
 
 function StatusPill({ activation, subscription }) {
   if (activation === 'inactive') {
@@ -199,7 +199,7 @@ function AgentRow({ agent, searchShop }) {
                         <p className="truncate max-w-[140px]">{s.owner_name}</p>
                       </td>
                       <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                        {s.contact_number || '—'}
+                        {s.contact_number || '-'}
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill activation={s.activation_status} subscription={s.subscription_status} />

@@ -133,7 +133,7 @@ const ACCENTS = [
 ];
 const accent = (name) => ACCENTS[(name.charCodeAt(0) || 0) % ACCENTS.length];
 
-// ── Compact product card (no image — slim left accent strip) ───
+// ── Compact product card (no image - slim left accent strip) ───
 function ProductCard({ product, onSelect, disabled }) {
   const qty        = parseFloat(product.stock_quantity) || 0;
   const outOfStock = product.has_inventory && qty <= 0;
@@ -149,7 +149,7 @@ function ProductCard({ product, onSelect, disabled }) {
                     ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md cursor-pointer'}`}
     >
-      {/* Colour accent strip — 4px left edge */}
+      {/* Colour accent strip - 4px left edge */}
       <div className={`w-1 shrink-0 self-stretch ${accent(product.name)}`} />
 
       {/* Content */}
@@ -169,7 +169,7 @@ function ProductCard({ product, onSelect, disabled }) {
         </div>
       </div>
 
-      {/* Stock badges — top-right corner */}
+      {/* Stock badges - top-right corner */}
       {outOfStock && (
         <span className="absolute top-1.5 right-1.5 text-[9px] bg-red-100 text-red-600
                          px-1.5 py-0.5 rounded font-semibold leading-tight">Out</span>
@@ -217,7 +217,7 @@ function CartRow({ item, onQty, onDiscount, onRemove }) {
 
       {/* Bottom row: qty stepper + unit price + discount + subtotal */}
       <div className="flex items-center gap-2 pl-4">
-        {/* Pill stepper — for kg items show weight; for unit items show integer */}
+        {/* Pill stepper - for kg items show weight; for unit items show integer */}
         {item.unit_type === 'kg' ? (
           <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden shrink-0">
             <button
@@ -541,7 +541,7 @@ export default function POSPage() {
   const hasLoyalty     = user?.loyalty_enabled && (isClothing || user?.shop_type === 'grocery' || user?.shop_type === 'retail');
 
   const [scannerMode] = useState(() => localStorage.getItem('scannerMode') || 'both');
-  // Clothing shops always show all scanner options — barcode is the primary input method
+  // Clothing shops always show all scanner options - barcode is the primary input method
   const showUsb   = isClothing || (barcodeEnabled && (scannerMode === 'usb'   || scannerMode === 'both'));
   const showPhone = isClothing || (barcodeEnabled && (scannerMode === 'phone' || scannerMode === 'both'));
 
@@ -626,7 +626,7 @@ export default function POSPage() {
       const pts  = data.loyalty_points ?? 0;
       const name = data.name || data.customer_name || '';
       setCustomerData({ loyalty_points: pts, name });
-      toast.success(`${name || phone} — ${pts} pts`);
+      toast.success(`${name || phone} - ${pts} pts`);
     } catch {
       setCustomerData({ loyalty_points: 0 });
     }
@@ -674,7 +674,7 @@ export default function POSPage() {
         setVoucherCode(data.voucher_code);
         setVoucherAmount(parseFloat(data.amount));
         const expDate = new Date(data.expires_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
-        toast.success(`🎫 Refund voucher applied — Rs. ${Number(data.amount).toFixed(2)} (valid until ${expDate})`);
+        toast.success(`🎫 Refund voucher applied - Rs. ${Number(data.amount).toFixed(2)} (valid until ${expDate})`);
       } catch (err) {
         toast.error(err.response?.data?.error || 'Voucher invalid or expired');
       }
@@ -778,7 +778,7 @@ export default function POSPage() {
       setActivePreOrder({ id: order.id, token_number: order.token_number });
       setShowPreOrder(false);
       setPreOrderToken('');
-      toast.success(`Token ${order.token_number} loaded — ${added} item(s) added to cart`);
+      toast.success(`Token ${order.token_number} loaded - ${added} item(s) added to cart`);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Token not found');
     } finally {
@@ -842,7 +842,7 @@ export default function POSPage() {
                 </span>
               </button>
             )}
-            {/* Camera scanner — direct device camera, ideal for mobile */}
+            {/* Camera scanner - direct device camera, ideal for mobile */}
             {(barcodeEnabled || isClothing) && !readOnly && (
               <button
                 onClick={() => setShowCamera(true)}
@@ -924,7 +924,7 @@ export default function POSPage() {
         {readOnly && (
           <div className="mx-3 mt-2 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800
                           rounded-lg px-3 py-2 shrink-0">
-            Read-only mode — sales disabled. Renew subscription.
+            Read-only mode - sales disabled. Renew subscription.
           </div>
         )}
 
@@ -969,11 +969,11 @@ export default function POSPage() {
           </div>
         )}
 
-        {/* Product grid — pb accounts for bottom tab (56px) + floating cart (~56px) + safe area */}
+        {/* Product grid - pb accounts for bottom tab (56px) + floating cart (~56px) + safe area */}
         <div className="flex-1 overflow-y-auto px-3 md:pb-4"
              style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}>
           {loadingProds ? (
-            /* Skeleton — matches compact card shape */
+            /* Skeleton - matches compact card shape */
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pt-1">
               {[...Array(14)].map((_, i) => (
                 <div key={i} className="flex rounded-xl border border-gray-200 overflow-hidden
@@ -1096,7 +1096,7 @@ export default function POSPage() {
         />
       )}
 
-      {/* Direct device camera scanner — stays open for multi-scan */}
+      {/* Direct device camera scanner - stays open for multi-scan */}
       {showCamera && (
         <PosCameraScanner
           onDone={(items) => {

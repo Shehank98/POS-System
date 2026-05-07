@@ -147,7 +147,7 @@ export function linesToText(lines) {
 
 /**
  * Convert lines array to HTML for rendering in a <pre>.
- * ##QR## lines are skipped here — ThermalReceiptPreview handles them separately.
+ * ##QR## lines are skipped here - ThermalReceiptPreview handles them separately.
  */
 export function linesToHtml(lines) {
   return lines

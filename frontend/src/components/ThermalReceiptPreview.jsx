@@ -16,7 +16,7 @@ import { generateThermalLines, linesToHtml } from '../utils/thermalReceiptUtils'
 export default function ThermalReceiptPreview({ data, onClose, defaultWidth = 48, qrUrl, autoPrint = false }) {
   const [charWidth, setCharWidth] = useState(defaultWidth);
 
-  // Hidden canvas — sole purpose is generating a PNG data URL for the print window
+  // Hidden canvas - sole purpose is generating a PNG data URL for the print window
   const qrCanvasContainerRef = useRef(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const autoPrinted = useRef(false);
@@ -100,7 +100,7 @@ ${qrBlock}
   return (
     <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-6">
 
-      {/* Off-screen canvas — only used to generate the PNG data URL for printing */}
+      {/* Off-screen canvas - only used to generate the PNG data URL for printing */}
       <div
         ref={qrCanvasContainerRef}
         style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none', opacity: 0 }}
@@ -149,7 +149,7 @@ ${qrBlock}
           </div>
         </div>
 
-        {/* Receipt paper — width driven by ch units so every character fits */}
+        {/* Receipt paper - width driven by ch units so every character fits */}
         <div className="p-4 bg-gray-100 flex justify-center overflow-x-auto">
           <div
             className="bg-white shadow-md"
@@ -163,7 +163,7 @@ ${qrBlock}
           >
             <pre style={preStyle} dangerouslySetInnerHTML={{ __html: beforeHtml }} />
 
-            {/* QR section — flexbox centres the SVG correctly (textAlign won't work on SVG) */}
+            {/* QR section - flexbox centres the SVG correctly (textAlign won't work on SVG) */}
             {hasQR && (
               <div style={{
                 width:         `${charWidth}ch`,

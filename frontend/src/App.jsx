@@ -35,7 +35,7 @@ import ClothingExchangesPage from './pages/ClothingExchangesPage';
 import ClothingAnalyticsPage from './pages/ClothingAnalyticsPage';
 import BranchManagementPage from './pages/BranchManagementPage';
 
-// QR Display (public — customer-facing mobile page)
+// QR Display (public - customer-facing mobile page)
 import QRDisplayPage from './pages/QRDisplayPage';
 
 // Car Wash module
@@ -73,14 +73,14 @@ function ShopTypeIndex() {
   return <Navigate to="/pos" replace />;
 }
 
-/** Guards a route behind a feature flag — redirects home if flag is false */
+/** Guards a route behind a feature flag - redirects home if flag is false */
 function FeatureRoute({ feature, children }) {
   const user = useAuthStore((s) => s.user);
   if (user?.[feature] === false) return <Navigate to="/" replace />;
   return children;
 }
 
-/** Guards a route to a specific shop_type — redirects home if type doesn't match */
+/** Guards a route to a specific shop_type - redirects home if type doesn't match */
 function ShopTypeRoute({ shopType, children }) {
   const user = useAuthStore((s) => s.user);
   if (user?.shop_type !== shopType) return <Navigate to="/" replace />;
@@ -166,7 +166,7 @@ export default function App() {
           <Route path="settings"    element={<SettingsPage />} />
           <Route path="pre-orders"  element={<FeatureRoute feature="pre_orders_enabled"><PreOrdersPage /></FeatureRoute>} />
           <Route path="customers"   element={<FeatureRoute feature="customers_enabled"><CustomersPage /></FeatureRoute>} />
-          {/* Clothing module routes — also require correct shop type */}
+          {/* Clothing module routes - also require correct shop type */}
           <Route path="exchanges"          element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="exchanges_enabled"><ClothingExchangesPage /></FeatureRoute></ShopTypeRoute>} />
           <Route path="clothing-analytics" element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="analytics_enabled"><ClothingAnalyticsPage /></FeatureRoute></ShopTypeRoute>} />
           <Route path="branches"           element={<ShopTypeRoute shopType="clothing"><FeatureRoute feature="branches_enabled"><BranchManagementPage /></FeatureRoute></ShopTypeRoute>} />

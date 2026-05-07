@@ -12,10 +12,10 @@ const STATUS_BADGE = {
 };
 
 function fmtDate(raw, opts) {
-  if (!raw) return '—';
+  if (!raw) return '-';
   const datePart = String(raw).slice(0, 10);
   const d = new Date(datePart + 'T00:00:00');
-  return isNaN(d) ? '—' : d.toLocaleDateString('en-US', opts);
+  return isNaN(d) ? '-' : d.toLocaleDateString('en-US', opts);
 }
 
 export default function CarWashStaffView() {

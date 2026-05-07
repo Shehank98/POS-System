@@ -9,7 +9,7 @@ import { adminApi } from '../../api/client';
 
 const fmt     = new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 });
 const fmtMoney = (n) => `LKR ${fmt.format(Number(n) || 0)}`;
-const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '-';
 const todayISO = () => new Date().toISOString().split('T')[0];
 
 const STATUS_CHIP = {
@@ -43,7 +43,7 @@ function PayoutModal({ agent, commissions, onClose, onDone }) {
         agent_id:       agent.id,
         ...form,
       });
-      toast.success(`Marked ${data.paid_count} commission(s) as paid — ${fmtMoney(data.total_amount)}`);
+      toast.success(`Marked ${data.paid_count} commission(s) as paid - ${fmtMoney(data.total_amount)}`);
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Payout failed');
@@ -70,7 +70,7 @@ function PayoutModal({ agent, commissions, onClose, onDone }) {
             {agent.bank_name && (
               <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400 space-y-0.5">
                 <p><span className="text-gray-500">Account:</span> {agent.account_holder} · {agent.bank_account}</p>
-                <p><span className="text-gray-500">Bank:</span> {agent.bank_name}{agent.bank_branch ? ` — ${agent.bank_branch}` : ''}</p>
+                <p><span className="text-gray-500">Bank:</span> {agent.bank_name}{agent.bank_branch ? ` - ${agent.bank_branch}` : ''}</p>
               </div>
             )}
             {!agent.bank_name && (
@@ -157,7 +157,7 @@ function AgentCommissionCard({ agent, commissions, onRefresh }) {
     setApproving(true);
     try {
       const { data } = await adminApi.approveCommissions({ commission_ids: ids, agent_id: agent.id });
-      toast.success(`Approved ${data.approved_count} commission(s) — ${fmtMoney(data.total_amount)}`);
+      toast.success(`Approved ${data.approved_count} commission(s) - ${fmtMoney(data.total_amount)}`);
       setSelected(new Set());
       onRefresh();
     } catch (err) {
@@ -400,9 +400,9 @@ function PayoutHistoryTab() {
                   {l.bank_name && <p className="text-xs text-gray-500">{l.account_holder} · {l.bank_account}</p>}
                 </td>
                 <td className="px-4 py-3 font-semibold text-green-400 whitespace-nowrap">{fmtMoney(l.amount)}</td>
-                <td className="px-4 py-3 text-gray-300 capitalize">{l.payment_method?.replace(/_/g, ' ') || '—'}</td>
-                <td className="px-4 py-3 text-gray-400 font-mono text-xs">{l.transaction_reference || '—'}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{l.notes || '—'}</td>
+                <td className="px-4 py-3 text-gray-300 capitalize">{l.payment_method?.replace(/_/g, ' ') || '-'}</td>
+                <td className="px-4 py-3 text-gray-400 font-mono text-xs">{l.transaction_reference || '-'}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{l.notes || '-'}</td>
               </tr>
             ))}
           </tbody>

@@ -7,7 +7,7 @@ const BASE = import.meta.env.VITE_API_URL
 /**
  * Canonical receipt size key stored in localStorage.
  * Settings page saves '80mm' | '58mm' | 'a4'.
- * 'narrow' was the legacy key for 58mm — normalised transparently.
+ * 'narrow' was the legacy key for 58mm - normalised transparently.
  */
 export function getReceiptSize() {
   const raw = localStorage.getItem('pos_receipt_size');
