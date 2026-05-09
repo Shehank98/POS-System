@@ -22,7 +22,7 @@ class AuthInterceptor extends Interceptor {
     if (err.response?.statusCode == 401) {
       final body = err.response?.data;
       final errorMsg = body is Map ? (body['error'] as String? ?? '') : '';
-      // Only clear session if token is invalid/expired — not for permission errors
+      // Only clear session if token is invalid/expired - not for permission errors
       if (errorMsg.contains('token') || errorMsg.contains('Token')) {
         await _ref.read(secureStorageProvider).deleteAll();
         _ref.invalidate(secureStorageProvider);

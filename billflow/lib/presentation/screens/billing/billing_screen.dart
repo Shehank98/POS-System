@@ -34,7 +34,7 @@ class BillingScreen extends ConsumerWidget {
       statusIcon = Icons.warning_amber_rounded;
     } else {
       statusColor = AppColors.danger;
-      statusLabel = 'Expired — Access Restricted';
+      statusLabel = 'Expired - Access Restricted';
       statusIcon = Icons.block;
     }
 
@@ -187,7 +187,7 @@ class BillingScreen extends ConsumerWidget {
               _RenewalStep(
                   step: '3',
                   text:
-                      'Log out and log back in — full access restores automatically.'),
+                      'Log out and log back in - full access restores automatically.'),
             ],
           ),
 

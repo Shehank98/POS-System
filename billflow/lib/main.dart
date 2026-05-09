@@ -35,7 +35,7 @@ Future<void> _initFirebase() async {
     await Firebase.initializeApp();
     await PushNotificationService.initialize();
   } catch (e) {
-    // ignore — push notifications disabled if Firebase not configured
+    // ignore - push notifications disabled if Firebase not configured
     debugPrint('Firebase init error: $e');
   }
 }

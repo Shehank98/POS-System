@@ -431,7 +431,7 @@ class _JobCard extends ConsumerWidget {
                 const Icon(Icons.directions_car, size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  job.vehicleNumber ?? '—',
+                  job.vehicleNumber ?? '-',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 15),
                 ),
@@ -821,7 +821,7 @@ class _CreateJobSheetState extends ConsumerState<_CreateJobSheet> {
                 label: Text(
                   _selectedServices.isEmpty
                       ? 'Select at least one service'
-                      : 'Create Job — ${formatCurrency(_total)}',
+                      : 'Create Job - ${formatCurrency(_total)}',
                   style: const TextStyle(
                       fontSize: 15, fontWeight: FontWeight.bold),
                 ),

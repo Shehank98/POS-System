@@ -73,7 +73,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
             await storage.saveBiometricEnabled(true);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Fingerprint login enabled — active on next app open'),
+                content: Text('Fingerprint login enabled - active on next app open'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -282,7 +282,7 @@ class _CarServiceScaffold extends ConsumerWidget {
     final productsEnabled = ref.watch(carServiceProductsEnabledProvider);
     final location = GoRouterState.of(context).matchedLocation;
 
-    // My Jobs tab — visible to all roles but shown in main nav for staff
+    // My Jobs tab - visible to all roles but shown in main nav for staff
     // For owners/managers it goes in More sheet; for staff it's a main tab
     final myJobsItem = const _NavItem(
       route: '/carwash',
@@ -588,7 +588,7 @@ class _GracePeriodBanner extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Subscription expires in $graceDays day${graceDays == 1 ? '' : 's'} — Tap to renew',
+                'Subscription expires in $graceDays day${graceDays == 1 ? '' : 's'} - Tap to renew',
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,

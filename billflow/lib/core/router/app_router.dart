@@ -104,7 +104,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggedIn && !needsBiometric) {
-        // Shop awaiting first payment — show holding screen, no POS access
+        // Shop awaiting first payment - show holding screen, no POS access
         if (user.isPendingPayment && loc != '/waiting-activation') {
           return '/waiting-activation';
         }
@@ -133,7 +133,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         pageBuilder: (_, s) => _fadeSlidePage(const LoginScreen(), s),
       ),
-      // Legacy path — redirected in guard above
+      // Legacy path - redirected in guard above
       GoRoute(
         path: '/agent-login',
         redirect: (_, __) => '/login?mode=agent',

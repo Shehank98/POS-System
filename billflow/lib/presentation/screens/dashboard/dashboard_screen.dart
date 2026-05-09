@@ -223,7 +223,7 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Account expired — Read Only Mode',
+                        'Account expired - Read Only Mode',
                         style: TextStyle(
                             color: AppColors.warning,
                             fontWeight: FontWeight.w600),

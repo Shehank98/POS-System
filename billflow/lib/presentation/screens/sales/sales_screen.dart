@@ -57,7 +57,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final isClothing = shopType == 'clothing';
     final isCarwash = shopType == 'car_wash';
 
-    // Carwash shops don't use product-based POS — redirect to carwash screen
+    // Carwash shops don't use product-based POS - redirect to carwash screen
     if (isCarwash) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/carwash');
@@ -701,7 +701,7 @@ class _CartSheet extends ConsumerWidget {
                         label: Text(
                           user?.readOnly == true
                               ? 'Read Only Mode'
-                              : 'Charge — ${formatCurrency(cart.total)}',
+                              : 'Charge - ${formatCurrency(cart.total)}',
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15),
                         ),

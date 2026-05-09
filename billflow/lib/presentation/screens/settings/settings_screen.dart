@@ -75,7 +75,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(enable
-            ? 'Fingerprint login enabled — active on next app open'
+            ? 'Fingerprint login enabled - active on next app open'
             : 'Fingerprint login disabled'),
       ));
     }
@@ -118,10 +118,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(user?.username ?? '—',
+                        Text(user?.username ?? '-',
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text(user?.shopName ?? '—',
+                        Text(user?.shopName ?? '-',
                             style: TextStyle(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -249,8 +249,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   user?.subscriptionStatus == 'active'
                       ? 'Active'
                       : user?.inGracePeriod == true
-                          ? 'Grace period — ${user?.graceDaysRemaining} days left'
-                          : 'Expired — renew to restore access',
+                          ? 'Grace period - ${user?.graceDaysRemaining} days left'
+                          : 'Expired - renew to restore access',
                   style: TextStyle(
                     color: isLocked ? Colors.red : Colors.grey,
                     fontSize: 12,
@@ -285,7 +285,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.store_outlined),
                   title: const Text('Shop Type'),
-                  trailing: Text(user?.shopType ?? '—',
+                  trailing: Text(user?.shopType ?? '-',
                       style: const TextStyle(color: Colors.grey)),
                 ),
               ],

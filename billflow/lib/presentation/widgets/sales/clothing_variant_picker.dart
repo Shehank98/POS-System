@@ -346,7 +346,7 @@ class _VariantPickerSheetState extends ConsumerState<_VariantPickerSheet> {
                           ? 'Select size and color'
                           : _matchedVariant!.isOutOfStock
                               ? 'Out of Stock'
-                              : 'Add to Cart — Rs. ${formatNumber(_matchedVariant!.effectivePrice)}',
+                              : 'Add to Cart - Rs. ${formatNumber(_matchedVariant!.effectivePrice)}',
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold),
                     ),

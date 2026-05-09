@@ -30,7 +30,7 @@ class FeatureFlagRefresher extends AsyncNotifier<void> {
         PushNotificationService.subscribeToTopic('shop_${user.shopId}_alerts');
       } catch (_) {}
     } catch (_) {
-      // Silent fail — keep using cached flags until next successful refresh
+      // Silent fail - keep using cached flags until next successful refresh
     }
   }
 
@@ -40,11 +40,11 @@ class FeatureFlagRefresher extends AsyncNotifier<void> {
 final featureFlagRefresherProvider =
     AsyncNotifierProvider<FeatureFlagRefresher, void>(FeatureFlagRefresher.new);
 
-// ── Feature flag providers — one per admin-panel flag ─────────────────────────
+// ── Feature flag providers - one per admin-panel flag ─────────────────────────
 // These are read-only derived views of the user object in authProvider.
 // The admin panel maps exactly to these field names in the shops table.
 
-// Barcode Scanner — Hardware/camera barcode at POS
+// Barcode Scanner - Hardware/camera barcode at POS
 final barcodeEnabledProvider = Provider<bool>((ref) =>
     ref.watch(authProvider).valueOrNull?.barcodeEnabled ?? false);
 

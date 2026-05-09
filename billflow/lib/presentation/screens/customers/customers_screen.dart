@@ -479,7 +479,7 @@ class _CancellationBanner extends StatelessWidget {
           Expanded(
             child: Text(
               tracking.cooldownActive
-                  ? '${tracking.totalCancellations} cancellations — Cooldown active'
+                  ? '${tracking.totalCancellations} cancellations - Cooldown active'
                   : '${tracking.totalCancellations} cancellation${tracking.totalCancellations == 1 ? '' : 's'} on record',
               style: TextStyle(
                   fontSize: 13, color: Colors.orange.shade900),

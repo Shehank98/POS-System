@@ -14,7 +14,7 @@ const _kNotificationDetails = NotificationDetails(
   ),
 );
 
-// Top-level background handler — runs in a separate Dart isolate.
+// Top-level background handler - runs in a separate Dart isolate.
 // Backend sends data-only FCM messages (no 'notification' field) so Android
 // does not auto-show a system notification, and this handler shows exactly one.
 @pragma('vm:entry-point')

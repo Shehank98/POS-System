@@ -302,7 +302,7 @@ class _ActionButtons extends ConsumerWidget {
                         await notifier.markAsPaid(order.id);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('QR payment confirmed — order marked paid'), backgroundColor: Color(0xFF00C853)),
+                            const SnackBar(content: Text('QR payment confirmed - order marked paid'), backgroundColor: Color(0xFF00C853)),
                           );
                         }
                       },

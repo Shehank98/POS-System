@@ -15,7 +15,7 @@ class UserModel {
   final int graceDaysRemaining;
   final double? daysUntilExpiry;
 
-  // ── Feature flags — exact match to admin panel ───────────────
+  // ── Feature flags - exact match to admin panel ───────────────
   // Barcode Scanner (Hardware/camera barcode at POS)
   // (barcodeEnabled is already a top-level field above)
 

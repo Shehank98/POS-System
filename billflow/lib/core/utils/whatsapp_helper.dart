@@ -102,7 +102,7 @@ class WhatsAppHelper {
       for (final item in txn.items!) {
         final name = item.productName ?? 'Item';
         buf.writeln(
-            '$name x${formatNumber(item.quantity)} — ${formatCurrency(item.subtotal)}');
+            '$name x${formatNumber(item.quantity)} - ${formatCurrency(item.subtotal)}');
       }
     }
     buf.writeln('──────────────────────');

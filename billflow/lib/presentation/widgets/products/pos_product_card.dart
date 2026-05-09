@@ -47,7 +47,7 @@ class PosProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Name — up to 2 lines
+              // Name - up to 2 lines
               Text(
                 product.name,
                 maxLines: 2,
