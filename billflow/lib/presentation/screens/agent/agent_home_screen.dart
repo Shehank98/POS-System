@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/agent_model.dart';
 import '../../../data/services/agent_service.dart';
@@ -13,7 +16,7 @@ import '../../widgets/common/shimmer_list.dart';
 final _currFmt = NumberFormat('#,##0.00', 'en_US');
 String fmtMoney(double v) => 'LKR ${_currFmt.format(v)}';
 String fmtDate(DateTime? d) =>
-    d == null ? '—' : DateFormat('dd MMM yyyy').format(d);
+    d == null ? '-' : DateFormat('dd MMM yyyy').format(d);
 
 // ── Status helpers ────────────────────────────────────────────
 Color _subColor(String status) {
@@ -177,7 +180,7 @@ class _DashboardTab extends ConsumerWidget {
                       Text(
                         s['subscription_end_date'] != null
                             ? fmtDate(DateTime.tryParse(s['subscription_end_date'] as String))
-                            : '—',
+                            : '-',
                         style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                       ),
                     ]),
@@ -204,17 +207,17 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
   int _step = 0;
   bool _saving = false;
 
-  // Step 1 — shop info
+  // Step 1 - shop info
   final _nameCtrl    = TextEditingController();
   final _ownerCtrl   = TextEditingController();
   final _emailCtrl   = TextEditingController();
   final _phoneCtrl   = TextEditingController();
   final _addressCtrl = TextEditingController();
-  // Step 2 — login
+  // Step 2 - login
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePw = true;
-  // Step 3 — plan
+  // Step 3 - plan
   List<Map<String, dynamic>> _plans = [];
   int? _selectedPlanId;
   int _months = 1;
@@ -412,7 +415,7 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               if (_plans.isEmpty)
-                Text('No plans available — shop will be created without a plan.',
+                Text('No plans available - shop will be created without a plan.',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), fontSize: 13))
               else ...[
                 ..._plans.map((p) {
@@ -513,7 +516,7 @@ class _OnboardWizardSheetState extends ConsumerState<_OnboardWizardSheet>
                 ['Email',      _emailCtrl.text],
                 if (_phoneCtrl.text.isNotEmpty) ['Phone', _phoneCtrl.text],
                 ['Username',   _usernameCtrl.text],
-                ['Plan',       _plans.firstWhere((p) => p['id'] == _selectedPlanId, orElse: () => {'name': '— no plan'})['name'].toString()],
+                ['Plan',       _plans.firstWhere((p) => p['id'] == _selectedPlanId, orElse: () => {'name': '- no plan'})['name'].toString()],
                 ['Duration',   '$_months month${_months > 1 ? 's' : ''}'],
                 if (price != null) ['Expected Amt', fmtMoney(price)],
               ].map((row) => Padding(
@@ -737,7 +740,7 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                   color: Theme.of(context).colorScheme.surface,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () {}, // placeholder for detail view
+                    onTap: () => _showShopDetail(context, ref, c),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -814,6 +817,15 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
     'expired' => AppColors.danger,
     _         => AppColors.primary,
   };
+
+  void _showShopDetail(BuildContext context, WidgetRef ref, AgentCustomer c) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ShopDetailSheet(customer: c, ref: ref),
+    );
+  }
 }
 
 class _StatusDot extends StatelessWidget {
@@ -953,7 +965,7 @@ class _PaymentsTabState extends ConsumerState<_PaymentsTab> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Payment submitted — awaiting admin verification')),
+                      const SnackBar(content: Text('Payment submitted - awaiting admin verification')),
                     );
                   }
                 } catch (e) {
@@ -1274,10 +1286,10 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
 
               if (!_editingBank) ...[
                 for (final row in [
-                  ['Bank',    agent.bankName ?? '—'],
-                  ['Account', agent.bankAccount ?? '—'],
-                  ['Branch',  agent.bankBranch ?? '—'],
-                  ['Holder',  agent.accountHolder ?? '—'],
+                  ['Bank',    agent.bankName ?? '-'],
+                  ['Account', agent.bankAccount ?? '-'],
+                  ['Branch',  agent.bankBranch ?? '-'],
+                  ['Holder',  agent.accountHolder ?? '-'],
                 ])
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -1340,6 +1352,485 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
   }
 }
 
+// ── Shop detail bottom sheet ──────────────────────────────────
+class _ShopDetailSheet extends StatefulWidget {
+  final AgentCustomer customer;
+  final WidgetRef ref;
+  const _ShopDetailSheet({required this.customer, required this.ref});
+
+  @override
+  State<_ShopDetailSheet> createState() => _ShopDetailSheetState();
+}
+
+class _ShopDetailSheetState extends State<_ShopDetailSheet> {
+  final _noteCtrl = TextEditingController();
+  bool _savingNote = false;
+
+  AgentCustomer get c => widget.customer;
+
+  @override
+  void dispose() { _noteCtrl.dispose(); super.dispose(); }
+
+  Future<void> _saveNote() async {
+    final note = _noteCtrl.text.trim();
+    if (note.isEmpty) return;
+    setState(() => _savingNote = true);
+    try {
+      await widget.ref.read(agentServiceProvider).saveShopNote(c.id, note);
+      _noteCtrl.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Note saved')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _savingNote = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _subColor(c.subscriptionStatus);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, ctrl) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(children: [
+          const SizedBox(height: 8),
+          Container(width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 4),
+          Expanded(child: ListView(controller: ctrl, padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
+            // Header
+            Row(children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: statusColor.withValues(alpha: 0.15),
+                child: Text(c.name[0].toUpperCase(),
+                    style: TextStyle(color: statusColor,
+                        fontWeight: FontWeight.bold, fontSize: 18)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(c.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(c.ownerName,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              ])),
+              _StatusDot(status: c.subscriptionStatus, color: statusColor),
+            ]),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            // Info rows
+            if (c.email.isNotEmpty)
+              _InfoRow(icon: Icons.email_outlined, label: 'Email', value: c.email),
+            if (c.phone != null && c.phone!.isNotEmpty)
+              _InfoRow(icon: Icons.phone_outlined, label: 'Phone', value: c.phone!),
+            if (c.planName != null)
+              _InfoRow(icon: Icons.workspace_premium_outlined,
+                  label: 'Plan', value: c.planName!),
+            if (c.subscriptionEndDate != null)
+              _InfoRow(icon: Icons.calendar_today_outlined, label: 'Expires',
+                  value: fmtDate(c.subscriptionEndDate)),
+            if (c.expectedAmount != null)
+              _InfoRow(icon: Icons.payments_outlined, label: 'Expected',
+                  value: fmtMoney(c.expectedAmount!)),
+            const SizedBox(height: 20),
+            // Actions
+            if (c.isPendingPayment) ...[
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => _ShopPaymentQRSheet(
+                      shopId: c.id, shopName: c.name,
+                      onSuccess: () {
+                        widget.ref.invalidate(agentCustomersProvider);
+                        widget.ref.invalidate(agentDashboardProvider);
+                      },
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.qr_code),
+                label: const Text('Generate HelaPay QR'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1B5E20),
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 4),
+            // Note field
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Add note',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: _savingNote
+                      ? const SizedBox(height: 18, width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.send_outlined),
+                  onPressed: _savingNote ? null : _saveNote,
+                ),
+              ),
+            ),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(children: [
+      Icon(icon, size: 16, color: Colors.grey[500]),
+      const SizedBox(width: 8),
+      Text('$label: ', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+      Expanded(child: Text(value,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+    ]),
+  );
+}
+
+// ── Shop payment QR sheet ─────────────────────────────────────
+class _ShopPaymentQRSheet extends ConsumerStatefulWidget {
+  final int shopId;
+  final String shopName;
+  final VoidCallback onSuccess;
+  const _ShopPaymentQRSheet({
+    required this.shopId,
+    required this.shopName,
+    required this.onSuccess,
+  });
+
+  @override
+  ConsumerState<_ShopPaymentQRSheet> createState() => _ShopPaymentQRSheetState();
+}
+
+class _ShopPaymentQRSheetState extends ConsumerState<_ShopPaymentQRSheet> {
+  AgentShopQR? _qr;
+  String? _error;
+  bool _loading = true;
+  bool _success = false;
+  Timer? _pollTimer;
+  Timer? _countdownTimer;
+  int _secondsLeft = 600;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateQR();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _generateQR() async {
+    setState(() { _loading = true; _error = null; _qr = null; });
+    try {
+      _qr = await ref.read(agentServiceProvider).generateShopPaymentQR(widget.shopId);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _secondsLeft = _qr!.expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 600);
+        });
+        _startPolling();
+        _startCountdown();
+      }
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_qr == null || !mounted) return;
+      try {
+        final status = await ref.read(agentServiceProvider)
+            .getShopPaymentQRStatus(widget.shopId, _qr!.reference);
+        final paymentStatus = status['payment_status'];
+        if (paymentStatus == 2 || paymentStatus == '2') {
+          _pollTimer?.cancel();
+          _countdownTimer?.cancel();
+          if (mounted) {
+            setState(() => _success = true);
+            widget.onSuccess();
+          }
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _secondsLeft = (_secondsLeft - 1).clamp(0, 600));
+      if (_secondsLeft == 0) {
+        _pollTimer?.cancel();
+        _countdownTimer?.cancel();
+      }
+    });
+  }
+
+  String get _timeLeft {
+    final m = _secondsLeft ~/ 60;
+    final s = _secondsLeft % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 16),
+        Text('HelaPay QR - ${widget.shopName}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 4),
+        Text('LKR 2,500.00 activation payment',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+        const SizedBox(height: 20),
+
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: CircularProgressIndicator(),
+          )
+        else if (_success)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(children: [
+              const Icon(Icons.check_circle, color: AppColors.success, size: 72),
+              const SizedBox(height: 12),
+              const Text('Payment Received!',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18,
+                      color: AppColors.success)),
+              const SizedBox(height: 6),
+              Text('${widget.shopName} is now active',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+                child: const Text('Done'),
+              ),
+            ]),
+          )
+        else if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(children: [
+              const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+              const SizedBox(height: 12),
+              Text(_error!, textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.danger)),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: _generateQR,
+                child: const Text('Retry'),
+              ),
+            ]),
+          )
+        else if (_qr != null) ...[
+          if (_secondsLeft == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(children: [
+                const Icon(Icons.timer_off_outlined, size: 48, color: Colors.orange),
+                const SizedBox(height: 12),
+                const Text('QR Expired', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: _generateQR, child: const Text('Generate New QR')),
+              ]),
+            )
+          else ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: QrImageView(
+                data: _qr!.qrData,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.timer_outlined, size: 14, color: Colors.orange),
+              const SizedBox(width: 4),
+              Text('Expires in $_timeLeft',
+                  style: const TextStyle(fontSize: 12, color: Colors.orange,
+                      fontWeight: FontWeight.w500)),
+            ]),
+            const SizedBox(height: 8),
+            Text('Ref: ${_qr!.reference}',
+                style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+          ],
+        ],
+
+        if (!_success && !_loading) ...[
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 44)),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+// ── Agent notifications sheet ─────────────────────────────────
+class _AgentNotificationsSheet extends ConsumerStatefulWidget {
+  const _AgentNotificationsSheet();
+
+  @override
+  ConsumerState<_AgentNotificationsSheet> createState() =>
+      _AgentNotificationsSheetState();
+}
+
+class _AgentNotificationsSheetState
+    extends ConsumerState<_AgentNotificationsSheet> {
+  Future<void> _markAllRead() async {
+    await ref.read(agentServiceProvider).markAllNotificationsRead();
+    ref.invalidate(agentNotificationsProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifs = ref.watch(agentNotificationsProvider);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(children: [
+        const SizedBox(height: 8),
+        Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2))),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+          child: Row(children: [
+            const Text('Notifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Spacer(),
+            TextButton(
+              onPressed: _markAllRead,
+              child: const Text('Mark all read', style: TextStyle(fontSize: 12)),
+            ),
+          ]),
+        ),
+        const Divider(height: 1),
+        Expanded(child: notifs.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('$e')),
+          data: (list) {
+            if (list.isEmpty) {
+              return Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.notifications_none_outlined,
+                      size: 48, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  Text('No notifications yet',
+                      style: TextStyle(color: Colors.grey[500])),
+                ]),
+              );
+            }
+            return ListView.builder(
+              itemCount: list.length,
+              itemBuilder: (_, i) {
+                final n = list[i];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: n.isRead
+                        ? Colors.grey[100]
+                        : const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                    child: Icon(
+                      _notifIcon(n.type),
+                      color: n.isRead ? Colors.grey : const Color(0xFF1B5E20),
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(n.title,
+                      style: TextStyle(
+                          fontWeight: n.isRead ? FontWeight.normal : FontWeight.bold,
+                          fontSize: 13)),
+                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(n.body, style: const TextStyle(fontSize: 12)),
+                    Text(fmtDate(n.createdAt),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                  ]),
+                  isThreeLine: true,
+                  onTap: n.isRead ? null : () async {
+                    await ref.read(agentServiceProvider).markNotificationRead(n.id);
+                    ref.invalidate(agentNotificationsProvider);
+                  },
+                );
+              },
+            );
+          },
+        )),
+      ]),
+    );
+  }
+
+  IconData _notifIcon(String type) => switch (type) {
+    'shop_activated' => Icons.store_outlined,
+    'commission_unlocked' => Icons.account_balance_wallet_outlined,
+    'payment_verified' => Icons.check_circle_outline,
+    _ => Icons.notifications_outlined,
+  };
+}
+
 // ── Agent Home Screen (tab container) ─────────────────────────
 class AgentHomeScreen extends ConsumerStatefulWidget {
   const AgentHomeScreen({super.key});
@@ -1394,7 +1885,7 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
           ref.invalidate(agentDashboardProvider);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Shop onboarded — awaiting payment')),
+              const SnackBar(content: Text('Shop onboarded - awaiting payment')),
             );
           }
         },
@@ -1468,6 +1959,28 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
         title: Text(_tabLabels[_tab],
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         actions: [
+          // Notification bell
+          Consumer(builder: (_, ref, __) {
+            final notifs = ref.watch(agentNotificationsProvider).valueOrNull ?? [];
+            final unread = notifs.where((n) => !n.isRead).length;
+            return IconButton(
+              icon: Badge(
+                isLabelVisible: unread > 0,
+                label: Text('$unread'),
+                child: const Icon(Icons.notifications_outlined, color: Colors.white),
+              ),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SizedBox(
+                  height: 500,
+                  child: _AgentNotificationsSheet(),
+                ),
+              ),
+            );
+          }),
           if (agent != null)
             Padding(
               padding: const EdgeInsets.only(right: 14),

@@ -107,6 +107,71 @@ class AgentService {
     final res = await _dio.get(ApiConstants.agentPlans, options: await _authOpts());
     return (res.data as List).cast<Map<String, dynamic>>();
   }
+
+  // ── Shop Payment QR (agent pays HelaPay on behalf of a shop) ──────────
+  Future<AgentShopQR> generateShopPaymentQR(int shopId) async {
+    final res = await _dio.post(
+      ApiConstants.agentShopPaymentQR(shopId),
+      options: await _authOpts(),
+    );
+    return AgentShopQR.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> getShopPaymentQRStatus(int shopId, String ref) async {
+    final res = await _dio.get(
+      ApiConstants.agentShopPaymentQRStatus(shopId, ref),
+      options: await _authOpts(),
+    );
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ── Deposit QR (agent top-up wallet via HelaPay) ──────────────────────
+  Future<AgentDepositQR> generateDepositQR(double amount) async {
+    final res = await _dio.post(
+      ApiConstants.agentDepositQR,
+      data: {'amount': amount},
+      options: await _authOpts(),
+    );
+    return AgentDepositQR.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> getDepositQRStatus(String ref) async {
+    final res = await _dio.get(
+      ApiConstants.agentDepositStatus(ref),
+      options: await _authOpts(),
+    );
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getDepositHistory() async {
+    final res = await _dio.get(ApiConstants.agentDepositHistory, options: await _authOpts());
+    return (res.data as List).cast<Map<String, dynamic>>();
+  }
+
+  // ── Shop note ─────────────────────────────────────────────────────────
+  Future<void> saveShopNote(int shopId, String note) async {
+    await _dio.put(
+      ApiConstants.agentShopNote(shopId),
+      data: {'note': note},
+      options: await _authOpts(),
+    );
+  }
+
+  // ── Notifications ──────────────────────────────────────────────────────
+  Future<List<AgentNotification>> getNotifications() async {
+    final res = await _dio.get(ApiConstants.agentNotifications, options: await _authOpts());
+    return (res.data as List)
+        .map((e) => AgentNotification.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> markNotificationRead(int id) async {
+    await _dio.put(ApiConstants.agentNotificationRead(id), options: await _authOpts());
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await _dio.put(ApiConstants.agentNotificationsReadAll, options: await _authOpts());
+  }
 }
 
 final agentServiceProvider = Provider<AgentService>((ref) => AgentService(

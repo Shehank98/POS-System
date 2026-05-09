@@ -16,6 +16,11 @@ final _allPaymentsProvider =
   return ref.read(adminServiceProvider).getAllPayments();
 });
 
+final _shopPaymentsProvider =
+    FutureProvider.autoDispose<List<AdminShopPayment>>((ref) {
+  return ref.read(adminServiceProvider).getShopPayments();
+});
+
 class AdminPaymentsScreen extends ConsumerStatefulWidget {
   const AdminPaymentsScreen({super.key});
 
@@ -26,7 +31,7 @@ class AdminPaymentsScreen extends ConsumerStatefulWidget {
 
 class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen>
     with SingleTickerProviderStateMixin {
-  late final _tabCtrl = TabController(length: 2, vsync: this);
+  late final _tabCtrl = TabController(length: 3, vsync: this);
 
   @override
   void dispose() {
@@ -50,6 +55,14 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen>
                 text: count > 0 ? 'Pending ($count)' : 'Pending');
           }),
           const Tab(text: 'All Payments'),
+          Consumer(builder: (_, ref, __) {
+            final count = ref
+                    .watch(_shopPaymentsProvider)
+                    .valueOrNull
+                    ?.where((p) => p.status == 'pending')
+                    .length ?? 0;
+            return Tab(text: count > 0 ? 'Shop Pays ($count)' : 'Shop Pays');
+          }),
         ],
       ),
       Expanded(
@@ -66,6 +79,7 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen>
               showActions: false,
               emptyMessage: 'No payments yet',
             ),
+            _ShopPaymentList(),
           ],
         ),
       ),
@@ -127,7 +141,7 @@ class _PaymentList extends ConsumerWidget {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                       content: Text(action == 'verify'
-                          ? 'Payment verified — shop activated'
+                          ? 'Payment verified - shop activated'
                           : 'Payment rejected'),
                       backgroundColor:
                           action == 'verify' ? Colors.green : Colors.red,
@@ -315,5 +329,182 @@ class _PaymentTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ── Shop self-payments list ───────────────────────────────────────────────
+class _ShopPaymentList extends ConsumerWidget {
+  const _ShopPaymentList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = NumberFormat('#,##0.00', 'en_US');
+    final payments = ref.watch(_shopPaymentsProvider);
+
+    return payments.when(
+      loading: () => const ShimmerList(itemCount: 5),
+      error: (e, _) => Center(child: Text('$e')),
+      data: (list) {
+        if (list.isEmpty) {
+          return Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text('No shop payments yet', style: TextStyle(color: Colors.grey[500])),
+            ]),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () => ref.refresh(_shopPaymentsProvider.future),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: list.length,
+            itemBuilder: (_, i) {
+              final p = list[i];
+              final statusColor = switch (p.status) {
+                'verified' => Colors.green,
+                'rejected' => Colors.red,
+                _ => Colors.orange,
+              };
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(p.shopName,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text(p.paymentMethod.replaceAll('_', ' '),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[500])),
+                      ])),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                        Text('LKR ${fmt.format(p.amount)}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(p.status,
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: statusColor,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ]),
+                    ]),
+                    if (p.adminNote != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('Note: ${p.adminNote}',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.red[700])),
+                      ),
+                    ],
+                    if (p.status == 'pending') ...[
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Expanded(child: OutlinedButton(
+                          onPressed: () => _reject(context, ref, p.id),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red)),
+                          child: const Text('Reject'),
+                        )),
+                        const SizedBox(width: 10),
+                        Expanded(child: FilledButton(
+                          onPressed: () => _verify(context, ref, p.id),
+                          style: FilledButton.styleFrom(
+                              backgroundColor: Colors.green),
+                          child: const Text('Verify'),
+                        )),
+                      ]),
+                    ],
+                  ]),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _verify(BuildContext context, WidgetRef ref, int id) async {
+    try {
+      await ref.read(adminServiceProvider).verifyShopPayment(id);
+      ref.invalidate(_shopPaymentsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment verified - shop activated'),
+              backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _reject(BuildContext context, WidgetRef ref, int id) async {
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reject Shop Payment'),
+        content: TextField(
+          controller: noteCtrl,
+          decoration: const InputDecoration(labelText: 'Reason (optional)'),
+          maxLines: 2,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(adminServiceProvider)
+          .rejectShopPayment(id, noteCtrl.text.trim());
+      ref.invalidate(_shopPaymentsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment rejected')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 }

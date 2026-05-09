@@ -121,6 +121,16 @@ class ApiConstants {
   static const String agentNotificationsReadAll = '/agents/me/notifications/read-all';
   static String agentNotificationRead(int id) => '/agents/me/notifications/$id/read';
   static String agentEditCustomer(int shopId) => '/agents/me/customers/$shopId';
+  // Agent shop payment QR
+  static String agentShopPaymentQR(int shopId) => '/agents/me/shops/$shopId/payment-qr';
+  static String agentShopPaymentQRStatus(int shopId, String ref) => '/agents/me/shops/$shopId/payment-qr/status/$ref';
+  static String agentShopPayments(int shopId) => '/agents/me/shops/$shopId/payments';
+  static String agentShopNote(int shopId) => '/agents/me/shops/$shopId/note';
+  // Agent deposit QR (wallet top-up)
+  static const String agentDepositQR      = '/agents/me/deposit/generate-qr';
+  static String agentDepositStatus(String ref) => '/agents/me/deposit/status/$ref';
+  static const String agentDepositHistory  = '/agents/me/deposit/history';
+  static const String agentSubscriptions   = '/agents/me/subscriptions';
 
   // ── Admin ─────────────────────────────────────────────────────
   static const String adminLogin        = '/admin/login';
@@ -141,6 +151,31 @@ class ApiConstants {
   static const String adminAgentPayout  = '/admin/agent-commissions/payout';
   static const String adminPlans        = '/admin/plans';
   static String adminPlanById(int id)   => '/admin/plans/$id';
-  static const String adminAuditLog             = '/admin/audit-log';
+  static const String adminAuditLog              = '/admin/audit-log';
   static const String adminNotificationsDispatch = '/admin/notifications/dispatch';
+  // Admin commission management
+  static const String adminCommissionsApprove    = '/admin/agent-commissions/approve';
+  static const String adminPayoutLogs            = '/admin/agent-payout-logs';
+  // Admin broader views
+  static const String adminShopsByAgent          = '/admin/shops-by-agent';
+  static const String adminFinancialSummary      = '/admin/financial-summary';
+  // Admin shop extras
+  static String adminShopSales(int id)           => '/admin/shops/$id/sales';
+  static String adminShopUsers(int id)           => '/admin/shops/$id/users';
+  static String adminShopUserById(int s, int u)  => '/admin/shops/$s/users/$u';
+  // Admin shop self-payments
+  static const String adminShopPayments          = '/admin/shop-payments';
+  static String adminShopPaymentVerify(int id)   => '/admin/shop-payments/$id/verify';
+  static String adminShopPaymentReject(int id)   => '/admin/shop-payments/$id/reject';
+  // Admin notifications
+  static const String adminNotifications         = '/admin/notifications';
+  static const String adminNotificationsReadAll  = '/admin/notifications/read-all';
+  static String adminNotificationRead(int id)    => '/admin/notifications/$id/read';
+  // Admin agent registration management
+  static String adminAgentApprove(int id)        => '/admin/agents/$id/approve';
+  static String adminAgentReject(int id)         => '/admin/agents/$id/reject';
+  static const String adminAgentRegistrations    = '/admin/agent-registrations';
+  static String adminAgentDocuments(int id)      => '/admin/agents/$id/documents';
+  static const String adminGenerateInvite        = '/admin/generate-agent-invite';
+  static String adminAgentBankDetails(int id)    => '/admin/agents/$id/bank-details';
 }

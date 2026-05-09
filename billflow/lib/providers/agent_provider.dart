@@ -21,3 +21,11 @@ final agentCommissionsProvider = FutureProvider.autoDispose<List<AgentCommission
 final agentRenewalsProvider = FutureProvider.autoDispose<List<AgentCustomer>>((ref) {
   return ref.read(agentServiceProvider).getRenewals();
 });
+
+final agentNotificationsProvider = FutureProvider.autoDispose<List<AgentNotification>>((ref) {
+  return ref.read(agentServiceProvider).getNotifications();
+});
+
+final agentDepositHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  return ref.read(agentServiceProvider).getDepositHistory();
+});

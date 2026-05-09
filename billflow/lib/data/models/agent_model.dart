@@ -1,4 +1,4 @@
-// Safe helpers — handles both numeric and string JSON values from PostgreSQL
+// Safe helpers - handles both numeric and string JSON values from PostgreSQL
 int _i(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
 double _d(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
@@ -255,5 +255,86 @@ class AgentDashboard {
         walletVerified:      _d(json['wallet_verified']),
         expiringSoon: (json['expiring_soon'] as List<dynamic>? ?? [])
             .cast<Map<String, dynamic>>(),
+      );
+}
+
+// ── AgentShopQR - HelaPay QR generated on behalf of a shop ───────────────
+class AgentShopQR {
+  final String reference;
+  final String qrData;
+  final double amount;
+  final String shopName;
+  final DateTime expiresAt;
+
+  const AgentShopQR({
+    required this.reference,
+    required this.qrData,
+    required this.amount,
+    required this.shopName,
+    required this.expiresAt,
+  });
+
+  factory AgentShopQR.fromJson(Map<String, dynamic> json) => AgentShopQR(
+        reference: json['reference'] as String? ?? '',
+        qrData:    json['qr_data']   as String? ?? '',
+        amount:    _d(json['amount']),
+        shopName:  json['shop_name'] as String? ?? '',
+        expiresAt: json['expires_at'] != null
+            ? DateTime.tryParse(json['expires_at'].toString()) ?? DateTime.now().add(const Duration(minutes: 10))
+            : DateTime.now().add(const Duration(minutes: 10)),
+      );
+}
+
+// ── AgentDepositQR - HelaPay QR to top up agent wallet ───────────────────
+class AgentDepositQR {
+  final String reference;
+  final String qrData;
+  final double amount;
+  final DateTime expiresAt;
+
+  const AgentDepositQR({
+    required this.reference,
+    required this.qrData,
+    required this.amount,
+    required this.expiresAt,
+  });
+
+  factory AgentDepositQR.fromJson(Map<String, dynamic> json) => AgentDepositQR(
+        reference: json['reference'] as String? ?? '',
+        qrData:    json['qr_data']   as String? ?? '',
+        amount:    _d(json['amount']),
+        expiresAt: json['expires_at'] != null
+            ? DateTime.tryParse(json['expires_at'].toString()) ?? DateTime.now().add(const Duration(minutes: 10))
+            : DateTime.now().add(const Duration(minutes: 10)),
+      );
+}
+
+// ── AgentNotification ─────────────────────────────────────────────────────
+class AgentNotification {
+  final int id;
+  final String type;
+  final String title;
+  final String body;
+  final bool isRead;
+  final DateTime createdAt;
+
+  const AgentNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  factory AgentNotification.fromJson(Map<String, dynamic> json) => AgentNotification(
+        id:        _i(json['id']),
+        type:      json['type']  as String? ?? '',
+        title:     json['title'] as String? ?? '',
+        body:      json['body']  as String? ?? json['message'] as String? ?? '',
+        isRead:    json['is_read'] == true,
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }

@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../providers/admin_auth_provider.dart';
+import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_shops_screen.dart';
 import 'admin_payments_screen.dart';
 import 'admin_agents_screen.dart';
 import 'admin_plans_screen.dart';
+import 'admin_commissions_screen.dart';
 
 class AdminHomeScreen extends ConsumerStatefulWidget {
   const AdminHomeScreen({super.key});
@@ -22,11 +25,12 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   int _tab = 0;
 
   static const _tabs = [
-    (icon: Icons.dashboard_outlined,          activeIcon: Icons.dashboard,          label: 'Dashboard'),
-    (icon: Icons.store_outlined,              activeIcon: Icons.store,              label: 'Shops'),
-    (icon: Icons.payments_outlined,           activeIcon: Icons.payments,           label: 'Payments'),
-    (icon: Icons.badge_outlined,              activeIcon: Icons.badge,              label: 'Agents'),
-    (icon: Icons.workspace_premium_outlined,  activeIcon: Icons.workspace_premium,  label: 'Plans'),
+    (icon: Icons.dashboard_outlined,             activeIcon: Icons.dashboard,             label: 'Dashboard'),
+    (icon: Icons.store_outlined,                 activeIcon: Icons.store,                 label: 'Shops'),
+    (icon: Icons.payments_outlined,              activeIcon: Icons.payments,              label: 'Payments'),
+    (icon: Icons.badge_outlined,                 activeIcon: Icons.badge,                 label: 'Agents'),
+    (icon: Icons.workspace_premium_outlined,     activeIcon: Icons.workspace_premium,     label: 'Plans'),
+    (icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet, label: 'Commissions'),
   ];
 
   static const _screens = [
@@ -35,9 +39,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     AdminPaymentsScreen(),
     AdminAgentsScreen(),
     AdminPlansScreen(),
+    AdminCommissionsScreen(),
   ];
 
-  static const _titles = ['Admin Dashboard', 'Shops', 'Payments', 'Agents', 'Plans'];
+  static const _titles = ['Admin Dashboard', 'Shops', 'Payments', 'Agents', 'Plans', 'Commissions'];
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +52,27 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
         actions: [
+          Consumer(builder: (_, ref, __) {
+            final notifs = ref.watch(_adminNotificationsProvider).valueOrNull ?? [];
+            final unread = notifs.where((n) => !n.isRead).length;
+            return IconButton(
+              icon: Badge(
+                isLabelVisible: unread > 0,
+                label: Text('$unread'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SizedBox(
+                  height: 520,
+                  child: _AdminNotificationsSheet(),
+                ),
+              ),
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () => _showMoreSheet(context),
@@ -134,6 +160,112 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
           return result;
         },
       ),
+    );
+  }
+}
+
+// ── Admin notifications provider ─────────────────────────────────────────────
+final _adminNotificationsProvider =
+    FutureProvider.autoDispose<List<AdminNotification>>((ref) {
+  return ref.read(adminServiceProvider).getAdminNotifications();
+});
+
+// ── Admin notifications sheet ─────────────────────────────────────────────────
+class _AdminNotificationsSheet extends ConsumerStatefulWidget {
+  const _AdminNotificationsSheet();
+
+  @override
+  ConsumerState<_AdminNotificationsSheet> createState() =>
+      _AdminNotificationsSheetState();
+}
+
+class _AdminNotificationsSheetState
+    extends ConsumerState<_AdminNotificationsSheet> {
+  Future<void> _markAllRead() async {
+    await ref.read(adminServiceProvider).markAllAdminNotificationsRead();
+    ref.invalidate(_adminNotificationsProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifs = ref.watch(_adminNotificationsProvider);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(children: [
+        const SizedBox(height: 8),
+        Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2))),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+          child: Row(children: [
+            const Text('Notifications',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Spacer(),
+            TextButton(
+              onPressed: _markAllRead,
+              child: const Text('Mark all read', style: TextStyle(fontSize: 12)),
+            ),
+          ]),
+        ),
+        const Divider(height: 1),
+        Expanded(child: notifs.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('$e')),
+          data: (list) {
+            if (list.isEmpty) {
+              return Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.notifications_none_outlined,
+                      size: 48, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  Text('No notifications yet',
+                      style: TextStyle(color: Colors.grey[500])),
+                ]),
+              );
+            }
+            return ListView.builder(
+              itemCount: list.length,
+              itemBuilder: (_, i) {
+                final n = list[i];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: n.isRead
+                        ? Colors.grey[100]
+                        : const Color(0xFF1A237E).withValues(alpha: 0.1),
+                    child: Icon(
+                      Icons.notifications_outlined,
+                      color: n.isRead ? Colors.grey : const Color(0xFF1A237E),
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(n.title,
+                      style: TextStyle(
+                          fontWeight: n.isRead ? FontWeight.normal : FontWeight.bold,
+                          fontSize: 13)),
+                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(n.body, style: const TextStyle(fontSize: 12)),
+                    Text(
+                      n.createdAt != null
+                          ? DateFormat('dd MMM yyyy HH:mm').format(n.createdAt)
+                          : '-',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                    ),
+                  ]),
+                  isThreeLine: true,
+                  onTap: n.isRead ? null : () async {
+                    await ref.read(adminServiceProvider).markAdminNotificationRead(n.id);
+                    ref.invalidate(_adminNotificationsProvider);
+                  },
+                );
+              },
+            );
+          },
+        )),
+      ]),
     );
   }
 }

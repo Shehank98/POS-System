@@ -227,6 +227,11 @@ class _StatusChip extends StatelessWidget {
 
 // ── Shop Detail ────────────────────────────────────────────────────────
 
+final _shopUsersProvider =
+    FutureProvider.autoDispose.family<List<ShopUser>, int>((ref, shopId) {
+  return ref.read(adminServiceProvider).getShopUsers(shopId);
+});
+
 class AdminShopDetailScreen extends ConsumerStatefulWidget {
   final AdminShop shop;
   const AdminShopDetailScreen({super.key, required this.shop});
@@ -239,6 +244,7 @@ class AdminShopDetailScreen extends ConsumerStatefulWidget {
 class _AdminShopDetailScreenState
     extends ConsumerState<AdminShopDetailScreen> {
   bool _saving = false;
+  bool _deleting = false;
 
   void _showSubscriptionDialog() {
     final statusCtrl = TextEditingController(
@@ -319,6 +325,17 @@ class _AdminShopDetailScreenState
             onPressed: _showSubscriptionDialog,
             tooltip: 'Edit subscription',
           ),
+          IconButton(
+            icon: _deleting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.red))
+                : const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: _deleting ? null : () => _confirmDelete(context),
+            tooltip: 'Delete shop',
+          ),
         ],
       ),
       body: ListView(
@@ -363,9 +380,217 @@ class _AdminShopDetailScreenState
                     label: 'Transactions', value: shop.transactionCount,
                     icon: Icons.receipt_long_outlined)),
           ]),
+          const SizedBox(height: 24),
+          _ShopUsersSection(shopId: shop.id),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Shop'),
+        content: Text(
+            'Permanently delete "${widget.shop.name}"?\n\nThis action cannot be undone. All shop data including products, transactions, and users will be removed.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await ref.read(adminServiceProvider).deleteShop(widget.shop.id);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Shop deleted'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        setState(() => _deleting = false);
+      }
+    }
+  }
+}
+
+// ── Shop Users Management ─────────────────────────────────────────────────
+class _ShopUsersSection extends ConsumerWidget {
+  final int shopId;
+  const _ShopUsersSection({required this.shopId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final async = ref.watch(_shopUsersProvider(shopId));
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text('Shop Users',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold)),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: () => ref.invalidate(_shopUsersProvider(shopId)),
+          icon: const Icon(Icons.refresh, size: 16),
+          label: const Text('Refresh'),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      async.when(
+        loading: () => const Center(
+            child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        )),
+        error: (e, _) => Text('Error loading users: $e',
+            style: TextStyle(color: cs.error)),
+        data: (users) {
+          if (users.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text('No users yet',
+                    style: TextStyle(color: cs.onSurfaceVariant)),
+              ),
+            );
+          }
+          return Column(
+            children: users.map((u) => _ShopUserTile(
+              user: u,
+              shopId: shopId,
+              onDeleted: () => ref.invalidate(_shopUsersProvider(shopId)),
+            )).toList(),
+          );
+        },
+      ),
+    ]);
+  }
+}
+
+class _ShopUserTile extends ConsumerWidget {
+  final ShopUser user;
+  final int shopId;
+  final VoidCallback onDeleted;
+  const _ShopUserTile(
+      {required this.user, required this.shopId, required this.onDeleted});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: cs.primaryContainer,
+          child: Text(
+            user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+            style: TextStyle(color: cs.onPrimaryContainer),
+          ),
+        ),
+        title: Text(user.name,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('@${user.username}',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            Row(children: [
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: cs.secondaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(user.role,
+                    style: TextStyle(
+                        fontSize: 10, color: cs.onSecondaryContainer)),
+              ),
+              const SizedBox(width: 6),
+              if (!user.isActive)
+                Container(
+                  margin: const EdgeInsets.only(top: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Inactive',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600)),
+                ),
+            ]),
+          ],
+        ),
+        isThreeLine: true,
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+          onPressed: () => _confirmRemove(context, ref),
+          tooltip: 'Remove user',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove User'),
+        content: Text('Remove ${user.name} from this shop?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(adminServiceProvider).deleteShopUser(shopId, user.id);
+      onDeleted();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${user.name} removed')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 }
 

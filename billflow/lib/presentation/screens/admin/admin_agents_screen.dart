@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -10,8 +11,122 @@ final _adminAgentsProvider = FutureProvider.autoDispose<List<AdminAgent>>((ref) 
   return ref.read(adminServiceProvider).getAgents();
 });
 
-class AdminAgentsScreen extends ConsumerWidget {
+final _pendingRegistrationsProvider =
+    FutureProvider.autoDispose<List<AgentRegistration>>((ref) {
+  return ref.read(adminServiceProvider).getPendingRegistrations();
+});
+
+class AdminAgentsScreen extends ConsumerStatefulWidget {
   const AdminAgentsScreen({super.key});
+
+  @override
+  ConsumerState<AdminAgentsScreen> createState() => _AdminAgentsScreenState();
+}
+
+class _AdminAgentsScreenState extends ConsumerState<AdminAgentsScreen>
+    with SingleTickerProviderStateMixin {
+  late final _tabCtrl = TabController(length: 2, vsync: this);
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generateInvite() async {
+    try {
+      final url = await ref.read(adminServiceProvider).generateInviteToken();
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Agent Invite Link'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Share this link with the new agent:',
+                style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(url, style: const TextStyle(fontSize: 12)),
+            ),
+          ]),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: url));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Copied to clipboard')));
+              },
+              child: const Text('Copy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        child: Row(children: [
+          Consumer(builder: (_, ref, __) {
+            final pending = ref
+                    .watch(_pendingRegistrationsProvider)
+                    .valueOrNull
+                    ?.where((r) => r.status == 'pending')
+                    .length ?? 0;
+            return TabBar(
+              controller: _tabCtrl,
+              tabs: [
+                const Tab(text: 'Active Agents'),
+                Tab(text: pending > 0 ? 'Pending ($pending)' : 'Pending'),
+              ],
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+            );
+          }),
+          const Spacer(),
+          FilledButton.icon(
+            onPressed: _generateInvite,
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('Invite'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              backgroundColor: const Color(0xFF1A237E),
+            ),
+          ),
+        ]),
+      ),
+      Expanded(child: TabBarView(
+        controller: _tabCtrl,
+        children: [
+          _ActiveAgentsTab(),
+          _PendingRegistrationsTab(),
+        ],
+      )),
+    ]);
+  }
+}
+
+// ── Active agents tab (original content) ─────────────────────────────────
+class _ActiveAgentsTab extends ConsumerWidget {
+  const _ActiveAgentsTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,6 +199,179 @@ class AdminAgentsScreen extends ConsumerWidget {
       useSafeArea: true,
       builder: (_) => _AgentModal(agent: agent, ref: ref),
     );
+  }
+}
+
+// ── Pending registrations tab ─────────────────────────────────────────────
+class _PendingRegistrationsTab extends ConsumerWidget {
+  const _PendingRegistrationsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(_pendingRegistrationsProvider);
+
+    return async.when(
+      loading: () => const ShimmerList(itemCount: 4),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (regs) {
+        final pending = regs.where((r) => r.status == 'pending').toList();
+        if (pending.isEmpty) {
+          return Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.how_to_reg_outlined, size: 56, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text('No pending registrations',
+                  style: TextStyle(color: Colors.grey[500])),
+            ]),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () => ref.refresh(_pendingRegistrationsProvider.future),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: pending.length,
+            itemBuilder: (_, i) {
+              final r = pending[i];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.orange.withValues(alpha: 0.15),
+                        child: Text(r.name[0].toUpperCase(),
+                            style: const TextStyle(
+                                color: Colors.orange, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(r.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(r.email,
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600])),
+                      ])),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('Pending',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ]),
+                    if (r.phone != null || r.district != null) ...[
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 12, children: [
+                        if (r.phone != null)
+                          Text('Phone: ${r.phone}',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600])),
+                        if (r.district != null)
+                          Text('District: ${r.district}',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600])),
+                      ]),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: OutlinedButton(
+                        onPressed: () => _reject(context, ref, r.id),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red)),
+                        child: const Text('Reject'),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: FilledButton(
+                        onPressed: () => _approve(context, ref, r.id),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green),
+                        child: const Text('Approve'),
+                      )),
+                    ]),
+                  ]),
+                ),
+              ).animate().fadeIn(
+                  delay: Duration(milliseconds: (i * 40).clamp(0, 300)),
+                  duration: 300.ms);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _approve(BuildContext context, WidgetRef ref, int id) async {
+    try {
+      await ref.read(adminServiceProvider).approveAgent(id);
+      ref.invalidate(_pendingRegistrationsProvider);
+      ref.invalidate(_adminAgentsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Agent approved - they can now log in'),
+              backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _reject(BuildContext context, WidgetRef ref, int id) async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reject Registration'),
+        content: TextField(
+          controller: reasonCtrl,
+          decoration: const InputDecoration(labelText: 'Reason'),
+          maxLines: 2,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(adminServiceProvider)
+          .rejectAgent(id, reasonCtrl.text.trim());
+      ref.invalidate(_pendingRegistrationsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registration rejected')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 }
 
