@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
+import '../../widgets/common/design_system.dart';
 
 final _currFmt = NumberFormat('#,##0.00', 'en_US');
 String _fmt(double v) => 'LKR ${_currFmt.format(v)}';
@@ -171,14 +173,9 @@ class _CommissionList extends ConsumerWidget {
         }).toList();
 
         if (filtered.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.account_balance_wallet_outlined,
-                  size: 48, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text('No ${statusFilter == 'pending' ? 'pending' : 'approved'} commissions',
-                  style: TextStyle(color: Colors.grey[500])),
-            ]),
+          return DSEmptyState(
+            icon: Icons.account_balance_wallet_outlined,
+            heading: 'No ${statusFilter == 'pending' ? 'pending' : 'approved'} commissions',
           );
         }
 
@@ -318,12 +315,9 @@ class _PayoutLogList extends ConsumerWidget {
       data: (list) {
         final paid = list.where((c) => c.isPaid).toList();
         if (paid.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text('No paid commissions yet', style: TextStyle(color: Colors.grey[500])),
-            ]),
+          return const DSEmptyState(
+            icon: Icons.receipt_long_outlined,
+            heading: 'No paid commissions yet',
           );
         }
         return RefreshIndicator(
@@ -379,18 +373,19 @@ class _TypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOnboarding = type == 'onboarding';
-    final color = isOnboarding ? Colors.purple : Colors.teal;
+    final color = isOnboarding ? const Color(0xFF7C3AED) : const Color(0xFF0D9488);
     return Container(
-      margin: const EdgeInsets.only(top: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      margin: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Text(
         isOnboarding ? 'Onboarding' : 'Monthly',
-        style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w600),
+        style: GoogleFonts.inter(
+            fontSize: 9, color: color, fontWeight: FontWeight.w700),
       ),
     );
   }

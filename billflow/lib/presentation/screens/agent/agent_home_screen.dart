@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/constants/app_colors.dart';
@@ -11,6 +12,7 @@ import '../../../data/services/agent_service.dart';
 import '../../../providers/agent_auth_provider.dart';
 import '../../../providers/agent_provider.dart';
 import '../../widgets/common/shimmer_list.dart';
+import '../../widgets/common/design_system.dart';
 
 // ── Formatters ────────────────────────────────────────────────
 final _currFmt = NumberFormat('#,##0.00', 'en_US');
@@ -58,29 +60,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.18 : 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-        ],
-      ),
-    );
+    return DSStatCard(label: label, value: value, icon: icon, color: color);
   }
 }
 
@@ -141,27 +121,28 @@ class _DashboardTab extends ConsumerWidget {
             if (d.pendingSubmissions > 0) ...[
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
+                  color: AppColors.statusTrial.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                  border: Border.all(color: AppColors.statusTrial.withValues(alpha: 0.35)),
                 ),
                 child: Row(children: [
-                  Icon(Icons.hourglass_top_outlined, color: AppColors.warning, size: 18),
-                  const SizedBox(width: 8),
-                  Text('${d.pendingSubmissions} cash payment(s) awaiting admin verification',
-                      style: TextStyle(fontSize: 13, color: AppColors.warning)),
+                  Icon(Icons.schedule_rounded, color: AppColors.statusTrial, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${d.pendingSubmissions} cash payment${d.pendingSubmissions == 1 ? '' : 's'} awaiting admin verification',
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.statusTrial, fontWeight: FontWeight.w500),
+                    ),
+                  ),
                 ]),
               ),
             ],
 
             // Expiring soon
             if (d.expiringSoon.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              const Text('Expiring Soon (3 days)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 8),
+              const DSSectionHeader(title: 'Expiring Soon', padding: EdgeInsets.fromLTRB(0, 20, 0, 8)),
               ...d.expiringSoon.map((s) => Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
@@ -715,12 +696,11 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
           }).toList();
 
           if (filtered.isEmpty) {
-            return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.store_outlined, size: 48, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text(_q.isNotEmpty ? 'No results for "$_q"' : 'No shops in this category',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
-            ]));
+            return DSEmptyState(
+              icon: Icons.store_outlined,
+              heading: _q.isNotEmpty ? 'No results for "$_q"' : 'No shops in this category',
+              subtext: _q.isEmpty ? 'Use the filter chips above to browse shops' : null,
+            );
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(agentCustomersProvider.future),
@@ -733,73 +713,92 @@ class _CustomersTabState extends ConsumerState<_CustomersTab> {
                 final expiryLabel = _expiryLabel(c);
                 final expiryColor = _expiryColor(c, context);
 
-                return Card(
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                  color: Theme.of(context).colorScheme.surface,
-                  child: InkWell(
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.cardDark : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () => _showShopDetail(context, ref, c),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: statusColor.withValues(alpha: 0.15),
-                            child: Text(c.name[0].toUpperCase(),
-                                style: TextStyle(color: statusColor,
-                                    fontWeight: FontWeight.bold, fontSize: 15)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(c.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text(c.ownerName,
-                                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-                          ])),
-                          _StatusDot(status: c.subscriptionStatus, color: statusColor),
-                        ]),
+                    border: isDark
+                        ? null
+                        : Border.all(color: AppColors.border, width: 0.8),
+                    boxShadow: isDark ? [] : [AppColors.cardShadowSm],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showShopDetail(context, ref, c),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            DSAvatar(name: c.name, size: 38, backgroundColor: statusColor),
+                            const SizedBox(width: 10),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(
+                                c.name,
+                                style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600, fontSize: 14,
+                                    color: isDark ? Colors.white : AppColors.textPrimary),
+                              ),
+                              Text(
+                                c.ownerName,
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
+                              ),
+                            ])),
+                            DSStatusBadge.fromStatus(c.subscriptionStatus),
+                          ]),
 
-                        const SizedBox(height: 8),
-                        const Divider(height: 1),
-                        const SizedBox(height: 8),
+                          const SizedBox(height: 10),
+                          Divider(height: 1, color: isDark ? AppColors.cardDark2 : AppColors.border),
+                          const SizedBox(height: 10),
 
-                        Row(children: [
-                          if (c.planName != null) ...[
-                            Icon(Icons.workspace_premium_outlined,
-                                size: 13, color: Colors.grey[500]),
-                            const SizedBox(width: 4),
-                            Text(c.planName!,
-                                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-                            const SizedBox(width: 12),
-                          ],
-                          if (c.isPendingPayment) ...[
-                            Icon(Icons.hourglass_top_outlined,
-                                size: 13, color: Colors.orange[600]),
-                            const SizedBox(width: 4),
-                            Text('Awaiting payment',
-                                style: TextStyle(fontSize: 11, color: Colors.orange[700],
-                                    fontWeight: FontWeight.w500)),
-                          ] else if (expiryLabel.isNotEmpty) ...[
-                            Icon(
-                              c.subscriptionStatus == 'expired'
-                                  ? Icons.cancel_outlined : Icons.schedule_outlined,
-                              size: 13, color: expiryColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(expiryLabel,
-                                style: TextStyle(fontSize: 11, color: expiryColor,
-                                    fontWeight: FontWeight.w500)),
-                          ],
-                          const Spacer(),
-                          if (c.expectedAmount != null && c.isPendingPayment)
-                            Text('LKR ${_currFmt.format(c.expectedAmount!)}',
-                                style: const TextStyle(fontSize: 11,
-                                    fontWeight: FontWeight.w600, color: Color(0xFF1B5E20))),
+                          Row(children: [
+                            if (c.planName != null) ...[
+                              Icon(Icons.workspace_premium_outlined,
+                                  size: 13, color: AppColors.textMuted),
+                              const SizedBox(width: 4),
+                              Text(c.planName!,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11, color: AppColors.textMuted)),
+                              const SizedBox(width: 12),
+                            ],
+                            if (c.isPendingPayment) ...[
+                              Icon(Icons.hourglass_top_outlined,
+                                  size: 13, color: AppColors.statusTrial),
+                              const SizedBox(width: 4),
+                              Text('Awaiting payment',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11, color: AppColors.statusTrial,
+                                      fontWeight: FontWeight.w500)),
+                            ] else if (expiryLabel.isNotEmpty) ...[
+                              Icon(
+                                c.subscriptionStatus == 'expired'
+                                    ? Icons.cancel_outlined : Icons.schedule_outlined,
+                                size: 13, color: expiryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(expiryLabel,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11, color: expiryColor,
+                                      fontWeight: FontWeight.w500)),
+                            ],
+                            const Spacer(),
+                            if (c.expectedAmount != null && c.isPendingPayment)
+                              Text(
+                                'LKR ${_currFmt.format(c.expectedAmount!)}',
+                                style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.agentGreen),
+                              ),
+                          ]),
                         ]),
-                      ]),
+                      ),
                     ),
                   ),
                 );
@@ -1952,12 +1951,18 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
   Widget build(BuildContext context) {
     final agent = ref.watch(agentAuthProvider).valueOrNull;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B5E20),
-        foregroundColor: Colors.white,
-        title: Text(_tabLabels[_tab],
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        title: Text(
+          _tabLabels[_tab],
+          style: GoogleFonts.poppins(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
         actions: [
           // Notification bell
           Consumer(builder: (_, ref, __) {
@@ -1967,7 +1972,10 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
               icon: Badge(
                 isLabelVisible: unread > 0,
                 label: Text('$unread'),
-                child: const Icon(Icons.notifications_outlined, color: Colors.white),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
               ),
               onPressed: () => showModalBottomSheet(
                 context: context,
@@ -1983,21 +1991,14 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
           }),
           if (agent != null)
             Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(agent.name,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-                  if (agent.district != null)
-                    Text(agent.district!,
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.white70)),
-                ],
+              padding: const EdgeInsets.only(right: 12),
+              child: GestureDetector(
+                onTap: () => setState(() => _tab = 4),
+                child: DSAvatar(
+                  name: agent.name,
+                  size: 34,
+                  backgroundColor: AppColors.agentGreen,
+                ),
               ),
             ),
         ],
@@ -2006,11 +2007,13 @@ class _AgentHomeScreenState extends ConsumerState<AgentHomeScreen> {
       floatingActionButton: _tab == 1
           ? FloatingActionButton.extended(
               onPressed: _showOnboardSheet,
-              backgroundColor: const Color(0xFF2E7D32),
+              backgroundColor: AppColors.agentGreen,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.store_mall_directory),
-              label: const Text('Onboard Shop',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              icon: const Icon(Icons.store_mall_directory_rounded),
+              label: Text(
+                'Onboard Shop',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
             )
           : null,
       bottomNavigationBar: NavigationBar(

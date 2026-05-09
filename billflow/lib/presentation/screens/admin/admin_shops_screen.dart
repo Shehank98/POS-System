@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../widgets/common/shimmer_list.dart';
+import '../../widgets/common/design_system.dart';
 
 final _adminShopsProvider =
     FutureProvider.autoDispose.family<List<AdminShop>, String?>((ref, status) {
@@ -40,7 +43,11 @@ class AdminShopsScreen extends ConsumerWidget {
                         s.email.toLowerCase().contains(search.toLowerCase()))
                     .toList();
             if (filtered.isEmpty) {
-              return const Center(child: Text('No shops found'));
+              return const DSEmptyState(
+                icon: Icons.store_outlined,
+                heading: 'No shops found',
+                subtext: 'Try adjusting your search or filter',
+              );
             }
             return RefreshIndicator(
               onRefresh: () =>
@@ -154,72 +161,75 @@ class _ShopTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = shop.isActive
-        ? Colors.green
+        ? AppColors.statusActive
         : shop.isTrial
-            ? Colors.orange
-            : cs.error;
+            ? AppColors.statusTrial
+            : AppColors.statusExpired;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: statusColor.withValues(alpha: 0.12),
-          child: Icon(Icons.store_outlined, color: statusColor),
-        ),
-        title: Text(shop.name,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(shop.ownerName, style: TextStyle(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 4),
-            Row(children: [
-              _StatusChip(status: shop.subscriptionStatus, color: statusColor),
-              const SizedBox(width: 8),
-              if (shop.subscriptionEndDate != null)
-                Text(
-                  'Expires ${DateFormat('dd MMM yy').format(shop.subscriptionEndDate!)}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant),
-                ),
-            ]),
-          ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () => _showDetail(context, ref, shop),
-        ),
-      ),
-    );
-  }
-
-  void _showDetail(BuildContext context, WidgetRef ref, AdminShop shop) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => AdminShopDetailScreen(shop: shop),
-    ));
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-  final Color color;
-  const _StatusChip({required this.status, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? null : Border.all(color: AppColors.border, width: 0.8),
+        boxShadow: isDark ? [] : [AppColors.cardShadowSm],
       ),
-      child: Text(
-        status[0].toUpperCase() + status.substring(1),
-        style: TextStyle(
-            fontSize: 11, color: color, fontWeight: FontWeight.w600),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => AdminShopDetailScreen(shop: shop),
+          )),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(children: [
+              DSAvatar(name: shop.name, size: 40, backgroundColor: statusColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    shop.name,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    shop.ownerName,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    DSStatusBadge.fromStatus(shop.subscriptionStatus),
+                    if (shop.subscriptionEndDate != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        'Expires ${DateFormat('dd MMM yy').format(shop.subscriptionEndDate!)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF64748B) : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ]),
+                ]),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDark ? const Color(0xFF475569) : AppColors.textMuted,
+              ),
+            ]),
+          ),
+        ),
       ),
     );
   }
@@ -602,24 +612,7 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(children: [
-        SizedBox(
-          width: 100,
-          child: Text(label,
-              style: TextStyle(
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13)),
-        ),
-        Expanded(
-          child: Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.w500, color: valueColor)),
-        ),
-      ]),
-    );
+    return DSInfoTile(label: label, value: value, valueColor: valueColor);
   }
 }
 

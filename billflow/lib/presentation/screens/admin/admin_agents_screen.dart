@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../widgets/common/shimmer_list.dart';
+import '../../widgets/common/design_system.dart';
 
 final _adminAgentsProvider = FutureProvider.autoDispose<List<AdminAgent>>((ref) {
   return ref.read(adminServiceProvider).getAgents();
@@ -137,21 +140,15 @@ class _ActiveAgentsTab extends ConsumerWidget {
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (agents) {
         if (agents.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.badge_outlined,
-                  size: 64,
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant),
-              const SizedBox(height: 12),
-              const Text('No agents yet'),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () => _showAgentModal(context, ref, null),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Agent'),
-              ),
-            ]),
+          return DSEmptyState(
+            icon: Icons.badge_outlined,
+            heading: 'No agents yet',
+            subtext: 'Add your first sales agent to get started',
+            action: FilledButton.icon(
+              onPressed: () => _showAgentModal(context, ref, null),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Agent'),
+            ),
           );
         }
 
@@ -216,13 +213,10 @@ class _PendingRegistrationsTab extends ConsumerWidget {
       data: (regs) {
         final pending = regs.where((r) => r.status == 'pending').toList();
         if (pending.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.how_to_reg_outlined, size: 56, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text('No pending registrations',
-                  style: TextStyle(color: Colors.grey[500])),
-            ]),
+          return const DSEmptyState(
+            icon: Icons.how_to_reg_outlined,
+            heading: 'No pending registrations',
+            subtext: 'New agent sign-ups will appear here for review',
           );
         }
         return RefreshIndicator(

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../widgets/common/shimmer_list.dart';
+import '../../widgets/common/design_system.dart';
 
 final _pendingPaymentsProvider =
     FutureProvider.autoDispose<List<AdminPaymentSubmission>>((ref) {
@@ -107,14 +110,9 @@ class _PaymentList extends ConsumerWidget {
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (payments) {
         if (payments.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.receipt_long_outlined,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-              const SizedBox(height: 12),
-              Text(emptyMessage),
-            ]),
+          return DSEmptyState(
+            icon: Icons.receipt_long_outlined,
+            heading: emptyMessage,
           );
         }
         return RefreshIndicator(
@@ -346,12 +344,10 @@ class _ShopPaymentList extends ConsumerWidget {
       error: (e, _) => Center(child: Text('$e')),
       data: (list) {
         if (list.isEmpty) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey[300]),
-              const SizedBox(height: 12),
-              Text('No shop payments yet', style: TextStyle(color: Colors.grey[500])),
-            ]),
+          return const DSEmptyState(
+            icon: Icons.receipt_long_outlined,
+            heading: 'No shop payments yet',
+            subtext: 'Shop owner payments will appear here',
           );
         }
         return RefreshIndicator(

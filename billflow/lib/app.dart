@@ -21,8 +21,8 @@ class BillFlowApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'BillFlow',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: themeMode,
       routerConfig: router,
     );

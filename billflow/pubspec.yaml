@@ -49,6 +49,9 @@ dependencies:
   # QR code rendering
   qr_flutter: ^4.1.0
 
+  # Typography
+  google_fonts: ^6.2.1
+
   # Animations
   flutter_animate: ^4.5.0
   shimmer: ^3.0.0

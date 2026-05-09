@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../providers/admin_auth_provider.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
+import '../../widgets/common/design_system.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_shops_screen.dart';
 import 'admin_payments_screen.dart';
@@ -48,9 +51,13 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_tab]),
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
+        title: Text(
+          _titles[_tab],
+          style: GoogleFonts.poppins(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         actions: [
           Consumer(builder: (_, ref, __) {
             final notifs = ref.watch(_adminNotificationsProvider).valueOrNull ?? [];
@@ -104,19 +111,15 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
-            leading: CircleAvatar(
-              backgroundColor:
-                  Theme.of(context).colorScheme.primaryContainer,
-              child: Text(
-                (admin?.email ?? 'A')[0].toUpperCase(),
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold),
-              ),
+            leading: DSAvatar(
+              name: admin?.email ?? 'Admin',
+              size: 40,
+              backgroundColor: AppColors.navy,
             ),
             title: Text(admin?.email ?? 'Admin',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Super Admin'),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text('Super Admin',
+                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
           ).animate().fadeIn(duration: 200.ms),
           const Divider(),
           ListTile(

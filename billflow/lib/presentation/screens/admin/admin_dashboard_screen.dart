@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../data/models/admin_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../widgets/common/shimmer_list.dart';
+import '../../widgets/common/design_system.dart';
 
 final _adminDashboardProvider = FutureProvider.autoDispose<AdminDashboardStats>((ref) {
   return ref.read(adminServiceProvider).getDashboard();
@@ -16,73 +19,134 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(_adminDashboardProvider);
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(_adminDashboardProvider.future),
       child: CustomScrollView(
         slivers: [
+          // Header greeting card
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Overview',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: cs.onSurfaceVariant)),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.navy, AppColors.navyMid],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [AppColors.buttonShadow],
+                ),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        'Admin Dashboard',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Overview of your BillFlow platform',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.72),
+                        ),
+                      ),
+                    ]),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.bar_chart_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                ]),
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.05, end: 0),
+
+          // Stat cards
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Text(
+                'Overview',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                ),
+              ),
             ),
           ),
+
           async.when(
             loading: () => const SliverToBoxAdapter(
-                child: ShimmerGrid(itemCount: 6, itemHeight: 90)),
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: ShimmerGrid(itemCount: 6, itemHeight: 110),
+                )),
             error: (e, _) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(child: Text('Error: $e')),
+              child: DSEmptyState(
+                icon: Icons.error_outline_rounded,
+                heading: 'Failed to load stats',
+                subtext: e.toString(),
               ),
             ),
             data: (stats) => SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               sliver: SliverGrid(
                 delegate: SliverChildListDelegate([
-                  _StatCard(
+                  _DashStatCard(
                     label: 'Total Shops',
                     value: '${stats.totalShops}',
-                    icon: Icons.store_outlined,
-                    color: cs.primary,
+                    icon: Icons.store_rounded,
+                    color: AppColors.navy,
                     delay: 0,
                   ),
-                  _StatCard(
+                  _DashStatCard(
                     label: 'Active',
                     value: '${stats.activeShops}',
-                    icon: Icons.check_circle_outline,
-                    color: Colors.green,
+                    icon: Icons.check_circle_rounded,
+                    color: AppColors.statusActive,
                     delay: 60,
                   ),
-                  _StatCard(
+                  _DashStatCard(
                     label: 'Trial',
                     value: '${stats.trialShops}',
-                    icon: Icons.hourglass_top_outlined,
-                    color: Colors.orange,
+                    icon: Icons.hourglass_top_rounded,
+                    color: AppColors.statusTrial,
                     delay: 120,
                   ),
-                  _StatCard(
+                  _DashStatCard(
                     label: 'Expired',
                     value: '${stats.expiredShops}',
-                    icon: Icons.cancel_outlined,
-                    color: cs.error,
+                    icon: Icons.cancel_rounded,
+                    color: AppColors.statusExpired,
                     delay: 180,
                   ),
-                  _StatCard(
-                    label: 'Total Revenue',
+                  _DashStatCard(
+                    label: 'Revenue',
                     value: 'Rs ${NumberFormat('#,##0').format(stats.totalRevenue)}',
-                    icon: Icons.payments_outlined,
-                    color: Colors.teal,
+                    icon: Icons.payments_rounded,
+                    color: const Color(0xFF0D9488),
                     delay: 240,
                   ),
-                  _StatCard(
+                  _DashStatCard(
                     label: 'Pending',
                     value: '${stats.pendingPayments}',
-                    icon: Icons.pending_actions_outlined,
-                    color: Colors.deepOrange,
+                    icon: Icons.pending_actions_rounded,
+                    color: AppColors.danger,
                     delay: 300,
                   ),
                 ]),
@@ -90,7 +154,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.5,
+                  childAspectRatio: 1.55,
                 ),
               ),
             ),
@@ -102,14 +166,14 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _DashStatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
   final int delay;
 
-  const _StatCard({
+  const _DashStatCard({
     required this.label,
     required this.value,
     required this.icon,
@@ -119,33 +183,58 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant),
-                    overflow: TextOverflow.ellipsis),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark
+            ? null
+            : Border.all(color: AppColors.border, width: 0.8),
+        boxShadow: isDark ? [] : [AppColors.cardShadow],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, color: color, size: 17),
+          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+                height: 1,
               ),
-            ]),
-            Text(value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF94A3B8) : AppColors.textMuted,
+              ),
+            ),
+          ]),
+        ],
       ),
     )
         .animate()
         .fadeIn(delay: Duration(milliseconds: delay), duration: 400.ms)
-        .slideY(begin: 0.2, end: 0, delay: Duration(milliseconds: delay), duration: 400.ms);
+        .slideY(
+            begin: 0.12,
+            end: 0,
+            delay: Duration(milliseconds: delay),
+            duration: 400.ms,
+            curve: Curves.easeOut);
   }
 }
