@@ -1,11 +1,11 @@
 {
-  "name": "POS System",
-  "short_name": "POS",
-  "description": "Multi-tenant Point of Sale system",
-  "start_url": "/",
+  "name": "BillFlow Agent",
+  "short_name": "BF Agent",
+  "description": "BillFlow agent portal - manage shops and commissions",
+  "start_url": "/agent/login",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "theme_color": "#059669",
   "orientation": "any",
   "icons": [
     {
@@ -21,12 +21,5 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["business", "finance"],
-  "shortcuts": [
-    {
-      "name": "POS Terminal",
-      "url": "/pos",
-      "description": "Open the POS cashier screen"
-    }
-  ]
+  "categories": ["business", "finance"]
 }

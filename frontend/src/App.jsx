@@ -29,6 +29,7 @@ import CommissionManagementPage from './pages/admin/CommissionManagementPage';
 import AgentLoginPage from './pages/agent/AgentLoginPage';
 import AgentRegistrationPage from './pages/agent/AgentRegistrationPage';
 import AgentPortalPage from './pages/agent/AgentPortalPage';
+import AgentInstallPage from './pages/agent/AgentInstallPage';
 
 // Clothing module
 import ClothingExchangesPage from './pages/ClothingExchangesPage';
@@ -107,6 +108,7 @@ export default function App() {
         <Route path="/qr-display" element={<QRDisplayPage />} />
 
         {/* ── Agent portal ──────────────────────────────────── */}
+        <Route path="/agent/install"  element={<AgentInstallPage />} />
         <Route path="/agent/login"    element={<AgentLoginPage />} />
         <Route path="/agent/register" element={<AgentRegistrationPage />} />
         <Route
