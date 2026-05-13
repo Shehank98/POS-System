@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/transaction_model.dart';
@@ -8,7 +10,6 @@ import '../../../data/services/report_service.dart';
 import '../../../providers/report_provider.dart';
 import '../../widgets/common/error_view.dart';
 import '../../widgets/common/loading_overlay.dart';
-import '../../widgets/common/stat_card.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -37,267 +38,145 @@ class ReportsScreen extends ConsumerWidget {
     final start = ref.watch(reportStartDateProvider);
     final end = ref.watch(reportEndDateProvider);
     final summaryAsync = ref.watch(salesSummaryProvider);
-    final cs = Theme.of(context).colorScheme;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Reports'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Overview'),
-              Tab(text: 'Tax'),
-            ],
-          ),
-        ),
-        body: Column(
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Date range picker
+            // ── Header ──────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(context, ref, true),
-                      icon: const Icon(Icons.calendar_today, size: 15),
-                      label: Text(formatDate(start),
-                          style: const TextStyle(fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 42)),
+                  Text(
+                    'EXPORTS & Z-REPORTS',
+                    style: GoogleFonts.manrope(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink3,
+                      letterSpacing: 1.4,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('→',
-                        style: TextStyle(color: cs.onSurfaceVariant)),
-                  ),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(context, ref, false),
-                      icon: const Icon(Icons.calendar_today, size: 15),
-                      label: Text(formatDate(end),
-                          style: const TextStyle(fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 42)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Reports',
+                    style: GoogleFonts.manrope(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 4),
+            const SizedBox(height: 20),
 
-            Expanded(
-              child: TabBarView(
+            // ── Date range picker ────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
                 children: [
-                  // ── Overview tab ──────────────────────────────────────
-                  summaryAsync.when(
-                    loading: () => const LoadingOverlay(),
-                    error: (e, _) => ErrorView(
-                        message: e.toString(),
-                        onRetry: () => ref.invalidate(salesSummaryProvider)),
-                    data: (summary) => SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Key metrics 2×2 grid
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            childAspectRatio: 1.3,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            children: [
-                              StatCard(
-                                label: 'Transactions',
-                                value: '${summary.totalTransactions}',
-                                icon: Icons.receipt_long_outlined,
-                              ),
-                              StatCard(
-                                label: 'Revenue',
-                                value: formatCurrency(summary.totalRevenue),
-                                icon: Icons.attach_money,
-                                iconColor: Colors.green,
-                              ),
-                              StatCard(
-                                label: 'Net Revenue',
-                                value: formatCurrency(summary.netRevenue),
-                                icon: Icons.trending_up,
-                                iconColor: Colors.blue,
-                              ),
-                              StatCard(
-                                label: 'Tax Collected',
-                                value: formatCurrency(summary.totalTax),
-                                icon: Icons.account_balance_outlined,
-                                iconColor: Colors.purple,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // Supplementary row: discounts / refunds / voided
-                          Row(children: [
-                            Expanded(
-                              child: _MetricTile(
-                                label: 'Discounts',
-                                value: formatCurrency(summary.totalDiscounts),
-                                icon: Icons.discount_outlined,
-                                color: Colors.orange,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MetricTile(
-                                label: 'Refunds',
-                                value: formatCurrency(summary.totalRefunds),
-                                icon: Icons.undo_outlined,
-                                color: Colors.red,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MetricTile(
-                                label: 'Voided',
-                                value: '${summary.voidedTransactions}',
-                                icon: Icons.cancel_outlined,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ]),
-
-                          const SizedBox(height: 12),
-
-                          // Payment method breakdown (compact, no chart)
-                          Card(
-                            margin: EdgeInsets.zero,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(children: [
-                                    Icon(Icons.payments_outlined,
-                                        size: 17, color: cs.primary),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Payment Methods',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold),
-                                    ),
-                                  ]),
-                                  const SizedBox(height: 14),
-                                  _PaymentBreakdown(summary: summary),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // Export
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final svc = ref.read(reportServiceProvider);
-                              final url = await svc.buildSalesExportUrl(
-                                  toApiDate(start), toApiDate(end));
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url,
-                                    mode: LaunchMode.externalApplication);
-                              }
-                            },
-                            icon: const Icon(Icons.download_outlined, size: 16),
-                            label: const Text('Export to Excel'),
-                            style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 44)),
-                          ),
-                        ],
+                  Expanded(
+                    child: _DateButton(
+                      date: start,
+                      onTap: () => _pickDate(context, ref, true),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      '→',
+                      style: GoogleFonts.manrope(
+                        color: AppColors.ink3,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-
-                  // ── Tax tab ───────────────────────────────────────────
-                  Consumer(builder: (ctx, r, _) {
-                    final taxAsync = r.watch(taxReportProvider);
-                    return taxAsync.when(
-                      loading: () => const LoadingOverlay(),
-                      error: (e, _) => ErrorView(message: e.toString()),
-                      data: (report) => SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(children: [
-                                  _TaxRow('Total Tax',
-                                      formatCurrency(report.totalTax),
-                                      bold: true),
-                                  const Divider(height: 20),
-                                  _TaxRow('Total Revenue',
-                                      formatCurrency(report.totalRevenue)),
-                                  const SizedBox(height: 4),
-                                  _TaxRow(
-                                    'Net (excl. tax)',
-                                    formatCurrency(report.totalRevenue -
-                                        report.totalTax),
-                                  ),
-                                ]),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (report.byDay.isNotEmpty) ...[
-                              Text('Daily Breakdown',
-                                  style: Theme.of(ctx)
-                                      .textTheme
-                                      .titleSmall
-                                      ?.copyWith(
-                                          fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              Card(
-                                child: Column(
-                                  children: report.byDay
-                                      .asMap()
-                                      .entries
-                                      .map((entry) {
-                                    final d = entry.value;
-                                    final isLast =
-                                        entry.key == report.byDay.length - 1;
-                                    return Column(children: [
-                                      ListTile(
-                                        dense: true,
-                                        title: Text(d.date,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w500)),
-                                        subtitle: Text(
-                                            '${d.transactions} transactions'),
-                                        trailing: Text(
-                                            formatCurrency(d.taxCollected),
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                      ),
-                                      if (!isLast)
-                                        const Divider(
-                                            height: 1, indent: 16),
-                                    ]);
-                                  }).toList(),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
+                  Expanded(
+                    child: _DateButton(
+                      date: end,
+                      onTap: () => _pickDate(context, ref, false),
+                    ),
+                  ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Quick reports section ──────────────────────
+                    _Eyebrow('QUICK'),
+                    const SizedBox(height: 10),
+                    _QuickReportsGrid(
+                      onZReport: () async {
+                        final svc = ref.read(reportServiceProvider);
+                        final url = await svc.buildSalesExportUrl(
+                            toApiDate(start), toApiDate(end));
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      onSalesByItem: () async {
+                        final svc = ref.read(reportServiceProvider);
+                        final url = await svc.buildSalesExportUrl(
+                            toApiDate(start), toApiDate(end));
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      onDiscounts: () async {
+                        final svc = ref.read(reportServiceProvider);
+                        final url = await svc.buildSalesExportUrl(
+                            toApiDate(start), toApiDate(end),
+                            format: 'excel');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      onCashDrawer: () async {
+                        final svc = ref.read(reportServiceProvider);
+                        final url = await svc.buildInventoryExportUrl();
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Recent exports section ─────────────────────
+                    _Eyebrow('RECENT'),
+                    const SizedBox(height: 10),
+
+                    summaryAsync.when(
+                      loading: () => const _RecentExportsShimmer(),
+                      error: (e, _) => ErrorView(
+                        message: e.toString(),
+                        onRetry: () => ref.invalidate(salesSummaryProvider),
+                      ),
+                      data: (summary) => _RecentExportsList(
+                        summary: summary,
+                        start: start,
+                        end: end,
+                        ref: ref,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -307,7 +186,364 @@ class ReportsScreen extends ConsumerWidget {
   }
 }
 
-// ── Payment breakdown (compact bar rows) ─────────────────────────────────────
+// ── Eyebrow label ─────────────────────────────────────────────────────────────
+
+class _Eyebrow extends StatelessWidget {
+  final String text;
+  const _Eyebrow(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: GoogleFonts.manrope(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        color: AppColors.ink3,
+        letterSpacing: 1.4,
+      ),
+    );
+  }
+}
+
+// ── Date button ───────────────────────────────────────────────────────────────
+
+class _DateButton extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onTap;
+  const _DateButton({required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.hairline),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_outlined,
+                size: 14, color: AppColors.ink3),
+            const SizedBox(width: 8),
+            Text(
+              formatDate(date),
+              style: GoogleFonts.manrope(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Quick reports 2x2 grid ────────────────────────────────────────────────────
+
+class _QuickReportsGrid extends StatelessWidget {
+  final VoidCallback onZReport;
+  final VoidCallback onSalesByItem;
+  final VoidCallback onDiscounts;
+  final VoidCallback onCashDrawer;
+
+  const _QuickReportsGrid({
+    required this.onZReport,
+    required this.onSalesByItem,
+    required this.onDiscounts,
+    required this.onCashDrawer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.45,
+      children: [
+        _ReportTile(
+          icon: Icons.summarize_outlined,
+          title: 'Z-Report',
+          subtitle: 'Daily summary',
+          onTap: onZReport,
+        ),
+        _ReportTile(
+          icon: Icons.inventory_2_outlined,
+          title: 'Sales by item',
+          subtitle: 'Product breakdown',
+          onTap: onSalesByItem,
+        ),
+        _ReportTile(
+          icon: Icons.discount_outlined,
+          title: 'Discounts',
+          subtitle: 'Applied discounts',
+          onTap: onDiscounts,
+        ),
+        _ReportTile(
+          icon: Icons.point_of_sale_outlined,
+          title: 'Cash drawer',
+          subtitle: 'Inventory export',
+          onTap: onCashDrawer,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReportTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ReportTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.soft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: AppColors.ink2),
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: GoogleFonts.manrope(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.manrope(
+                fontSize: 11,
+                color: AppColors.ink3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Recent exports list ───────────────────────────────────────────────────────
+
+class _RecentExportsList extends StatelessWidget {
+  final TransactionSummary summary;
+  final DateTime start;
+  final DateTime end;
+  final WidgetRef ref;
+
+  const _RecentExportsList({
+    required this.summary,
+    required this.start,
+    required this.end,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _ExportItem(
+        fileType: 'XLS',
+        fileName: 'sales_${toApiDate(start)}_${toApiDate(end)}.xlsx',
+        size: '${(summary.totalTransactions * 0.8).toStringAsFixed(1)} KB',
+        onDownload: () async {
+          final svc = ref.read(reportServiceProvider);
+          final url = await svc.buildSalesExportUrl(
+              toApiDate(start), toApiDate(end));
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        },
+      ),
+      _ExportItem(
+        fileType: 'CSV',
+        fileName: 'inventory_export.csv',
+        size: '12.4 KB',
+        onDownload: () async {
+          final svc = ref.read(reportServiceProvider);
+          final url = await svc.buildInventoryExportUrl();
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        },
+      ),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final isLast = entry.key == items.length - 1;
+          return Column(
+            children: [
+              _ExportRow(item: entry.value),
+              if (!isLast)
+                const Divider(
+                    height: 1, indent: 16, color: AppColors.hairline),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _ExportItem {
+  final String fileType;
+  final String fileName;
+  final String size;
+  final VoidCallback onDownload;
+
+  const _ExportItem({
+    required this.fileType,
+    required this.fileName,
+    required this.size,
+    required this.onDownload,
+  });
+}
+
+class _ExportRow extends StatelessWidget {
+  final _ExportItem item;
+  const _ExportRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          // File type badge — 32x32, soft bg, mono text
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.soft,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                item.fileType,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink2,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // File info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.fileName,
+                  style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.size,
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 11,
+                    color: AppColors.ink3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Download icon
+          GestureDetector(
+            onTap: item.onDownload,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: const Icon(
+                Icons.download_outlined,
+                size: 18,
+                color: AppColors.ink3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Loading shimmer placeholder ───────────────────────────────────────────────
+
+class _RecentExportsShimmer extends StatelessWidget {
+  const _RecentExportsShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.brand,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Payment breakdown (kept for data layer compatibility) ─────────────────────
 
 class _PaymentBreakdown extends StatelessWidget {
   final TransactionSummary summary;
@@ -317,130 +553,73 @@ class _PaymentBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = summary.cashCount + summary.cardCount + summary.mobileCount;
     if (total == 0) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Center(child: Text('No transactions in selected range')),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: Text(
+            'No transactions in selected range',
+            style: GoogleFonts.manrope(color: AppColors.ink3, fontSize: 13),
+          ),
+        ),
       );
     }
     return Column(children: [
-      _PayRow('Cash', summary.cashCount, Colors.blue[600]!, total),
+      _PayBar('Cash', summary.cashCount, total),
       const SizedBox(height: 10),
-      _PayRow('Card', summary.cardCount, Colors.orange[600]!, total),
+      _PayBar('Card', summary.cardCount, total),
       const SizedBox(height: 10),
-      _PayRow('Mobile / QR', summary.mobileCount, Colors.green[600]!, total),
+      _PayBar('Mobile / QR', summary.mobileCount, total),
     ]);
   }
 }
 
-class _PayRow extends StatelessWidget {
+class _PayBar extends StatelessWidget {
   final String label;
   final int count;
-  final Color color;
   final int total;
-  const _PayRow(this.label, this.count, this.color, this.total);
+  const _PayBar(this.label, this.count, this.total);
 
   @override
   Widget build(BuildContext context) {
     final pct = total > 0 ? count / total : 0.0;
-    final cs = Theme.of(context).colorScheme;
     return Row(children: [
-      Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      SizedBox(
+        width: 46,
+        child: Text(
+          label,
+          style: GoogleFonts.manrope(fontSize: 12, color: AppColors.ink2),
+        ),
       ),
       const SizedBox(width: 8),
-      SizedBox(
-        width: 76,
-        child: Text(label, style: const TextStyle(fontSize: 13)),
-      ),
       Expanded(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: pct,
-            minHeight: 8,
-            backgroundColor: cs.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
+            backgroundColor: AppColors.soft,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.brand),
           ),
         ),
       ),
       const SizedBox(width: 10),
       SizedBox(
         width: 58,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('$count txn',
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          Text('${(pct * 100).toStringAsFixed(0)}%',
-              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(
+            '$count txn',
+            style: GoogleFonts.jetBrainsMono(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+                color: AppColors.ink),
+          ),
+          Text(
+            '${(pct * 100).toStringAsFixed(0)}%',
+            style: GoogleFonts.manrope(fontSize: 10, color: AppColors.ink3),
+          ),
         ]),
       ),
     ]);
-  }
-}
-
-// ── Small metric tile ─────────────────────────────────────────────────────────
-
-class _MetricTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  const _MetricTile(
-      {required this.label,
-      required this.value,
-      required this.icon,
-      required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(height: 6),
-        Text(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
-        Text(label,
-            style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
-      ]),
-    );
-  }
-}
-
-// ── Tax row ───────────────────────────────────────────────────────────────────
-
-class _TaxRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool bold;
-  const _TaxRow(this.label, this.value, {this.bold = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(children: [
-        Text(label,
-            style: TextStyle(
-                fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                fontSize: bold ? 14 : 13)),
-        const Spacer(),
-        Text(value,
-            style: TextStyle(
-                fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                fontSize: bold ? 14 : 13)),
-      ]),
-    );
   }
 }

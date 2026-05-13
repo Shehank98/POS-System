@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../data/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
@@ -11,8 +14,8 @@ import '../../../providers/notification_provider.dart';
 
 class _NavItem {
   final String route;
-  final IconData icon;
-  final IconData selectedIcon;
+  final Widget icon;
+  final Widget selectedIcon;
   final String label;
 
   const _NavItem({
@@ -22,9 +25,6 @@ class _NavItem {
     required this.label,
   });
 }
-
-// Max nav items before collapsing extras into "More"
-const _kMaxNavItems = 5;
 
 class AppScaffold extends ConsumerStatefulWidget {
   final Widget child;
@@ -38,29 +38,24 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkBiometricPrompt());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _checkBiometricPrompt());
   }
 
   Future<void> _checkBiometricPrompt() async {
     if (!mounted) return;
     final storage = ref.read(secureStorageProvider);
-
     final alreadyPrompted = await storage.readBiometricPrompted();
     if (alreadyPrompted) return;
-
     final alreadyEnabled = await storage.readBiometricEnabled();
     if (alreadyEnabled) return;
-
     final auth = LocalAuthentication();
     final deviceSupported = await auth.isDeviceSupported();
     if (!deviceSupported) return;
-
     final available = await ref.read(biometricServiceProvider).isAvailable();
     if (!available) return;
     if (!mounted) return;
-
     await storage.saveBiometricPrompted();
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -72,15 +67,16 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
           if (ok) {
             await storage.saveBiometricEnabled(true);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Fingerprint login enabled - active on next app open'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Fingerprint verification failed. You can enable it later in Settings.'),
+              SnackBar(
+                content: Text(
+                  'Fingerprint login enabled',
+                  style: GoogleFonts.manrope(
+                      fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                backgroundColor: AppColors.brand,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             );
           }
@@ -96,118 +92,133 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     final unread = ref.watch(unreadNotificationCountProvider);
     final isCarService = ref.watch(isCarServiceShopProvider);
 
-    // Subscription lock: fully expired → only billing allowed
-    final isLocked = (user?.readOnly ?? false) && !(user?.inGracePeriod ?? false);
+    final isLocked =
+        (user?.readOnly ?? false) && !(user?.inGracePeriod ?? false);
     if (isLocked) {
       return Scaffold(
+        backgroundColor: AppColors.bg,
         body: widget.child,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: 0,
-          onDestinationSelected: (_) => context.go('/billing'),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.credit_card_outlined),
-              selectedIcon: Icon(Icons.credit_card),
+        bottomNavigationBar: _BillFlowNavBar(
+          items: [
+            _NavItem(
+              route: '/billing',
+              icon: const Icon(Icons.credit_card_outlined),
+              selectedIcon: const Icon(Icons.credit_card),
               label: 'Billing',
             ),
           ],
+          selectedIndex: 0,
+          onTap: (_) => context.go('/billing'),
         ),
       );
     }
 
-    // ── Car Service navigation ─────────────────────────────────────
     if (isCarService) {
       return _CarServiceScaffold(
           child: widget.child, user: user, unread: unread);
     }
 
-    // ── Standard retail navigation ─────────────────────────────────
     final customersOn = ref.watch(customersEnabledProvider);
     final analyticsOn = ref.watch(analyticsEnabledProvider);
 
-    final allItems = <_NavItem>[
-      const _NavItem(
-        route: '/dashboard',
-        icon: Icons.home_outlined,
-        selectedIcon: Icons.home,
-        label: 'Home',
-      ),
-      const _NavItem(
+    // Primary 4 items always in bottom nav
+    final primaryItems = <_NavItem>[
+      _NavItem(
         route: '/sales',
-        icon: Icons.point_of_sale_outlined,
-        selectedIcon: Icons.point_of_sale,
-        label: 'POS',
+        icon: const Icon(Icons.shopping_cart_outlined),
+        selectedIcon: const Icon(Icons.shopping_cart),
+        label: 'Sale',
       ),
-      const _NavItem(
-        route: '/transactions',
-        icon: Icons.receipt_long_outlined,
-        selectedIcon: Icons.receipt_long,
-        label: 'Sales',
+      _NavItem(
+        route: '/dashboard',
+        icon: const Icon(Icons.bar_chart_outlined),
+        selectedIcon: const Icon(Icons.bar_chart),
+        label: 'Today',
       ),
-      const _NavItem(
+      _NavItem(
         route: '/products',
-        icon: Icons.inventory_2_outlined,
-        selectedIcon: Icons.inventory_2,
-        label: 'Products',
+        icon: const Icon(Icons.inventory_2_outlined),
+        selectedIcon: const Icon(Icons.inventory_2),
+        label: 'Catalog',
+      ),
+      _NavItem(
+        route: '/transactions',
+        icon: const Icon(Icons.receipt_long_outlined),
+        selectedIcon: const Icon(Icons.receipt_long),
+        label: 'Orders',
+      ),
+    ];
+
+    // Overflow items in "More" sheet
+    final overflowItems = <_NavItem>[
+      const _NavItem(
+        route: '/reports',
+        icon: Icon(Icons.summarize_outlined),
+        selectedIcon: Icon(Icons.summarize),
+        label: 'Reports',
       ),
       if (customersOn)
         const _NavItem(
           route: '/customers',
-          icon: Icons.people_outline,
-          selectedIcon: Icons.people,
+          icon: Icon(Icons.people_outline),
+          selectedIcon: Icon(Icons.people),
           label: 'Customers',
         ),
       if (analyticsOn)
         const _NavItem(
           route: '/analytics',
-          icon: Icons.insights_outlined,
-          selectedIcon: Icons.insights,
+          icon: Icon(Icons.insights_outlined),
+          selectedIcon: Icon(Icons.insights),
           label: 'Analytics',
         ),
       if (user?.isManagerOrAbove == true)
         const _NavItem(
           route: '/audit-log',
-          icon: Icons.history_outlined,
-          selectedIcon: Icons.history,
+          icon: Icon(Icons.history_outlined),
+          selectedIcon: Icon(Icons.history),
           label: 'Audit Log',
         ),
       const _NavItem(
-        route: '/reports',
-        icon: Icons.bar_chart_outlined,
-        selectedIcon: Icons.bar_chart,
-        label: 'Reports',
+        route: '/pre-orders',
+        icon: Icon(Icons.pending_actions_outlined),
+        selectedIcon: Icon(Icons.pending_actions),
+        label: 'Pre-orders',
+      ),
+      const _NavItem(
+        route: '/notifications',
+        icon: Icon(Icons.notifications_outlined),
+        selectedIcon: Icon(Icons.notifications),
+        label: 'Notifications',
+      ),
+      const _NavItem(
+        route: '/billing',
+        icon: Icon(Icons.credit_card_outlined),
+        selectedIcon: Icon(Icons.credit_card),
+        label: 'Billing',
       ),
       const _NavItem(
         route: '/settings',
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
+        icon: Icon(Icons.settings_outlined),
+        selectedIcon: Icon(Icons.settings),
         label: 'Settings',
       ),
     ];
 
-    final bool hasOverflow = allItems.length >= _kMaxNavItems;
-    final visibleItems = hasOverflow
-        ? allItems.sublist(0, _kMaxNavItems - 1)
-        : allItems;
-    final overflowItems = hasOverflow
-        ? allItems.sublist(_kMaxNavItems - 1)
-        : <_NavItem>[];
-
     final location = GoRouterState.of(context).matchedLocation;
-    final visibleRoutes = visibleItems.map((e) => e.route).toList();
-
+    final primaryRoutes = primaryItems.map((e) => e.route).toList();
     final isOverflowActive = overflowItems.any((e) => location.startsWith(e.route));
-    final visibleIdx = visibleRoutes.indexWhere((r) => location.startsWith(r));
+    final primaryIdx =
+        primaryRoutes.indexWhere((r) => location.startsWith(r));
     final selectedIndex = isOverflowActive
-        ? visibleItems.length
-        : (visibleIdx < 0 ? 0 : visibleIdx);
+        ? primaryItems.length
+        : (primaryIdx < 0 ? 0 : primaryIdx);
 
     void openMoreSheet() {
+      HapticFeedback.lightImpact();
       showModalBottomSheet(
         context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
         builder: (_) => _MoreSheet(
           items: overflowItems,
           currentLocation: location,
@@ -220,45 +231,119 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
       );
     }
 
-    final navDestinations = <NavigationDestination>[
-      ...visibleItems.map((item) => NavigationDestination(
-            icon: Icon(item.icon),
-            selectedIcon: Icon(item.selectedIcon),
-            label: item.label,
-          )),
-      if (hasOverflow)
-        NavigationDestination(
-          icon: Badge(
-            isLabelVisible: unread > 0 &&
-                overflowItems.any((e) => e.route == '/reports'),
-            label: Text('$unread'),
-            child: const Icon(Icons.more_horiz_outlined),
-          ),
-          selectedIcon: const Icon(Icons.more_horiz),
-          label: 'More',
-        ),
-    ];
-
     return Scaffold(
+      backgroundColor: AppColors.bg,
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (user?.inGracePeriod ?? false)
             _GracePeriodBanner(graceDays: user!.graceDaysRemaining),
-          NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (i) {
-              if (hasOverflow && i == visibleItems.length) {
+          _BillFlowNavBar(
+            items: [
+              ...primaryItems,
+              _NavItem(
+                route: '__more__',
+                icon: unread > 0
+                    ? Badge(
+                        label: Text('$unread',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 9)),
+                        child: const Icon(Icons.more_horiz_outlined),
+                      )
+                    : const Icon(Icons.more_horiz_outlined),
+                selectedIcon: const Icon(Icons.more_horiz),
+                label: 'More',
+              ),
+            ],
+            selectedIndex: isOverflowActive ? primaryItems.length : selectedIndex,
+            onTap: (i) {
+              if (i == primaryItems.length) {
                 openMoreSheet();
               } else {
-                context.go(visibleRoutes[i]);
+                HapticFeedback.selectionClick();
+                context.go(primaryRoutes[i]);
               }
             },
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: navDestinations,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── BillFlow bottom nav bar ───────────────────────────────────────────────────
+class _BillFlowNavBar extends StatelessWidget {
+  final List<_NavItem> items;
+  final int selectedIndex;
+  final void Function(int) onTap;
+
+  const _BillFlowNavBar({
+    required this.items,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? AppColors.cardDark.withValues(alpha: 0.96)
+        : AppColors.surface.withValues(alpha: 0.96);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(
+          top: BorderSide(color: AppColors.hairline, width: 1),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: items.indexed.map((entry) {
+              final (i, item) = entry;
+              final isSelected = i == selectedIndex;
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onTap(i),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        child: IconTheme(
+                          key: ValueKey(isSelected),
+                          data: IconThemeData(
+                            color: isSelected
+                                ? AppColors.ink
+                                : AppColors.ink3,
+                            size: 22,
+                          ),
+                          child: isSelected ? item.selectedIcon : item.icon,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: isSelected ? AppColors.ink : AppColors.ink3,
+                          letterSpacing: 0.01,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
@@ -282,56 +367,43 @@ class _CarServiceScaffold extends ConsumerWidget {
     final productsEnabled = ref.watch(carServiceProductsEnabledProvider);
     final location = GoRouterState.of(context).matchedLocation;
 
-    // My Jobs tab - visible to all roles but shown in main nav for staff
-    // For owners/managers it goes in More sheet; for staff it's a main tab
-    final myJobsItem = const _NavItem(
-      route: '/carwash',
-      icon: Icons.work_outline,
-      selectedIcon: Icons.work,
-      label: 'My Jobs',
-    );
-
-    // Build visible nav based on role
     List<_NavItem> visibleItems;
     List<_NavItem> overflowItems;
 
     if (isStaff) {
-      // Staff: Dashboard | My Jobs | Pre-Bookings | More
       visibleItems = [
         const _NavItem(
           route: '/carwash',
-          icon: Icons.dashboard_outlined,
-          selectedIcon: Icons.dashboard,
+          icon: Icon(Icons.dashboard_outlined),
+          selectedIcon: Icon(Icons.dashboard),
           label: 'Dashboard',
         ),
-        myJobsItem,
         const _NavItem(
           route: '/carwash/bookings',
-          icon: Icons.calendar_today_outlined,
-          selectedIcon: Icons.calendar_today,
-          label: 'Pre-Bookings',
+          icon: Icon(Icons.calendar_today_outlined),
+          selectedIcon: Icon(Icons.calendar_today),
+          label: 'Bookings',
         ),
       ];
       overflowItems = [];
     } else {
-      // Owner/Manager: Dashboard | Pre-Bookings | Services | More
       visibleItems = [
         const _NavItem(
           route: '/carwash',
-          icon: Icons.dashboard_outlined,
-          selectedIcon: Icons.dashboard,
+          icon: Icon(Icons.dashboard_outlined),
+          selectedIcon: Icon(Icons.dashboard),
           label: 'Dashboard',
         ),
         const _NavItem(
           route: '/carwash/bookings',
-          icon: Icons.calendar_today_outlined,
-          selectedIcon: Icons.calendar_today,
-          label: 'Pre-Bookings',
+          icon: Icon(Icons.calendar_today_outlined),
+          selectedIcon: Icon(Icons.calendar_today),
+          label: 'Bookings',
         ),
         const _NavItem(
           route: '/carwash/services',
-          icon: Icons.build_outlined,
-          selectedIcon: Icons.build,
+          icon: Icon(Icons.build_outlined),
+          selectedIcon: Icon(Icons.build),
           label: 'Services',
         ),
       ];
@@ -339,34 +411,33 @@ class _CarServiceScaffold extends ConsumerWidget {
         if (productsEnabled)
           const _NavItem(
             route: '/products',
-            icon: Icons.inventory_2_outlined,
-            selectedIcon: Icons.inventory_2,
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2),
             label: 'Products',
           ),
         const _NavItem(
           route: '/billing',
-          icon: Icons.credit_card_outlined,
-          selectedIcon: Icons.credit_card,
+          icon: Icon(Icons.credit_card_outlined),
+          selectedIcon: Icon(Icons.credit_card),
           label: 'Billing',
         ),
         const _NavItem(
           route: '/settings',
-          icon: Icons.settings_outlined,
-          selectedIcon: Icons.settings,
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
           label: 'Settings',
         ),
       ];
     }
 
-    final isOverflowActive = overflowItems.any((e) => location.startsWith(e.route));
+    final isOverflowActive =
+        overflowItems.any((e) => location.startsWith(e.route));
     final visibleRoutes = visibleItems.map((e) => e.route).toList();
 
-    // Exact match for /carwash to avoid matching /carwash/bookings etc.
     int selectedIndex;
     if (isOverflowActive) {
       selectedIndex = visibleItems.length;
     } else {
-      // Special: /carwash should only match if location IS /carwash exactly
       selectedIndex = 0;
       for (int i = 0; i < visibleItems.length; i++) {
         final route = visibleItems[i].route;
@@ -387,9 +458,8 @@ class _CarServiceScaffold extends ConsumerWidget {
     void openMoreSheet() {
       showModalBottomSheet(
         context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
         builder: (_) => _MoreSheet(
           items: overflowItems,
           currentLocation: location,
@@ -402,14 +472,11 @@ class _CarServiceScaffold extends ConsumerWidget {
       );
     }
 
-    final navDestinations = <NavigationDestination>[
-      ...visibleItems.map((item) => NavigationDestination(
-            icon: Icon(item.icon),
-            selectedIcon: Icon(item.selectedIcon),
-            label: item.label,
-          )),
+    final navItems = <_NavItem>[
+      ...visibleItems,
       if (hasOverflow)
-        const NavigationDestination(
+        const _NavItem(
+          route: '__more__',
           icon: Icon(Icons.more_horiz_outlined),
           selectedIcon: Icon(Icons.more_horiz),
           label: 'More',
@@ -417,23 +484,24 @@ class _CarServiceScaffold extends ConsumerWidget {
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       body: child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (user?.inGracePeriod ?? false)
             _GracePeriodBanner(graceDays: user!.graceDaysRemaining),
-          NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (i) {
+          _BillFlowNavBar(
+            items: navItems,
+            selectedIndex:
+                isOverflowActive ? visibleItems.length : selectedIndex,
+            onTap: (i) {
               if (hasOverflow && i == visibleItems.length) {
                 openMoreSheet();
               } else {
                 context.go(visibleRoutes[i]);
               }
             },
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: navDestinations,
           ),
         ],
       ),
@@ -457,52 +525,110 @@ class _MoreSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.cardDark : AppColors.surface;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
             Container(
               width: 36,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: cs.outlineVariant,
+                color: AppColors.hairline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'MORE',
+                  style: GoogleFonts.manrope(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.12,
+                    color: AppColors.ink3,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             ...items.indexed.map((entry) {
               final (idx, item) = entry;
               final isActive = currentLocation.startsWith(item.route);
+              final isNotif = item.route == '/notifications';
               return ListTile(
-                leading: Icon(
-                  isActive ? item.selectedIcon : item.icon,
-                  color: isActive ? cs.primary : cs.onSurfaceVariant,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color:
+                        isActive ? AppColors.ink : AppColors.soft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: IconTheme(
+                    data: IconThemeData(
+                      color: isActive ? Colors.white : AppColors.ink2,
+                      size: 18,
+                    ),
+                    child: isActive ? item.selectedIcon : item.icon,
+                  ),
                 ),
                 title: Text(
                   item.label,
-                  style: TextStyle(
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                    color: isActive ? cs.primary : null,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight:
+                        isActive ? FontWeight.w600 : FontWeight.w500,
+                    color: isActive ? AppColors.ink : AppColors.ink,
                   ),
                 ),
-                trailing: item.route == '/reports' && unread > 0
-                    ? Badge(label: Text('$unread'))
-                    : null,
+                trailing: isNotif && unread > 0
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$unread',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : Icon(Icons.chevron_right,
+                        color: AppColors.ink3, size: 16),
                 onTap: () => onTap(item.route),
               )
                   .animate()
                   .fadeIn(
-                      delay: Duration(milliseconds: idx * 40),
-                      duration: 250.ms)
+                      delay: Duration(milliseconds: idx * 30),
+                      duration: 200.ms)
                   .slideX(
-                      begin: 0.05,
+                      begin: 0.04,
                       end: 0,
-                      delay: Duration(milliseconds: idx * 40),
-                      duration: 250.ms);
+                      delay: Duration(milliseconds: idx * 30),
+                      duration: 200.ms);
             }),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -514,34 +640,40 @@ class _MoreSheet extends StatelessWidget {
 class _BiometricEnrollDialog extends StatelessWidget {
   final VoidCallback onEnable;
   final VoidCallback onSkip;
-  const _BiometricEnrollDialog({required this.onEnable, required this.onSkip});
+  const _BiometricEnrollDialog(
+      {required this.onEnable, required this.onSkip});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
-          width: 72, height: 72,
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
-            color: cs.primaryContainer,
+            color: AppColors.brandSoft,
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.fingerprint,
-              size: 40, color: cs.onPrimaryContainer),
+          child: const Icon(Icons.fingerprint,
+              size: 40, color: AppColors.brand),
         ),
         const SizedBox(height: 16),
-        Text('Enable Fingerprint Login?',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center),
+        Text(
+          'Enable Fingerprint Login?',
+          style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         Text(
-          'Log in faster next time using your fingerprint instead of your password.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant),
+          'Log in faster using your fingerprint instead of your password.',
+          style: GoogleFonts.manrope(
+              fontSize: 13, color: AppColors.ink2),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
@@ -550,10 +682,15 @@ class _BiometricEnrollDialog extends StatelessWidget {
       actions: [
         SizedBox(
           width: double.infinity,
-          child: FilledButton.icon(
+          child: FilledButton(
             onPressed: onEnable,
-            icon: const Icon(Icons.fingerprint, size: 18),
-            label: const Text('Enable Fingerprint'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.ink,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Enable Fingerprint',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
           ),
         ),
         const SizedBox(height: 8),
@@ -561,7 +698,8 @@ class _BiometricEnrollDialog extends StatelessWidget {
           width: double.infinity,
           child: TextButton(
             onPressed: onSkip,
-            child: const Text('Not Now'),
+            child: Text('Not Now',
+                style: GoogleFonts.manrope(color: AppColors.ink2)),
           ),
         ),
       ],
@@ -569,6 +707,7 @@ class _BiometricEnrollDialog extends StatelessWidget {
   }
 }
 
+// ── Grace period banner ───────────────────────────────────────────────────────
 class _GracePeriodBanner extends StatelessWidget {
   final int graceDays;
   const _GracePeriodBanner({required this.graceDays});
@@ -579,25 +718,24 @@ class _GracePeriodBanner extends StatelessWidget {
       onTap: () => context.push('/billing'),
       child: Container(
         width: double.infinity,
-        color: Colors.orange,
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded,
-                color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Subscription expires in $graceDays day${graceDays == 1 ? '' : 's'} - Tap to renew',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
-              ),
+        color: AppColors.warn,
+        padding:
+            const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
+        child: Row(children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Colors.white, size: 15),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Subscription expires in $graceDays day${graceDays == 1 ? '' : 's'} — tap to renew',
+              style: GoogleFonts.manrope(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white, size: 16),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right, color: Colors.white, size: 16),
+        ]),
       ),
     );
   }

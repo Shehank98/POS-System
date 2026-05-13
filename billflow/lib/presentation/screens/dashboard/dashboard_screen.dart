@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -22,6 +23,7 @@ class DashboardScreen extends ConsumerWidget {
   void _showProfileSheet(BuildContext context, WidgetRef ref, dynamic user) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -30,48 +32,85 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // drag handle
             Container(
-              width: 40,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: AppColors.hairline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 20),
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-              child: Text(
-                (user?.username ?? 'U')[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+            const SizedBox(height: 24),
+            // avatar
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.brandSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.hairline),
+              ),
+              child: Center(
+                child: Text(
+                  (user?.username ?? 'U')[0].toUpperCase(),
+                  style: GoogleFonts.manrope(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.brand,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             Text(
               user?.username ?? '',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.manrope(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+              ),
             ),
+            const SizedBox(height: 2),
             Text(
               user?.role?.toUpperCase() ?? '',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              style: GoogleFonts.manrope(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.brand,
+                letterSpacing: 0.8,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               user?.shopName ?? '',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              style: GoogleFonts.manrope(
+                fontSize: 13,
+                color: AppColors.ink3,
+              ),
             ),
             const SizedBox(height: 24),
-            const Divider(),
+            Divider(color: AppColors.hairline, height: 1),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.notifications_outlined),
-              title: const Text('Notifications'),
-              trailing: const Icon(Icons.chevron_right),
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.soft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.notifications_outlined,
+                    size: 18, color: AppColors.ink2),
+              ),
+              title: Text('Notifications',
+                  style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink)),
+              trailing: const Icon(Icons.chevron_right,
+                  size: 18, color: AppColors.ink3),
               onTap: () {
                 Navigator.pop(context);
                 context.push('/notifications');
@@ -80,17 +119,22 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
                   ref.read(authProvider.notifier).logout();
                 },
-                icon: const Icon(Icons.logout, color: AppColors.danger),
-                label: const Text('Sign Out',
-                    style: TextStyle(color: AppColors.danger)),
+                icon: const Icon(Icons.logout, color: AppColors.danger, size: 18),
+                label: Text('Sign Out',
+                    style: GoogleFonts.manrope(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14)),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.danger),
-                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -105,10 +149,16 @@ class DashboardScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).valueOrNull;
     final todayAsync = ref.watch(dashboardTodayProvider);
     final unread = ref.watch(unreadNotificationCountProvider);
-    final cs = Theme.of(context).colorScheme;
+
+    final now = DateTime.now();
+    final dayLabel =
+        '${DateFormat('EEE').format(now)} · ${DateFormat('MMM d').format(now)}'.toUpperCase();
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       body: RefreshIndicator(
+        color: AppColors.brand,
+        backgroundColor: AppColors.surface,
         onRefresh: () async {
           ref.invalidate(dashboardTodayProvider);
           ref.invalidate(dashboardWeekProvider);
@@ -116,382 +166,654 @@ class DashboardScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            // Header
+            // ── Header ─────────────────────────────────────────────────────
             SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryLight],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 16, 24),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user?.shopName ?? 'BillFlow',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Good ${_greeting()}, ${user?.username ?? ''}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Notification bell
-                        Stack(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.notifications_outlined,
-                                  color: Colors.white),
-                              onPressed: () => context.push('/notifications'),
-                            ),
-                            if (unread > 0)
-                              Positioned(
-                                right: 8,
-                                top: 8,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.danger,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      unread > 9 ? '9+' : '$unread',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
+                            // Eyebrow
+                            Text(
+                              dayLabel,
+                              style: GoogleFonts.manrope(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink3,
+                                letterSpacing: 0.12 * 10.5,
                               ),
+                            ),
+                            const SizedBox(height: 3),
+                            // "Today" title
+                            Text(
+                              'Today',
+                              style: GoogleFonts.manrope(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink,
+                                letterSpacing: -0.02 * 24,
+                              ),
+                            ),
                           ],
                         ),
-                        // Profile avatar
-                        GestureDetector(
-                          onTap: () => _showProfileSheet(context, ref, user),
-                          child: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      // Notification bell
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onTap: () => context.push('/notifications'),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.hairline),
+                              ),
+                              child: const Icon(Icons.notifications_outlined,
+                                  size: 20, color: AppColors.ink2),
+                            ),
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              right: -3,
+                              top: -3,
+                              child: Container(
+                                width: 17,
+                                height: 17,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.danger,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    unread > 9 ? '9+' : '$unread',
+                                    style: GoogleFonts.manrope(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      // "Open" pill + avatar
+                      _OpenPill(),
+                      const SizedBox(width: 10),
+                      // Profile avatar
+                      GestureDetector(
+                        onTap: () =>
+                            _showProfileSheet(context, ref, user),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.brandSoft,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.hairline),
+                          ),
+                          child: Center(
                             child: Text(
                               (user?.username ?? 'U')[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                              style: GoogleFonts.manrope(
+                                color: AppColors.brand,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
 
-            // Read-only warning
+            // ── Read-only warning ───────────────────────────────────────────
             if (user?.readOnly == true)
               SliverToBoxAdapter(
                 child: Container(
-                  color: AppColors.warning.withValues(alpha: 0.12),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warn.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: AppColors.warn.withValues(alpha: 0.3)),
+                  ),
                   child: Row(children: [
                     const Icon(Icons.warning_amber,
-                        color: AppColors.warning, size: 20),
+                        color: AppColors.warn, size: 18),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Account expired - Read Only Mode',
-                        style: TextStyle(
-                            color: AppColors.warning,
-                            fontWeight: FontWeight.w600),
+                        'Account expired — Read Only Mode',
+                        style: GoogleFonts.manrope(
+                            color: AppColors.warn,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13),
                       ),
                     ),
                   ]),
                 ),
               ),
 
-            // Stats cards
+            // ── Hero metric + sparkline ─────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: todayAsync.when(
+                  loading: () => const ShimmerCard(height: 180),
+                  error: (e, _) => ErrorView(
+                      message: e.toString(),
+                      onRetry: () => ref.invalidate(dashboardTodayProvider)),
+                  data: (today) => _HeroMetricCard(today: today),
+                ),
+              ),
+            ),
+
+            // ── Stats grid 2-col ────────────────────────────────────────────
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               sliver: todayAsync.when(
                 loading: () => const SliverToBoxAdapter(
-                    child: ShimmerGrid(itemCount: 4, itemHeight: 70)),
-                error: (e, _) => SliverToBoxAdapter(
-                    child: ErrorView(
-                        message: e.toString(),
-                        onRetry: () =>
-                            ref.invalidate(dashboardTodayProvider))),
+                    child: ShimmerGrid(itemCount: 2, itemHeight: 88)),
+                error: (_, __) => const SliverToBoxAdapter(child: SizedBox()),
                 data: (today) => SliverGrid(
                   delegate: SliverChildListDelegate([
-                    _StatCard(
-                      label: "Today's Revenue",
-                      value: formatCurrency(today.summary.totalSales),
-                      icon: Icons.attach_money,
-                      color: const Color(0xFF2E7D32),
-                      bg: const Color(0xFFE8F5E9),
-                    ),
-                    _StatCard(
-                      label: 'Transactions',
+                    _StatCard2(
+                      label: 'Orders',
                       value: '${today.summary.transactionCount}',
-                      icon: Icons.receipt_long_outlined,
-                      color: AppColors.primary,
-                      bg: const Color(0xFFE8EAF6),
+                      delta: null,
                     ),
-                    _StatCard(
-                      label: 'Items Sold',
-                      value: formatNumber(today.itemsSold),
-                      icon: Icons.shopping_bag_outlined,
-                      color: const Color(0xFF6A1B9A),
-                      bg: const Color(0xFFF3E5F5),
-                    ),
-                    _StatCard(
-                      label: 'Net Sales',
-                      value: formatCurrency(today.summary.netSales),
-                      icon: Icons.trending_up,
-                      color: const Color(0xFFE65100),
-                      bg: const Color(0xFFFFF3E0),
+                    _StatCard2(
+                      label: 'Avg Ticket',
+                      value: today.summary.transactionCount > 0
+                          ? formatCurrency(today.summary.netSales /
+                              today.summary.transactionCount)
+                          : 'Rs. 0',
+                      delta: null,
                     ),
                   ]),
                   gridDelegate:
                       const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 1.4,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                    childAspectRatio: 2.2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
                   ),
                 ),
               ),
             ),
 
-            // Quick actions
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Quick Actions',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.point_of_sale,
-                          label: 'Billing',
-                          color: AppColors.accent,
-                          onTap: () => context.go('/sales'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.inbox_outlined,
-                          label: 'Pre Orders',
-                          color: const Color(0xFF1565C0),
-                          onTap: () => context.push('/pre-orders'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickAction(
-                          icon: Icons.settings_outlined,
-                          label: 'Settings',
-                          color: const Color(0xFF6A1B9A),
-                          onTap: () => context.push('/settings'),
-                        ),
-                      ),
-                    ]),
-                  ],
-                ),
-              ),
-            ),
-
-            // Sales Trend card
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: todayAsync.whenData((today) =>
-                  _SalesTrendCard(today: today)
-                ).valueOrNull ?? const SizedBox.shrink(),
-              ),
-            ),
-
-            // Payment methods card
+            // ── Payment method mini-bars ────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: todayAsync.whenData((today) =>
-                  _PaymentMethodsCard(summary: today.summary)
-                ).valueOrNull ?? const SizedBox.shrink(),
+                child: todayAsync
+                        .whenData((today) =>
+                            _PaymentMethodsRow(summary: today.summary))
+                        .valueOrNull ??
+                    const SizedBox.shrink(),
               ),
             ),
 
-            // Top products
+            // ── Quick actions ───────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(children: [
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.point_of_sale_outlined,
+                      label: 'Billing',
+                      onTap: () => context.go('/sales'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.inbox_outlined,
+                      label: 'Pre Orders',
+                      onTap: () => context.push('/pre-orders'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.settings_outlined,
+                      label: 'Settings',
+                      onTap: () => context.push('/settings'),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+
+            // ── Sales trend card ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: todayAsync
+                        .whenData((today) => _SalesTrendCard(today: today))
+                        .valueOrNull ??
+                    const SizedBox.shrink(),
+              ),
+            ),
+
+            // ── Top sellers ─────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: todayAsync.whenData((today) {
                 if (today.topProducts.isEmpty) return const SizedBox.shrink();
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const Icon(Icons.emoji_events_outlined,
-                                size: 18, color: Color(0xFFF57F17)),
-                            const SizedBox(width: 8),
-                            Text('Top Products Today',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold)),
-                          ]),
-                          const SizedBox(height: 12),
-                          ...today.topProducts.asMap().entries.map((e) {
-                            final p = e.value;
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.1),
-                                child: Text('${e.key + 1}',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary)),
-                              ),
-                              title: Text(p.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14)),
-                              subtitle: Text('Qty: ${formatNumber(p.qtySold)}',
-                                  style: const TextStyle(fontSize: 12)),
-                              trailing: Text(formatCurrency(p.revenue),
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: cs.primary)),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: _TopSellersCard(products: today.topProducts),
                 );
               }).valueOrNull ??
                   const SizedBox.shrink(),
             ),
 
-            // Low stock alert
+            // ── Low stock alert ─────────────────────────────────────────────
             Consumer(builder: (ctx, r, _) {
               final lowAsync = r.watch(lowStockProvider);
               return SliverToBoxAdapter(
                 child: lowAsync.whenData((items) {
                   if (items.isEmpty) return const SizedBox.shrink();
                   return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    child: Card(
-                      color: AppColors.warning.withValues(alpha: 0.07),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(
-                            color: AppColors.warning.withValues(alpha: 0.3)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              const Icon(Icons.warning_amber,
-                                  color: AppColors.warning, size: 18),
-                              const SizedBox(width: 8),
-                              Text('Low Stock (${items.length} items)',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.warning)),
-                            ]),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: items
-                                  .take(6)
-                                  .map((p) => Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.warning
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color: AppColors.warning
-                                                  .withValues(alpha: 0.4)),
-                                        ),
-                                        child: Text(
-                                          '${p.name}: ${formatNumber(p.stockQuantity)}',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500),
-                                        ),
-                                      ))
-                                  .toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    child: _LowStockCard(items: items),
                   );
                 }).valueOrNull ??
                     const SizedBox.shrink(),
               );
             }),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
       ),
     );
   }
+}
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'morning';
-    if (h < 17) return 'afternoon';
-    return 'evening';
+// ── "Open" pill ───────────────────────────────────────────────────────────────
+
+class _OpenPill extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.brandSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.brand.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+              color: AppColors.brand,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'Open',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.brand,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-// ── Sales Trend Card ─────────────────────────────────────────────────────────
+// ── Hero metric card ──────────────────────────────────────────────────────────
+
+class _HeroMetricCard extends StatelessWidget {
+  final DashboardToday today;
+  const _HeroMetricCard({required this.today});
+
+  @override
+  Widget build(BuildContext context) {
+    final netSales = today.summary.netSales;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Eyebrow
+          Text(
+            'Net sales',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ink3,
+              letterSpacing: 0.1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Large number
+          Text(
+            formatCurrency(netSales),
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 32,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Trend badge
+          _TrendBadge(today: today),
+          const SizedBox(height: 16),
+          // Sparkline hourly bar chart
+          if (today.hourly.isNotEmpty)
+            _HourlySparkline(hourly: today.hourly),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.06, end: 0, duration: 400.ms, curve: Curves.easeOut);
+  }
+}
+
+class _TrendBadge extends StatelessWidget {
+  final DashboardToday today;
+  const _TrendBadge({required this.today});
+
+  @override
+  Widget build(BuildContext context) {
+    // Show items sold as a secondary indicator alongside the main metric
+    final itemCount = today.itemsSold;
+    final txnCount = today.summary.transactionCount;
+
+    return Row(
+      children: [
+        const Icon(Icons.arrow_upward_rounded, size: 13, color: AppColors.brand),
+        const SizedBox(width: 3),
+        Text(
+          '$txnCount orders · ${formatNumber(itemCount)} items sold',
+          style: GoogleFonts.manrope(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.brand,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HourlySparkline extends StatelessWidget {
+  final List<HourlyPoint> hourly;
+  const _HourlySparkline({required this.hourly});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxSales =
+        hourly.map((h) => h.sales).reduce((a, b) => a > b ? a : b);
+    if (maxSales == 0) return const SizedBox.shrink();
+
+    final peakHour =
+        hourly.firstWhere((h) => h.sales == maxSales, orElse: () => hourly.first);
+
+    return SizedBox(
+      height: 52,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: hourly.map((h) {
+          final fraction = maxSales > 0 ? (h.sales / maxSales) : 0.0;
+          final isPeak = h.hour == peakHour.hour;
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1.5),
+              child: FractionallySizedBox(
+                alignment: Alignment.bottomCenter,
+                heightFactor: fraction.clamp(0.05, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isPeak
+                        ? AppColors.brand
+                        : AppColors.brand.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ── Stat card 2-col ───────────────────────────────────────────────────────────
+
+class _StatCard2 extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? delta;
+
+  const _StatCard2({
+    required this.label,
+    required this.value,
+    this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.manrope(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ink3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (delta != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              delta!,
+              style: GoogleFonts.manrope(
+                fontSize: 11,
+                color: AppColors.brand,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 350.ms, delay: 100.ms)
+        .slideY(begin: 0.08, end: 0, duration: 350.ms, curve: Curves.easeOut);
+  }
+}
+
+// ── Payment method mini-bars (3-col) ──────────────────────────────────────────
+
+class _PaymentMethodsRow extends StatelessWidget {
+  final DashboardSummary summary;
+  const _PaymentMethodsRow({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = summary.cashSales + summary.cardSales + summary.mobileSales;
+    if (total == 0) return const SizedBox.shrink();
+
+    final methods = [
+      _PayMethod('Cash', summary.cashSales),
+      _PayMethod('Card', summary.cardSales),
+      _PayMethod('Mobile', summary.mobileSales),
+    ];
+
+    // highest amount → gets ink bg (active style)
+    final maxAmount = methods.map((m) => m.amount).reduce((a, b) => a > b ? a : b);
+
+    return Row(
+      children: methods.asMap().entries.map((entry) {
+        final i = entry.key;
+        final m = entry.value;
+        final isActive = m.amount == maxAmount && maxAmount > 0;
+        final pct = total > 0 ? (m.amount / total * 100).toStringAsFixed(0) : '0';
+
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(left: i == 0 ? 0 : 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.ink : AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: isActive ? AppColors.ink : AppColors.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  m.label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? Colors.white70 : AppColors.ink3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$pct%',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? Colors.white : AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatCurrency(m.amount),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 10,
+                    color: isActive
+                        ? Colors.white.withValues(alpha: 0.6)
+                        : AppColors.ink3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _PayMethod {
+  final String label;
+  final double amount;
+  const _PayMethod(this.label, this.amount);
+}
+
+// ── Quick actions ─────────────────────────────────────────────────────────────
+
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.hairline),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.soft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: AppColors.ink2),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sales Trend Card ──────────────────────────────────────────────────────────
 
 class _SalesTrendCard extends ConsumerStatefulWidget {
   final DashboardToday today;
@@ -508,9 +830,7 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
   Widget build(BuildContext context) {
     final weekAsync = ref.watch(dashboardWeekProvider);
     final monthAsync = ref.watch(dashboardMonthProvider);
-    final cs = Theme.of(context).colorScheme;
 
-    // Compute total revenue for summary line
     double periodTotal = 0;
     if (_period == _TrendPeriod.today) {
       periodTotal = widget.today.summary.totalSales;
@@ -524,28 +844,50 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
       }
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                const Icon(Icons.show_chart, size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sales Trend',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sales Trend',
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    if (periodTotal > 0)
+                      Text(
+                        formatCurrency(periodTotal),
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          color: AppColors.ink2,
+                        ),
+                      ),
+                  ],
                 ),
-                // Period toggle buttons
-                Row(
+              ),
+              // Period toggle
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.soft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(3),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _PeriodBtn(
@@ -553,110 +895,116 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
                       active: _period == _TrendPeriod.today,
                       onTap: () => setState(() => _period = _TrendPeriod.today),
                     ),
-                    const SizedBox(width: 4),
                     _PeriodBtn(
-                      label: '7 Days',
+                      label: '7D',
                       active: _period == _TrendPeriod.week,
                       onTap: () => setState(() => _period = _TrendPeriod.week),
                     ),
-                    const SizedBox(width: 4),
                     _PeriodBtn(
-                      label: '30 Days',
+                      label: '30D',
                       active: _period == _TrendPeriod.month,
-                      onTap: () => setState(() => _period = _TrendPeriod.month),
+                      onTap: () =>
+                          setState(() => _period = _TrendPeriod.month),
                     ),
                   ],
                 ),
-              ],
-            ),
-            // Summary line
-            if (periodTotal > 0) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Total: ${formatCurrency(periodTotal)}',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
-            const SizedBox(height: 12),
-            // Chart area
-            if (_period == _TrendPeriod.today)
-              _buildTodayChart(cs)
-            else if (_period == _TrendPeriod.week)
-              weekAsync.when(
-                loading: () => const ShimmerCard(height: 160),
-                error: (_, __) => const SizedBox(
-                    height: 60,
-                    child: Center(child: Text('Unable to load'))),
-                data: (week) {
-                  if (week.isEmpty) {
-                    return const SizedBox(
-                        height: 160,
-                        child: Center(child: Text('No data')));
-                  }
-                  final spots = week
-                      .asMap()
-                      .entries
-                      .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
-                      .toList();
-                  final labels = week.map((d) {
-                    final dt = DateTime.tryParse(d.day);
-                    return dt != null ? DateFormat('EEE').format(dt) : d.day;
-                  }).toList();
-                  return _buildLineChart(spots, labels, 1, cs);
-                },
-              )
-            else
-              monthAsync.when(
-                loading: () => const ShimmerCard(height: 160),
-                error: (_, __) => const SizedBox(
-                    height: 60,
-                    child: Center(child: Text('Unable to load'))),
-                data: (month) {
-                  if (month.isEmpty) {
-                    return const SizedBox(
-                        height: 160,
-                        child: Center(child: Text('No data')));
-                  }
-                  final spots = month
-                      .asMap()
-                      .entries
-                      .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
-                      .toList();
-                  final labels = month.map((d) {
-                    final dt = DateTime.tryParse(d.day);
-                    return dt != null ? DateFormat('d').format(dt) : d.day;
-                  }).toList();
-                  return _buildLineChart(spots, labels, 7, cs);
-                },
-              ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          // Chart
+          if (_period == _TrendPeriod.today)
+            _buildTodayChart()
+          else if (_period == _TrendPeriod.week)
+            weekAsync.when(
+              loading: () => const ShimmerCard(height: 150),
+              error: (_, __) => SizedBox(
+                  height: 60,
+                  child: Center(
+                      child: Text('Unable to load',
+                          style: GoogleFonts.manrope(
+                              color: AppColors.ink3, fontSize: 13)))),
+              data: (week) {
+                if (week.isEmpty) {
+                  return SizedBox(
+                      height: 150,
+                      child: Center(
+                          child: Text('No data',
+                              style: GoogleFonts.manrope(
+                                  color: AppColors.ink3, fontSize: 13))));
+                }
+                final spots = week
+                    .asMap()
+                    .entries
+                    .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
+                    .toList();
+                final labels = week.map((d) {
+                  final dt = DateTime.tryParse(d.day);
+                  return dt != null ? DateFormat('EEE').format(dt) : d.day;
+                }).toList();
+                return _buildLineChart(spots, labels, 1);
+              },
+            )
+          else
+            monthAsync.when(
+              loading: () => const ShimmerCard(height: 150),
+              error: (_, __) => SizedBox(
+                  height: 60,
+                  child: Center(
+                      child: Text('Unable to load',
+                          style: GoogleFonts.manrope(
+                              color: AppColors.ink3, fontSize: 13)))),
+              data: (month) {
+                if (month.isEmpty) {
+                  return SizedBox(
+                      height: 150,
+                      child: Center(
+                          child: Text('No data',
+                              style: GoogleFonts.manrope(
+                                  color: AppColors.ink3, fontSize: 13))));
+                }
+                final spots = month
+                    .asMap()
+                    .entries
+                    .map((e) => FlSpot(e.key.toDouble(), e.value.sales))
+                    .toList();
+                final labels = month.map((d) {
+                  final dt = DateTime.tryParse(d.day);
+                  return dt != null ? DateFormat('d').format(dt) : d.day;
+                }).toList();
+                return _buildLineChart(spots, labels, 7);
+              },
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildTodayChart(ColorScheme cs) {
+  Widget _buildTodayChart() {
     final hourly = widget.today.hourly;
     if (hourly.isEmpty) {
-      return const SizedBox(
-          height: 160, child: Center(child: Text('No data')));
+      return SizedBox(
+          height: 150,
+          child: Center(
+              child: Text('No data',
+                  style:
+                      GoogleFonts.manrope(color: AppColors.ink3, fontSize: 13))));
     }
     final spots =
         hourly.map((h) => FlSpot(h.hour.toDouble(), h.sales)).toList();
-    // Labels every 6 hours: 0h, 6h, 12h, 18h
     final labels = List.generate(24, (i) => '${i}h');
-    return _buildLineChart(spots, labels, 6, cs);
+    return _buildLineChart(spots, labels, 6);
   }
 
   Widget _buildLineChart(
-      List<FlSpot> spots, List<String> labels, int labelInterval, ColorScheme cs) {
+      List<FlSpot> spots, List<String> labels, int labelInterval) {
     final maxY = spots.isEmpty
         ? 0.0
         : spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     final chartMaxY = maxY == 0 ? 100.0 : maxY * 1.25;
 
     return SizedBox(
-      height: 160,
+      height: 150,
       child: LineChart(
         LineChartData(
           maxY: chartMaxY,
@@ -666,7 +1014,7 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
             drawVerticalLine: false,
             horizontalInterval: chartMaxY / 4,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: cs.outlineVariant.withValues(alpha: 0.5),
+              color: AppColors.hairline,
               strokeWidth: 1,
             ),
           ),
@@ -692,7 +1040,8 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
                   }
                   return Text(
                     labels[idx],
-                    style: const TextStyle(fontSize: 9),
+                    style: GoogleFonts.manrope(
+                        fontSize: 9, color: AppColors.ink3),
                   );
                 },
               ),
@@ -703,8 +1052,10 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
               getTooltipItems: (touchedSpots) => touchedSpots
                   .map((s) => LineTooltipItem(
                         formatCurrency(s.y),
-                        const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 11),
+                        GoogleFonts.jetBrainsMono(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: Colors.white),
                       ))
                   .toList(),
             ),
@@ -714,15 +1065,15 @@ class _SalesTrendCardState extends ConsumerState<_SalesTrendCard> {
               spots: spots,
               isCurved: true,
               curveSmoothness: 0.35,
-              barWidth: 2.5,
-              color: cs.primary,
+              barWidth: 2,
+              color: AppColors.brand,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    cs.primary.withValues(alpha: 0.12),
-                    cs.primary.withValues(alpha: 0.0),
+                    AppColors.brand.withValues(alpha: 0.10),
+                    AppColors.brand.withValues(alpha: 0.0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -749,22 +1100,22 @@ class _PeriodBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? cs.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: active ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
+          border: active ? Border.all(color: AppColors.hairline) : null,
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.manrope(
             fontSize: 11,
-            color: active ? Colors.white : cs.onSurfaceVariant,
-            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+            color: active ? AppColors.ink : AppColors.ink3,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
@@ -772,239 +1123,178 @@ class _PeriodBtn extends StatelessWidget {
   }
 }
 
-// ── Payment Methods Card ─────────────────────────────────────────────────────
+// ── Top sellers card ──────────────────────────────────────────────────────────
 
-class _PaymentMethodsCard extends StatelessWidget {
-  final DashboardSummary summary;
-  const _PaymentMethodsCard({required this.summary});
+class _TopSellersCard extends StatelessWidget {
+  final List<TopProduct> products;
+  const _TopSellersCard({required this.products});
 
   @override
   Widget build(BuildContext context) {
-    final total =
-        summary.cashSales + summary.cardSales + summary.mobileSales;
-    if (total == 0) return const SizedBox.shrink();
+    final top3 = products.take(3).toList();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const Icon(Icons.payments_outlined,
-                  size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Payment Methods',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.emoji_events_outlined,
+                size: 16, color: AppColors.warn),
+            const SizedBox(width: 7),
+            Text(
+              'Top Sellers',
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
               ),
-            ]),
-            const SizedBox(height: 12),
-            _PayRow(
-              label: 'Cash',
-              amount: summary.cashSales,
-              color: Colors.blue[600]!,
-              total: total,
             ),
-            const SizedBox(height: 8),
-            _PayRow(
-              label: 'Card',
-              amount: summary.cardSales,
-              color: Colors.orange[600]!,
-              total: total,
+            const Spacer(),
+            Text(
+              'Today',
+              style: GoogleFonts.manrope(
+                  fontSize: 11, color: AppColors.ink3, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 8),
-            _PayRow(
-              label: 'Mobile/QR',
-              amount: summary.mobileSales,
-              color: Colors.green[600]!,
-              total: total,
-            ),
-          ],
-        ),
+          ]),
+          const SizedBox(height: 14),
+          ...top3.asMap().entries.map((e) {
+            final rank = e.key + 1;
+            final p = e.value;
+            final isFirst = rank == 1;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  // Rank
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: isFirst ? AppColors.brand : AppColors.soft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$rank',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              isFirst ? Colors.white : AppColors.ink2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Name
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.name,
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Qty ${formatNumber(p.qtySold)}',
+                          style: GoogleFonts.manrope(
+                            fontSize: 11,
+                            color: AppColors.ink3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Revenue
+                  Text(
+                    formatCurrency(p.revenue),
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
 }
 
-class _PayRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final Color color;
-  final double total;
+// ── Low stock card ────────────────────────────────────────────────────────────
 
-  const _PayRow({
-    required this.label,
-    required this.amount,
-    required this.color,
-    required this.total,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = total > 0 ? amount / total : 0.0;
-    final pctLabel =
-        '${(pct * 100).toStringAsFixed(0)}%';
-    final cs = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration:
-              BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 64,
-          child: Text(label,
-              style: const TextStyle(fontSize: 13)),
-        ),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 8,
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              formatCurrency(amount),
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            Text(
-              pctLabel,
-              style: TextStyle(
-                  fontSize: 10, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ── Reusable widgets ─────────────────────────────────────────────────────────
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final Color bg;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.bg,
-  });
+class _LowStockCard extends StatelessWidget {
+  final List<LowStockProduct> items;
+  const _LowStockCard({required this.items});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppColors.warn.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.warn.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 350.ms)
-        .slideY(begin: 0.1, end: 0, duration: 350.ms, curve: Curves.easeOut);
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 6),
+          Row(children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: AppColors.warn, size: 16),
+            const SizedBox(width: 7),
             Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
+              'Low Stock — ${items.length} item${items.length != 1 ? 's' : ''}',
+              style: GoogleFonts.manrope(
+                fontWeight: FontWeight.w700,
+                color: AppColors.warn,
+                fontSize: 13,
               ),
             ),
-          ],
-        ),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 7,
+            runSpacing: 6,
+            children: items
+                .take(6)
+                .map((p) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.warn.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppColors.warn.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        '${p.name}: ${formatNumber(p.stockQuantity)}',
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.warn,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ],
       ),
     );
   }

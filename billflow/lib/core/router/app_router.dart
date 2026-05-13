@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/biometric_provider.dart';
-import '../../providers/agent_auth_provider.dart';
-import '../../providers/admin_auth_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../presentation/screens/auth/login_screen.dart';
@@ -27,15 +25,12 @@ import '../../presentation/screens/carwash/carwash_services_screen.dart';
 import '../../presentation/screens/customers/customers_screen.dart';
 import '../../presentation/screens/pre_orders/pre_orders_screen.dart';
 import '../../presentation/widgets/common/app_scaffold.dart';
-import '../../presentation/screens/agent/agent_home_screen.dart';
-import '../../presentation/screens/admin/admin_home_screen.dart';
 import '../../presentation/screens/audit_log/audit_log_screen.dart';
 import '../../presentation/screens/auth/waiting_activation_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Subtle fade+slide used on every route push.
 Page<T> _fadeSlidePage<T>(Widget child, GoRouterState state) =>
     CustomTransitionPage<T>(
       key: state.pageKey,
@@ -48,8 +43,7 @@ Page<T> _fadeSlidePage<T>(Widget child, GoRouterState state) =>
           position: Tween(
             begin: const Offset(0, 0.035),
             end: Offset.zero,
-          ).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
           child: child,
         ),
       ),
@@ -57,46 +51,18 @@ Page<T> _fadeSlidePage<T>(Widget child, GoRouterState state) =>
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState      = ref.watch(authProvider);
-  final agentState     = ref.watch(agentAuthProvider);
-  final adminState     = ref.watch(adminAuthProvider);
   final needsBiometric = ref.watch(biometricGateProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
-      final user    = authState.valueOrNull;
-      final agent   = agentState.valueOrNull;
-      final admin   = adminState.valueOrNull;
+      final user      = authState.valueOrNull;
       final isLoggedIn = user != null;
       final isLoading  = authState.isLoading;
       final loc = state.matchedLocation;
 
-      // ── Admin routes ──────────────────────────────────────────────────
-      if (loc.startsWith('/admin')) {
-        if (adminState.isLoading) return null;
-        return admin == null ? '/login?mode=admin' : null;
-      }
-
-      // ── Agent routes ──────────────────────────────────────────────────
-      if (loc.startsWith('/agent')) {
-        if (agentState.isLoading) return null;
-        return agent == null ? '/login?mode=agent' : null;
-      }
-
-      // Legacy /agent-login deep-link redirect
-      if (loc == '/agent-login') {
-        return agent != null ? '/agent' : '/login?mode=agent';
-      }
-
-      // ── Redirect logged-in agent / admin away from splash & login ─────
-      if (agentState.isLoading || adminState.isLoading) {
-        return loc == '/' ? null : '/';
-      }
-      if (agent != null && (loc == '/' || loc == '/login')) return '/agent';
-      if (admin != null && (loc == '/' || loc == '/login')) return '/admin';
-
-      // ── Shop auth ─────────────────────────────────────────────────────
+      // ── Shop auth ─────────────────────────────────────────────────────────
       if (isLoading) return loc == '/' ? null : '/';
       if (!isLoggedIn && loc != '/login') return '/login';
       if (isLoggedIn && needsBiometric && loc != '/biometric') {
@@ -104,7 +70,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggedIn && !needsBiometric) {
-        // Shop awaiting first payment - show holding screen, no POS access
         if (user.isPendingPayment && loc != '/waiting-activation') {
           return '/waiting-activation';
         }
@@ -113,7 +78,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         const allowedWhenLocked = {'/billing', '/settings'};
         if (isLocked && !allowedWhenLocked.contains(loc)) return '/billing';
 
-        if (loc == '/login' || loc == '/' || loc == '/biometric' || loc == '/waiting-activation') {
+        if (loc == '/login' || loc == '/' || loc == '/biometric' ||
+            loc == '/waiting-activation') {
           if (user.isPendingPayment) return '/waiting-activation';
           return user.isCarServiceShop ? '/carwash' : '/dashboard';
         }
@@ -125,7 +91,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         pageBuilder: (_, s) => _fadeSlidePage(
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          const Scaffold(
+              body: Center(child: CircularProgressIndicator())),
           s,
         ),
       ),
@@ -133,26 +100,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         pageBuilder: (_, s) => _fadeSlidePage(const LoginScreen(), s),
       ),
-      // Legacy path - redirected in guard above
-      GoRoute(
-        path: '/agent-login',
-        redirect: (_, __) => '/login?mode=agent',
-      ),
-      GoRoute(
-        path: '/agent',
-        pageBuilder: (_, s) => _fadeSlidePage(const AgentHomeScreen(), s),
-      ),
-      GoRoute(
-        path: '/admin',
-        pageBuilder: (_, s) => _fadeSlidePage(const AdminHomeScreen(), s),
-      ),
       GoRoute(
         path: '/biometric',
         pageBuilder: (_, s) => _fadeSlidePage(const BiometricScreen(), s),
       ),
       GoRoute(
         path: '/waiting-activation',
-        pageBuilder: (_, s) => _fadeSlidePage(const WaitingActivationScreen(), s),
+        pageBuilder: (_, s) =>
+            _fadeSlidePage(const WaitingActivationScreen(), s),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
